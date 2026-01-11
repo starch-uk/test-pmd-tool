@@ -249,6 +249,7 @@ export class RuleTester {
 		const xpathCoverage = checkXPathCoverage(
 			this.ruleMetadata.xpath,
 			this.examples,
+			this.ruleFilePath,
 		);
 		this.results.xpathCoverage = xpathCoverage;
 

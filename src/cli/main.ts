@@ -59,7 +59,7 @@ async function main(): Promise<void> {
 		// Display results
 		const MIN_COUNT = 0;
 		const INDEX_OFFSET = 1;
-		console.log('\n📊 Test Results:');
+		console.log('📊 Test Results:');
 		console.log(`  Examples tested: ${String(result.examplesTested)}`);
 		console.log(`  Examples passed: ${String(result.examplesPassed)}`);
 		console.log(`  Total violations: ${String(result.totalViolations)}`);
@@ -82,8 +82,18 @@ async function main(): Promise<void> {
 			result.xpathCoverage.coverage.forEach(
 				// eslint-disable-next-line @typescript-eslint/prefer-readonly-parameter-types -- Callback parameters for forEach
 				(coverage, index) => {
-					const status = coverage.success ? '✅' : '❌';
 					const itemNumber = index + INDEX_OFFSET;
+					// Determine status icon: ✅ for complete, ⚠️ for incomplete, ❌ for failed
+					const status: string = coverage.success
+						? '✅'
+						: coverage.evidence.some(
+									// eslint-disable-next-line @typescript-eslint/prefer-readonly-parameter-types -- Callback parameter for some
+									(evidence) =>
+										evidence.count > MIN_COUNT &&
+										evidence.count < evidence.required,
+							  )
+							? '⚠️'
+							: '❌';
 					console.log(
 						`    ${String(itemNumber)}. ${status} ${coverage.message}`,
 					);
@@ -91,13 +101,25 @@ async function main(): Promise<void> {
 						coverage.evidence.forEach(
 							// eslint-disable-next-line @typescript-eslint/prefer-readonly-parameter-types -- Callback parameters for forEach
 							(evidence) => {
-								const evidenceStatus =
-									evidence.count >= evidence.required
-										? '✅'
-										: '⚠️';
-								console.log(
-									`       ${evidenceStatus} ${evidence.description} (${String(evidence.count)}/${String(evidence.required)})`,
-								);
+								const { description } = evidence;
+								// Only show description if it has content (not empty)
+								if (description.length > MIN_COUNT) {
+									// Check if description contains newlines (for conditionals, node types, etc.)
+									if (description.includes('\n')) {
+										// Split by newline and indent each line
+										description
+											.split('\n')
+											.forEach(
+												(line: Readonly<string>) => {
+													console.log(
+														`         ${line}`,
+													);
+												},
+											);
+									} else {
+										console.log(`         ${description}`);
+									}
+								}
 							},
 						);
 					}
@@ -109,9 +131,34 @@ async function main(): Promise<void> {
 			console.log(
 				`\n  Uncovered branches (${String(result.xpathCoverage.uncoveredBranches.length)}):`,
 			);
-			result.xpathCoverage.uncoveredBranches.forEach((branch) => {
-				console.log(`    - ${branch}`);
-			});
+			result.xpathCoverage.uncoveredBranches.forEach(
+				(branch: Readonly<string>) => {
+					// Parse branch format: "Node types: item1, item2, ..." or "Conditionals: ..."
+					const NOT_FOUND_INDEX = -1;
+					const COLON_OFFSET = 1;
+					const START_INDEX = 0;
+					const colonIndex = branch.indexOf(':');
+					if (colonIndex !== NOT_FOUND_INDEX) {
+						const branchType = branch.substring(
+							START_INDEX,
+							colonIndex,
+						);
+						const branchItems = branch
+							.substring(colonIndex + COLON_OFFSET)
+							.trim();
+						console.log(`    ${branchType}:`);
+						// Split items by comma and display each on its own line
+						branchItems
+							.split(',')
+							.forEach((item: Readonly<string>) => {
+								console.log(`     - ${item.trim()}`);
+							});
+					} else {
+						// Fallback: display as-is
+						console.log(`    - ${branch}`);
+					}
+				},
+			);
 		}
 
 		if (result.hardcodedValues.length > MIN_COUNT) {
@@ -128,8 +175,12 @@ async function main(): Promise<void> {
 			);
 		}
 
-		if (result.success) {
+		// Determine final status based on coverage completeness
+		const isCoverageIncomplete = !result.xpathCoverage.overallSuccess;
+		if (result.success && !isCoverageIncomplete) {
 			console.log('\n✅ All tests passed!');
+		} else if (isCoverageIncomplete) {
+			console.log('\n❌ Tests failed, incomplete coverage');
 		} else {
 			console.log('\n❌ Some tests failed');
 		}

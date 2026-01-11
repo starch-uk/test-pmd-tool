@@ -13,6 +13,7 @@ This is a TypeScript-based PMD rule testing tool that achieves 100% test coverag
 - Concurrent testing with Vitest
 
 **Design Philosophy:**
+- **100% Test Coverage** - All code must be fully tested (lines, functions, branches, statements)
 - **Modular Architecture** - Cohesive modules (≤500 lines each)
 - **Low Complexity** - All functions maintain <10 cyclomatic complexity (target: <7)
 - **High Readability** - Low cognitive complexity, maximum nesting depth: 3 levels
@@ -114,10 +115,11 @@ vi.mock('fs', () => ({
 ```
 
 ### 3. Test Coverage Requirements
-- **100% coverage target** for lines, functions, branches, and statements
+- **MANDATORY: 100% coverage target** for lines, functions, branches, and statements
 - **Remove unreachable code** paths that prevent coverage
 - **Refactor hard-to-test functions** to improve testability
 - **Concurrent test execution** for performance
+- **NO EXCEPTIONS** - All code must be fully tested
 
 ### 4. XML Processing Best Practices
 ```typescript
@@ -224,10 +226,12 @@ function checkCoverage(
 ## Quality Gates
 
 ### Pre-commit Requirements
+**MANDATORY: 100% test coverage is required before any commit**
+
 The `pnpm pre-commit` script runs all quality checks automatically:
 - ✅ Format check passes (`pnpm format:check`)
 - ✅ ESLint passes (`pnpm lint`)
-- ✅ 100% test coverage (`pnpm test:coverage`)
+- ✅ **100% test coverage** (`pnpm test:coverage`)
 
 **Manual verification (if needed):**
 - ✅ All tests pass (`pnpm test`)
