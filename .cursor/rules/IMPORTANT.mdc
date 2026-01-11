@@ -1,0 +1,206 @@
+---
+alwaysApply: true
+---
+
+# PMD Testing Tool - Critical Rules & Patterns
+
+## Project Overview
+This is a TypeScript-based PMD rule testing tool that achieves 100% test coverage. The codebase demonstrates best practices for:
+- XML parsing with @xmldom/xmldom
+- Child process execution with execSync
+- Comprehensive mocking strategies
+- Error handling patterns
+- Concurrent testing with Vitest
+
+## Core Documentation References
+
+### Tooling & Configuration
+- **[VITEST.md](./docs/VITEST.md)** - Testing framework setup, 100% coverage requirements, concurrent test execution
+- **[PNPM.md](./docs/PNPM.md)** - Package management, workspace configuration, script definitions
+- **[PRETTIER.md](./docs/PRETTIER.md)** - Code formatting standards and configuration
+
+### Code Quality & Linting
+- **[ESLINT.md](./docs/ESLINT.md)** - JavaScript/TypeScript linting rules and patterns
+- **[ESLINTJSDOC.md](./docs/ESLINTJSDOC.md)** - JSDoc documentation standards
+- **[HUSKY.md](./docs/HUSKY.md)** - Git hooks for pre-commit quality checks
+
+### Documentation Standards
+- **[JSDOC.md](./docs/JSDOC.md)** - Code documentation requirements and formatting
+- **[CODEANALYZER.md](./docs/CODEANALYZER.md)** - Static analysis configuration and rules
+
+### Domain-Specific Documentation
+- **[PMD.md](./docs/PMD.md)** - PMD integration, XML output parsing, CLI execution patterns
+- **[XPATH31.md](./docs/XPATH31.md)** - XPath expression analysis and AST node extraction
+
+## Critical Coding Patterns
+
+### 1. Error Handling & Resilience
+```typescript
+// Pattern: Graceful XML parsing with fallback
+try {
+    const violations = parseViolations(xmlOutput);
+    return { success: true, data: { violations } };
+} catch (parseError) {
+    // Always return structured result, never throw
+    return { success: false, error: `Parse failed: ${parseError.message}` };
+}
+```
+
+### 2. Mocking Strategy
+```typescript
+// Pattern: Comprehensive mocking for external dependencies
+vi.mock('child_process', () => ({
+    execSync: vi.fn(),
+}));
+vi.mock('fs', () => ({
+    readFileSync: vi.fn(() => 'mock content'),
+    writeFileSync: vi.fn(),
+}));
+```
+
+### 3. Test Coverage Requirements
+- **100% coverage target** for lines, functions, branches, and statements
+- **Remove unreachable code** paths that prevent coverage
+- **Refactor hard-to-test functions** to improve testability
+- **Concurrent test execution** for performance
+
+### 4. XML Processing Best Practices
+```typescript
+// Pattern: Defensive XML attribute access
+const rule = violationNode.getAttribute('rule') || '';
+const message = violationNode.getAttribute('message') ||
+               violationNode.textContent?.trim() || '';
+```
+
+### 5. Console Output Management
+```typescript
+// Pattern: Suppress noisy warnings in tests
+function suppressConsoleOutput(fn: () => any) {
+    const originalWarn = console.warn;
+    const originalError = console.error;
+    console.warn = vi.fn();
+    console.error = vi.fn();
+    try {
+        return fn();
+    } finally {
+        console.warn = originalWarn;
+        console.error = originalError;
+    }
+}
+```
+
+## Quality Gates
+
+### Pre-commit Requirements
+- ✅ All tests pass (`pnpm test`)
+- ✅ 100% test coverage (`pnpm test:coverage`)
+- ✅ ESLint passes (`pnpm lint`)
+- ✅ TypeScript compilation succeeds (`pnpm build`)
+- ✅ Prettier formatting applied (`pnpm format`)
+
+### Code Review Checklist
+- [ ] Error paths return structured results, never throw
+- [ ] External dependencies are properly mocked
+- [ ] XML parsing handles malformed input gracefully
+- [ ] Console output is suppressed in tests for xmldom warnings
+- [ ] Functions are refactored for testability when needed
+- [ ] Unreachable code paths are removed
+
+## File Organization Patterns
+
+### Test File Structure
+```
+tests/
+├── unit/           # Unit tests for individual functions
+├── integration/    # End-to-end workflow tests
+└── fixtures/       # Test data and mock files
+```
+
+### Source Code Organization
+```
+src/
+├── cli/            # Command-line interface
+├── parser/         # File and content parsing
+├── pmd/            # PMD integration and execution
+├── tester/         # Rule testing orchestration
+├── xpath/          # XPath analysis and extraction
+└── types/          # TypeScript type definitions
+```
+
+## Performance Considerations
+
+### Testing Performance
+- Use concurrent test execution (`sequence: { concurrent: true }`)
+- Mock external I/O operations (fs, child_process)
+- Avoid unnecessary DOM operations in tests
+
+### Runtime Performance
+- Parse XML once and cache results
+- Use streaming for large file processing
+- Implement timeout handling for external processes
+
+## Common Anti-patterns to Avoid
+
+### ❌ Don't throw errors in library code
+```typescript
+// BAD: Throws exceptions
+export function parseXml(xml: string) {
+    if (!xml) throw new Error('XML required');
+    // ...
+}
+
+// GOOD: Return structured results
+export function parseXml(xml: string): Result<XmlData> {
+    if (!xml) return { success: false, error: 'XML required' };
+    // ...
+}
+```
+
+### ❌ Don't use console.log in production code
+```typescript
+// BAD: Pollutes test output
+console.log('Processing file:', filePath);
+
+// GOOD: Use structured logging or remove
+// (Removed console.log statements from production code)
+```
+
+### ❌ Don't create hard-to-test functions
+```typescript
+// BAD: Multiple responsibilities, hard to mock
+export function processFile(path: string) {
+    const content = readFileSync(path);  // Direct FS call
+    const parsed = parseXml(content);     // Direct parsing
+    return analyzeData(parsed);           // Direct analysis
+}
+
+// GOOD: Dependency injection for testability
+export function processFile(path: string, readFn = readFileSync, parseFn = parseXml) {
+    const content = readFn(path);
+    const parsed = parseFn(content);
+    return analyzeData(parsed);
+}
+```
+
+### ❌ Don't keep unreachable code paths
+```typescript
+// BAD: Unreachable code path that can't be tested
+const value = obj.property?.optionalCall() ?? 'fallback';
+
+// GOOD: Remove unreachable paths - if it can't happen, don't protect against it
+const value = obj.property.optionalCall();
+```
+
+## Migration & Refactoring Notes
+
+### Recent Improvements
+- Unified `createTestFile` logic to remove conditional branches
+- Refactored error message construction for better testability
+- Removed unreachable code paths in XML parsing
+- Added comprehensive mocking for external dependencies
+- Implemented console suppression for noisy warnings
+
+### Future Considerations
+- Consider streaming XML parsing for large rule files
+- Evaluate caching strategies for repeated PMD executions
+- Implement parallel processing for multiple rule files

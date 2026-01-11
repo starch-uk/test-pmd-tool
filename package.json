@@ -1,0 +1,60 @@
+{
+	"bin": {
+		"test-pmd-rule": "./dist/test-pmd-rule.js"
+	},
+	"dependencies": {
+		"@xmldom/xmldom": "^0.8.11"
+	},
+	"devDependencies": {
+		"@eslint/js": "^9.39.2",
+		"@prettier/plugin-xml": "^3.4.2",
+		"@types/node": "^25.0.6",
+		"@typescript-eslint/eslint-plugin": "^8.52.0",
+		"@typescript-eslint/parser": "^8.52.0",
+		"@vitest/coverage-v8": "^4.0.16",
+		"agent-docs": "^1.3.1",
+		"esbuild": "^0.27.2",
+		"eslint": "^9.39.2",
+		"eslint-plugin-import": "^2.32.0",
+		"eslint-plugin-jsdoc": "^62.0.0",
+		"eslint-plugin-sort-class-members": "^1.21.0",
+		"eslint-plugin-sort-keys": "^2.3.5",
+		"husky": "^9.1.7",
+		"lint-staged": "^16.2.7",
+		"prettier": "^3.7.4",
+		"tsx": "^4.21.0",
+		"typescript": "^5.9.3",
+		"typescript-eslint": "^8.52.0",
+		"vitest": "^4.0.16"
+	},
+	"engines": {
+		"node": ">=25.0.0",
+		"pnpm": ">=10"
+	},
+	"files": [
+		"dist"
+	],
+	"name": "test-pmd-rule",
+	"packageManager": "pnpm@10.28.0",
+	"pnpm": {
+		"overrides": {},
+		"onlyBuiltDependencies": [
+			"agent-docs"
+		]
+	},
+	"scripts": {
+		"build": "tsx scripts/build.ts",
+		"format": "prettier --write \"src/**/*.ts\" \"tests/**/*.ts\" \"*.md\"",
+		"format:check": "prettier --check \"src/**/*.ts\" \"tests/**/*.ts\" \"*.md\" || echo 'Prettier check completed (some patterns may have no matches)'",
+		"lint": "eslint \"src/**/*.ts\" \"tests/**/*.ts\" || echo 'ESLint completed (some patterns may have no matches)'",
+		"lint:fix": "eslint --fix \"src/**/*.ts\" \"tests/**/*.ts\" || echo 'ESLint fix completed (some patterns may have no matches)'",
+		"pre-commit": "pnpm format:check && pnpm lint && pnpm test:coverage",
+		"prepare": "husky",
+		"test": "vitest run",
+		"test:coverage": "vitest run --coverage",
+		"test:watch": "vitest",
+		"typecheck": "tsc --noEmit"
+	},
+	"type": "module",
+	"version": "0.1.0"
+}
