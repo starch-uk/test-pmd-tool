@@ -1,3 +1,7 @@
+/**
+ * @file
+ * Unit tests for parseExample function.
+ */
 import { describe, it, expect } from 'vitest';
 import { parseExample } from '../../../src/parser/parseExample.js';
 
@@ -61,7 +65,6 @@ public class ValidClass {
 			'}',
 		]);
 	});
-
 
 	it('should handle mixed inline and section markers', () => {
 		const content = `

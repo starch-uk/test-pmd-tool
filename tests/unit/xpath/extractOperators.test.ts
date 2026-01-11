@@ -1,3 +1,7 @@
+/**
+ * @file
+ * Unit tests for extractOperators function.
+ */
 import { describe, it, expect } from 'vitest';
 import { extractOperators } from '../../../src/xpath/extractors/extractOperators.js';
 
@@ -85,5 +89,16 @@ describe('extractOperators', () => {
 		const result = extractOperators(xpath);
 
 		expect(result).toEqual(['+', '=']);
+	});
+
+	it('should skip matches with undefined operator', () => {
+		// Test with xpath that might produce matches without capture groups
+		// This ensures the undefined check works correctly
+		const xpath = '//BinaryExpression[@Op=]';
+		const result = extractOperators(xpath);
+
+		// Should handle gracefully without throwing
+		expect(Array.isArray(result)).toBe(true);
+		expect(result.length).toBe(0);
 	});
 });

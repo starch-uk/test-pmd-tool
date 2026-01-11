@@ -1,6 +1,10 @@
+/**
+ * @file
+ * End-to-end integration tests for RuleTester.
+ */
+import { existsSync, readFileSync } from 'fs';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { RuleTester } from '../../src/tester/RuleTester.js';
-import * as fs from 'fs';
 
 // Mock file system operations
 vi.mock('fs', () => ({
@@ -15,17 +19,18 @@ vi.mock('../../src/pmd/runPMD.js', () => ({
 }));
 
 import { runPMD } from '../../src/pmd/runPMD.js';
-import { existsSync, readFileSync, unlinkSync } from 'fs';
 
 const mockedExistsSync = vi.mocked(existsSync);
 const mockedReadFileSync = vi.mocked(readFileSync);
-const mockedUnlinkSync = vi.mocked(unlinkSync);
 const mockedRunPMD = vi.mocked(runPMD);
 
 describe('RuleTester Integration', () => {
-	let tester: RuleTester;
+	let tester: RuleTester | undefined = undefined;
 
 	beforeEach(() => {
+		// Suppress xmldom warnings and errors for all tests
+		console.warn = vi.fn();
+		console.error = vi.fn();
 		vi.clearAllMocks();
 
 		// Mock file existence
@@ -65,45 +70,46 @@ public class ValidClass {
 
 		// Mock PMD execution results
 		mockedRunPMD.mockReturnValue({
-			success: true,
 			data: {
 				violations: [
 					{
-						file: '/tmp/test.cls',
-						rule: 'TestRule',
-						message: 'Test message',
-						line: 3,
 						column: 5,
+						file: '/tmp/test.cls',
+						line: 3,
+						message: 'Test message',
+						rule: 'TestRule',
 					},
 				],
 			},
+			success: true,
 		});
 
 		tester = new RuleTester('/path/to/test-rule.xml');
 	});
 
 	afterEach(() => {
+		// Restore console methods
 		vi.restoreAllMocks();
 	});
 
-  it('should initialize with correct rule metadata', () => {
-    expect(tester['ruleName']).toBe('TestRule');
-    expect(tester['category']).toBe('unknown');
-  });
+	it('should initialize with correct rule metadata', () => {
+		expect(tester.ruleName).toBe('TestRule');
+		expect(tester.category).toBe('unknown');
+	});
 
 	it('should extract rule metadata correctly', () => {
-		const metadata = tester['extractRuleMetadata']();
+		const metadata = tester.extractRuleMetadata();
 
 		expect(metadata).toEqual({
-			ruleName: 'TestRule',
-			message: 'Test message',
 			description: 'Test rule description with sufficient length',
+			message: 'Test message',
+			ruleName: 'TestRule',
 			xpath: "//Method[@Visibility='public']",
 		});
 	});
 
 	it('should extract examples from rule XML', () => {
-		const examples = tester['extractExamples']();
+		const examples = tester.extractExamples();
 
 		expect(examples).toHaveLength(1);
 		expect(examples[0].exampleIndex).toBe(1);
@@ -138,12 +144,12 @@ public class ValidClass {
 		mockedReadFileSync.mockReturnValue(mockRuleXmlEmptyDesc);
 		const testerEmptyDesc = new RuleTester('/path/to/test-rule.xml');
 
-		const metadata = testerEmptyDesc['extractRuleMetadata']();
+		const metadata = testerEmptyDesc.extractRuleMetadata();
 
 		expect(metadata).toEqual({
-			ruleName: 'TestRule',
-			message: 'Test message',
 			description: null, // Empty description should be null
+			message: 'Test message',
+			ruleName: 'TestRule',
 			xpath: "//Method[@Visibility='public']",
 		});
 
@@ -211,14 +217,16 @@ public class ValidClass {
 	it('should validate rule file extension', () => {
 		mockedExistsSync.mockReturnValue(true);
 
-		expect(() => new RuleTester('/valid/path/file.txt')).toThrow('Rule file must have .xml extension');
+		expect(() => new RuleTester('/valid/path/file.txt')).toThrow(
+			'Rule file must have .xml extension',
+		);
 	});
 
 	it('should provide access to rule metadata', () => {
 		expect(tester.getRuleMetadata()).toEqual({
-			ruleName: 'TestRule',
-			message: 'Test message',
 			description: 'Test rule description with sufficient length',
+			message: 'Test message',
+			ruleName: 'TestRule',
 			xpath: "//Method[@Visibility='public']",
 		});
 	});
@@ -231,11 +239,13 @@ public class ValidClass {
 
 	it('should extract category from file path', () => {
 		// Test with rulesets in path
-		const testerWithRulesets = new RuleTester('/path/to/rulesets/best-practices/TestRule.xml');
-		expect(testerWithRulesets['category']).toBe('best-practices');
+		const testerWithRulesets = new RuleTester(
+			'/path/to/rulesets/best-practices/TestRule.xml',
+		);
+		expect(testerWithRulesets.category).toBe('best-practices');
 
 		// Test without rulesets in path
-		expect(tester['category']).toBe('unknown');
+		expect(tester.category).toBe('unknown');
 	});
 
 	it('should handle XML parsing errors gracefully', () => {
@@ -246,5 +256,4 @@ public class ValidClass {
 
 		expect(examples).toHaveLength(0); // Should return empty array on parse error
 	});
-
 });

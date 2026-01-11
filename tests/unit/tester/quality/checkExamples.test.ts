@@ -1,3 +1,7 @@
+/**
+ * @file
+ * Unit tests for checkExamples function.
+ */
 import { describe, it, expect } from 'vitest';
 import { checkExamples } from '../../../../src/tester/quality/checkExamples.js';
 import type { ExampleData } from '../../../../src/types/index.js';
@@ -14,12 +18,12 @@ describe('checkExamples', () => {
 	it('should warn when example has violations but no violation markers', () => {
 		const examples: ExampleData[] = [
 			{
-				exampleIndex: 1,
 				content: 'public class Test {}',
-				violations: ['public class Test {}'],
+				exampleIndex: 1,
+				validMarkers: [],
 				valids: [],
 				violationMarkers: [],
-				validMarkers: [],
+				violations: ['public class Test {}'],
 			},
 		];
 
@@ -27,18 +31,20 @@ describe('checkExamples', () => {
 
 		expect(result.passed).toBe(true);
 		expect(result.issues).toHaveLength(0);
-		expect(result.warnings).toContain('Example 1 has violations but no violation markers');
+		expect(result.warnings).toContain(
+			'Example 1 has violations but no violation markers',
+		);
 	});
 
 	it('should warn when example has valid code but no valid markers', () => {
 		const examples: ExampleData[] = [
 			{
-				exampleIndex: 1,
 				content: 'private int value;',
-				violations: [],
+				exampleIndex: 1,
+				validMarkers: [],
 				valids: ['private int value;'],
 				violationMarkers: [],
-				validMarkers: [],
+				violations: [],
 			},
 		];
 
@@ -46,18 +52,20 @@ describe('checkExamples', () => {
 
 		expect(result.passed).toBe(true);
 		expect(result.issues).toHaveLength(0);
-		expect(result.warnings).toContain('Example 1 has valid code but no valid markers');
+		expect(result.warnings).toContain(
+			'Example 1 has valid code but no valid markers',
+		);
 	});
 
 	it('should warn when example has code but no markers', () => {
 		const examples: ExampleData[] = [
 			{
-				exampleIndex: 1,
 				content: 'public class Test {}',
-				violations: ['public class Test {}'],
+				exampleIndex: 1,
+				validMarkers: [],
 				valids: [],
 				violationMarkers: [],
-				validMarkers: [],
+				violations: ['public class Test {}'],
 			},
 		];
 
@@ -71,12 +79,19 @@ describe('checkExamples', () => {
 	it('should warn when example has markers but no code', () => {
 		const examples: ExampleData[] = [
 			{
-				exampleIndex: 1,
 				content: '// Violation: Test',
-				violations: [],
-				valids: [],
-				violationMarkers: [{ lineNumber: 1, description: 'Test', isViolation: true, index: 0 }],
+				exampleIndex: 1,
 				validMarkers: [],
+				valids: [],
+				violationMarkers: [
+					{
+						description: 'Test',
+						index: 0,
+						isViolation: true,
+						lineNumber: 1,
+					},
+				],
+				violations: [],
 			},
 		];
 
@@ -90,12 +105,19 @@ describe('checkExamples', () => {
 	it('should pass when example has proper violation markers', () => {
 		const examples: ExampleData[] = [
 			{
-				exampleIndex: 1,
 				content: 'public class Test {} // ❌ Violation',
-				violations: ['public class Test {}'],
-				valids: [],
-				violationMarkers: [{ lineNumber: 1, description: 'Violation', isViolation: true, index: 0 }],
+				exampleIndex: 1,
 				validMarkers: [],
+				valids: [],
+				violationMarkers: [
+					{
+						description: 'Violation',
+						index: 0,
+						isViolation: true,
+						lineNumber: 1,
+					},
+				],
+				violations: ['public class Test {}'],
 			},
 		];
 
@@ -110,12 +132,19 @@ describe('checkExamples', () => {
 	it('should pass when example has proper valid markers', () => {
 		const examples: ExampleData[] = [
 			{
-				exampleIndex: 1,
 				content: 'private int value; // ✅ Valid',
-				violations: [],
+				exampleIndex: 1,
+				validMarkers: [
+					{
+						description: 'Valid',
+						index: 0,
+						isViolation: false,
+						lineNumber: 1,
+					},
+				],
 				valids: ['private int value;'],
 				violationMarkers: [],
-				validMarkers: [{ lineNumber: 1, description: 'Valid', isViolation: false, index: 0 }],
+				violations: [],
 			},
 		];
 
@@ -130,12 +159,26 @@ describe('checkExamples', () => {
 	it('should pass when example has mixed violation and valid markers', () => {
 		const examples: ExampleData[] = [
 			{
-				exampleIndex: 1,
 				content: 'mixed example content',
-				violations: ['public class Test {}'],
+				exampleIndex: 1,
+				validMarkers: [
+					{
+						description: 'Valid',
+						index: 0,
+						isViolation: false,
+						lineNumber: 2,
+					},
+				],
 				valids: ['private int value;'],
-				violationMarkers: [{ lineNumber: 1, description: 'Violation', isViolation: true, index: 0 }],
-				validMarkers: [{ lineNumber: 2, description: 'Valid', isViolation: false, index: 0 }],
+				violationMarkers: [
+					{
+						description: 'Violation',
+						index: 0,
+						isViolation: true,
+						lineNumber: 1,
+					},
+				],
+				violations: ['public class Test {}'],
 			},
 		];
 
@@ -149,12 +192,12 @@ describe('checkExamples', () => {
 	it('should error when example contains no code', () => {
 		const examples: ExampleData[] = [
 			{
-				exampleIndex: 1,
 				content: '// Just a comment',
-				violations: [],
+				exampleIndex: 1,
+				validMarkers: [],
 				valids: [],
 				violationMarkers: [],
-				validMarkers: [],
+				violations: [],
 			},
 		];
 
@@ -167,12 +210,12 @@ describe('checkExamples', () => {
 	it('should warn when example has no violation markers', () => {
 		const examples: ExampleData[] = [
 			{
-				exampleIndex: 1,
 				content: 'public class Test {}',
-				violations: ['public class Test {}'],
+				exampleIndex: 1,
+				validMarkers: [],
 				valids: [],
 				violationMarkers: [],
-				validMarkers: [],
+				violations: ['public class Test {}'],
 			},
 		];
 
@@ -186,12 +229,12 @@ describe('checkExamples', () => {
 	it('should warn when example has no valid markers', () => {
 		const examples: ExampleData[] = [
 			{
-				exampleIndex: 1,
 				content: 'private int value;',
-				violations: [],
+				exampleIndex: 1,
+				validMarkers: [],
 				valids: ['private int value;'],
 				violationMarkers: [],
-				validMarkers: [],
+				violations: [],
 			},
 		];
 
@@ -205,28 +248,35 @@ describe('checkExamples', () => {
 	it('should handle multiple examples with different issues', () => {
 		const examples: ExampleData[] = [
 			{
-				exampleIndex: 1,
 				content: 'public class Test {}',
-				violations: ['public class Test {}'],
-				valids: [],
-				violationMarkers: [{ lineNumber: 1, description: 'Violation', isViolation: true, index: 0 }],
+				exampleIndex: 1,
 				validMarkers: [],
+				valids: [],
+				violationMarkers: [
+					{
+						description: 'Violation',
+						index: 0,
+						isViolation: true,
+						lineNumber: 1,
+					},
+				],
+				violations: ['public class Test {}'],
 			},
 			{
-				exampleIndex: 2,
 				content: 'private int value;',
-				violations: [],
+				exampleIndex: 2,
+				validMarkers: [],
 				valids: ['private int value;'],
 				violationMarkers: [],
-				validMarkers: [],
+				violations: [],
 			},
 			{
-				exampleIndex: 3,
 				content: '// Just comment',
-				violations: [],
+				exampleIndex: 3,
+				validMarkers: [],
 				valids: [],
 				violationMarkers: [],
-				validMarkers: [],
+				violations: [],
 			},
 		];
 
@@ -234,7 +284,9 @@ describe('checkExamples', () => {
 
 		expect(result.passed).toBe(false); // Due to example 3 having no code
 		expect(result.issues).toContain('Example 3 contains no code');
-		expect(result.warnings).toContain('Example 2 has valid code but no valid markers');
+		expect(result.warnings).toContain(
+			'Example 2 has valid code but no valid markers',
+		);
 		expect(result.warnings).toContain('Example 2 has code but no markers');
 		expect(result.warnings).toContain('Example 3 has no valid markers');
 	});

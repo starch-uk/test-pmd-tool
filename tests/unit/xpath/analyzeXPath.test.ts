@@ -1,3 +1,7 @@
+/**
+ * @file
+ * Unit tests for analyzeXPath function.
+ */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { analyzeXPath } from '../../../src/xpath/analyzeXPath.js';
 
@@ -37,19 +41,19 @@ describe('analyzeXPath', () => {
 		vi.restoreAllMocks();
 	});
 
-  it('should return empty analysis when xpath is null', () => {
-    const result = analyzeXPath(null);
+	it('should return empty analysis when xpath is null', () => {
+		const result = analyzeXPath(null);
 
-    expect(result).toEqual({
-      nodeTypes: [],
-      operators: [],
-      attributes: [],
-      conditionals: [],
-      hasUnions: false,
-      hasLetExpressions: false,
-      patterns: [],
-    });
-  });
+		expect(result).toEqual({
+			attributes: [],
+			conditionals: [],
+			hasLetExpressions: false,
+			hasUnions: false,
+			nodeTypes: [],
+			operators: [],
+			patterns: [],
+		});
+	});
 
 	it('should analyze xpath and return all extracted components', () => {
 		const xpath =
@@ -59,7 +63,7 @@ describe('analyzeXPath', () => {
 		mockedExtractOperators.mockReturnValue(['+']);
 		mockedExtractAttributes.mockReturnValue(['Name', 'Static']);
 		mockedExtractConditionals.mockReturnValue([
-			{ type: 'not', expression: '@Static' },
+			{ expression: '@Static', type: 'not' },
 		]);
 
 		const result = analyzeXPath(xpath);
@@ -69,15 +73,15 @@ describe('analyzeXPath', () => {
 		expect(mockedExtractAttributes).toHaveBeenCalledWith(xpath);
 		expect(mockedExtractConditionals).toHaveBeenCalledWith(xpath);
 
-    expect(result).toEqual({
-      nodeTypes: ['Method', 'Field'],
-      operators: ['+'],
-      attributes: ['Name', 'Static'],
-      conditionals: [{ type: 'not', expression: '@Static' }],
-      hasUnions: true,
-      hasLetExpressions: false,
-      patterns: [],
-    });
+		expect(result).toEqual({
+			attributes: ['Name', 'Static'],
+			conditionals: [{ expression: '@Static', type: 'not' }],
+			hasLetExpressions: false,
+			hasUnions: true,
+			nodeTypes: ['Method', 'Field'],
+			operators: ['+'],
+			patterns: [],
+		});
 	});
 
 	it('should detect union operators (|)', () => {
@@ -116,15 +120,15 @@ describe('analyzeXPath', () => {
 
 		const result = analyzeXPath(xpath);
 
-    expect(result).toEqual({
-      nodeTypes: ['Method'],
-      operators: [],
-      attributes: ['Name'],
-      conditionals: [],
-      hasUnions: false,
-      hasLetExpressions: false,
-      patterns: [],
-    });
+		expect(result).toEqual({
+			attributes: ['Name'],
+			conditionals: [],
+			hasLetExpressions: false,
+			hasUnions: false,
+			nodeTypes: ['Method'],
+			operators: [],
+			patterns: [],
+		});
 	});
 
 	it('should handle complex xpath with all features', () => {
@@ -135,7 +139,7 @@ return $methods[not(@Static)] | //Field`;
 		mockedExtractOperators.mockReturnValue(['+']);
 		mockedExtractAttributes.mockReturnValue(['Static']);
 		mockedExtractConditionals.mockReturnValue([
-			{ type: 'not', expression: '@Static' },
+			{ expression: '@Static', type: 'not' },
 		]);
 
 		const result = analyzeXPath(xpath);
@@ -147,14 +151,14 @@ return $methods[not(@Static)] | //Field`;
 	it('should handle empty xpath string', () => {
 		const result = analyzeXPath('');
 
-    expect(result).toEqual({
-      nodeTypes: [],
-      operators: [],
-      attributes: [],
-      conditionals: [],
-      hasUnions: false,
-      hasLetExpressions: false,
-      patterns: [],
-    });
+		expect(result).toEqual({
+			attributes: [],
+			conditionals: [],
+			hasLetExpressions: false,
+			hasUnions: false,
+			nodeTypes: [],
+			operators: [],
+			patterns: [],
+		});
 	});
 });

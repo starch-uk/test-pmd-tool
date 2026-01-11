@@ -1,3 +1,7 @@
+/**
+ * @file
+ * Unit tests for extractMarkers function.
+ */
 import { describe, it, expect } from 'vitest';
 import { extractMarkers } from '../../../src/parser/extractMarkers.js';
 
@@ -16,18 +20,18 @@ public class TestClass {
 
 		expect(violationMarkers).toHaveLength(1);
 		expect(violationMarkers[0]).toEqual({
-			lineNumber: 3,
 			description: 'Inline violation marker // ❌',
-			isViolation: true,
 			index: 0,
+			isViolation: true,
+			lineNumber: 3,
 		});
 
 		expect(validMarkers).toHaveLength(1);
 		expect(validMarkers[0]).toEqual({
-			lineNumber: 5,
 			description: 'Inline valid marker // ✅',
-			isViolation: false,
 			index: 0,
+			isViolation: false,
+			lineNumber: 5,
 		});
 	});
 
@@ -48,18 +52,18 @@ public class ValidClass {
 
 		expect(violationMarkers).toHaveLength(1);
 		expect(violationMarkers[0]).toEqual({
-			lineNumber: 2,
 			description: 'Using magic numbers',
-			isViolation: true,
 			index: 0,
+			isViolation: true,
+			lineNumber: 2,
 		});
 
 		expect(validMarkers).toHaveLength(1);
 		expect(validMarkers[0]).toEqual({
-			lineNumber: 7,
 			description: 'Using constants',
-			isViolation: false,
 			index: 0,
+			isViolation: false,
+			lineNumber: 7,
 		});
 	});
 
@@ -75,10 +79,10 @@ public class TestClass {
 
 		expect(violationMarkers).toHaveLength(1);
 		expect(violationMarkers[0]).toEqual({
-			lineNumber: 4,
 			description: 'Inline violation marker // ❌',
-			isViolation: true,
 			index: 0,
+			isViolation: true,
+			lineNumber: 4,
 		});
 		expect(validMarkers).toHaveLength(0);
 	});

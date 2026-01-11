@@ -1,10 +1,18 @@
 /**
- * Extract attribute checks from XPath expression
- * @param xpath - XPath expression to analyze
- * @returns Array of unique attributes found
+ * @file
+ * Attribute extraction from XPath expressions.
+ */
+
+const MATCH_INDEX = 1;
+const MIN_STRING_LENGTH = 0;
+
+/**
+ * Extract attribute checks from XPath expression.
+ * @param xpath - XPath expression to analyze.
+ * @returns Array of unique attributes found.
  */
 export function extractAttributes(xpath: string): string[] {
-	if (!xpath) return [];
+	if (xpath.length === MIN_STRING_LENGTH) return [];
 
 	const attributes = new Set<string>();
 
@@ -14,9 +22,13 @@ export function extractAttributes(xpath: string): string[] {
 	);
 
 	for (const match of attrMatches) {
-		const attr = match[1];
+		const attr = match[MATCH_INDEX];
 		// Skip @Op as it's handled by extractOperators
-		if (attr && attr !== 'Op') {
+		if (
+			attr !== undefined &&
+			attr.length > MIN_STRING_LENGTH &&
+			attr !== 'Op'
+		) {
 			attributes.add(attr);
 		}
 	}

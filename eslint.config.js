@@ -68,6 +68,8 @@ const allRules = {
 		},
 	],
 	'@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
+	// Disable no-magic-numbers for test files (will be overridden in test config)
+	'@typescript-eslint/no-magic-numbers': 'error',
 };
 
 export default [
@@ -170,6 +172,30 @@ export default [
 			// TypeScript ESLint sorting rules (already enabled via allRules, but listed here for clarity)
 			'@typescript-eslint/sort-type-constituents': 'error',
 			'@typescript-eslint/member-ordering': 'error',
+		},
+	},
+	{
+		files: ['tests/**/*.ts'],
+		languageOptions: {
+			parser,
+			parserOptions: {
+				ecmaVersion: 2022,
+				sourceType: 'module',
+				project: ['./tsconfig.eslint.json'],
+			},
+		},
+		plugins: {
+			'@typescript-eslint': plugin,
+			jsdoc: jsdocPlugin,
+			'sort-keys': sortKeysPlugin,
+			'sort-class-members': sortClassMembersPlugin,
+			import: importPlugin,
+		},
+		rules: {
+			...allRules,
+			// Explicitly disable no-magic-numbers for test files
+			'@typescript-eslint/no-magic-numbers': 'off',
+			// Ensure this override takes precedence by setting it after allRules
 		},
 	},
 	{

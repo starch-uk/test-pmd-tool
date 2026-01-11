@@ -1,13 +1,19 @@
+/**
+ * @file
+ * Extracts violation and valid markers from example content for PMD rule testing.
+ */
 import type { ViolationMarker } from '../types/index.js';
 
+const LINE_NUMBER_OFFSET = 1;
+
 /**
- * Extract violation and valid markers from example content
- * @param exampleContent - Raw example content with markers
- * @returns Object containing violation and valid markers
+ * Extract violation and valid markers from example content.
+ * @param exampleContent - Raw example content with markers.
+ * @returns Object containing violation and valid markers.
  */
 export function extractMarkers(exampleContent: string): {
-	violationMarkers: ViolationMarker[];
 	validMarkers: ViolationMarker[];
+	violationMarkers: ViolationMarker[];
 } {
 	const lines = exampleContent.split('\n');
 	const violationMarkers: ViolationMarker[] = [];
@@ -18,22 +24,22 @@ export function extractMarkers(exampleContent: string): {
 
 	lines.forEach((line, index) => {
 		const trimmed = line.trim();
-		const lineNumber = index + 1;
+		const lineNumber = index + LINE_NUMBER_OFFSET;
 
 		// Check for inline violation/valid markers
 		if (trimmed.includes('// ❌')) {
 			violationMarkers.push({
-				lineNumber,
 				description: 'Inline violation marker // ❌',
-				isViolation: true,
 				index: violationMarkers.length,
+				isViolation: true,
+				lineNumber,
 			});
 		} else if (trimmed.includes('// ✅')) {
 			validMarkers.push({
-				lineNumber,
 				description: 'Inline valid marker // ✅',
-				isViolation: false,
 				index: validMarkers.length,
+				isViolation: false,
+				lineNumber,
 			});
 		}
 
@@ -44,24 +50,24 @@ export function extractMarkers(exampleContent: string): {
 					.substring('// Violation:'.length)
 					.trim();
 				violationMarkers.push({
-					lineNumber,
 					description,
-					isViolation: true,
 					index: violationMarkers.length,
+					isViolation: true,
+					lineNumber,
 				});
 			} else if (trimmed.startsWith('// Valid:')) {
 				const description = trimmed
 					.substring('// Valid:'.length)
 					.trim();
 				validMarkers.push({
-					lineNumber,
 					description,
-					isViolation: false,
 					index: validMarkers.length,
+					isViolation: false,
+					lineNumber,
 				});
 			}
 		}
 	});
 
-	return { violationMarkers, validMarkers };
+	return { validMarkers, violationMarkers };
 }

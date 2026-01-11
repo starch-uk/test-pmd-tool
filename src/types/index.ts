@@ -1,7 +1,8 @@
 /**
- * TypeScript type definitions for the PMD Rule Tester
+ * @file
+ * TypeScript type definitions for the PMD Rule Tester.
  */
-
+/* eslint-disable import/group-exports -- Type definitions must be exported individually */
 export interface XPathAnalysis {
 	nodeTypes: string[];
 	operators: string[];
@@ -19,10 +20,10 @@ export interface Conditional {
 }
 
 export interface HardcodedValueIssue {
-	type: 'attribute' | 'number' | 'array';
+	type: 'array' | 'attribute' | 'number';
 	value: string;
 	recommendation: string;
-	severity: 'warning' | 'error';
+	severity: 'error' | 'warning';
 }
 
 export interface CoverageResult {
@@ -33,7 +34,7 @@ export interface CoverageResult {
 }
 
 export interface CoverageEvidence {
-	type: 'violation' | 'valid';
+	type: 'valid' | 'violation';
 	count: number;
 	required: number;
 	description: string;
@@ -43,9 +44,9 @@ export interface CoverageDetail {
 	exampleIndex: number;
 	lineNumber: number;
 	lineText: string;
-	type: 'violation' | 'valid';
+	type: 'valid' | 'violation';
 	violationIndex?: number;
-	markerType: 'inline' | 'section' | 'combined';
+	markerType: 'combined' | 'inline' | 'section';
 }
 
 export interface ViolationMarker {
@@ -58,6 +59,7 @@ export interface ViolationMarker {
 
 export interface ExampleData {
 	content: string;
+	exampleIndex: number;
 	violations: string[];
 	valids: string[];
 	violationMarkers: ViolationMarker[];
@@ -135,7 +137,7 @@ export interface ValidationResult {
 }
 
 export interface BranchCombination {
-	type: 'violation' | 'valid';
+	type: 'valid' | 'violation';
 	violationIndex?: number;
 	sectionIndex?: number;
 	signature: string;

@@ -1,21 +1,28 @@
-import { checkRuleMetadata } from './quality/checkRuleMetadata.js';
-import { checkExamples } from './quality/checkExamples.js';
-import { checkDuplicates } from './quality/checkDuplicates.js';
+/**
+ * @file
+ * Quality checks orchestration for PMD rule validation.
+ */
 import type {
 	RuleMetadata,
 	ExampleData,
 	ValidationResult,
 } from '../types/index.js';
+import { checkRuleMetadata } from './quality/checkRuleMetadata.js';
+import { checkExamples } from './quality/checkExamples.js';
+import { checkDuplicates } from './quality/checkDuplicates.js';
+
+const MIN_ISSUES_COUNT = 0;
 
 /**
- * Main entry point for rule quality validation
- * @param ruleMetadata - Rule metadata from XML
- * @param examples - Array of parsed examples
- * @returns Validation result with issues and warnings
+ * Main entry point for rule quality validation.
+ * @param ruleMetadata - Rule metadata from XML.
+ * @param examples - Array of parsed examples.
+ * @returns Validation result with issues and warnings.
  */
 export function runQualityChecks(
-	ruleMetadata: RuleMetadata,
-	examples: ExampleData[],
+	ruleMetadata: Readonly<RuleMetadata>,
+	// eslint-disable-next-line @typescript-eslint/prefer-readonly-parameter-types -- Array elements are accessed and iterated
+	examples: readonly ExampleData[],
 ): ValidationResult {
 	const issues: string[] = [];
 	const warnings: string[] = [];
@@ -36,8 +43,8 @@ export function runQualityChecks(
 	warnings.push(...duplicatesResult.warnings);
 
 	return {
-		passed: issues.length === 0,
 		issues: issues,
+		passed: issues.length === MIN_ISSUES_COUNT,
 		warnings: warnings,
 	};
 }

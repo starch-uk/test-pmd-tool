@@ -1,26 +1,63 @@
+/**
+ * @file
+ * Unit tests for RuleTester class.
+ */
+import { readFileSync } from 'fs';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { RuleTester } from '../../../src/tester/RuleTester.js';
-import { readFileSync } from 'fs';
+import type { FileOperationResult } from '../../../src/types/index.js';
 
 // Mock dependencies
-vi.mock('fs', () => ({
-	readFileSync: vi.fn(),
-	existsSync: vi.fn(),
-}));
+vi.mock(
+	'fs',
+	() =>
+		({
+			existsSync: vi.fn(),
+			readFileSync: vi.fn(),
+		}) as {
+			existsSync: ReturnType<typeof vi.fn>;
+			readFileSync: ReturnType<typeof vi.fn>;
+		},
+);
 
-vi.mock('../../../src/xpath/extractXPath.js', () => ({
-	extractXPath: vi.fn(),
-}));
+vi.mock(
+	'../../../src/xpath/extractXPath.js',
+	() =>
+		({
+			extractXPath: vi.fn(),
+		}) as { extractXPath: ReturnType<typeof vi.fn> },
+);
 
-vi.mock('../../../src/pmd/runPMD.js', () => ({
-	runPMD: vi.fn(),
-}));
+vi.mock(
+	'../../../src/pmd/runPMD.js',
+	() =>
+		({
+			runPMD: vi.fn(),
+		}) as { runPMD: ReturnType<typeof vi.fn> },
+);
 
 const mockedReadFileSync = vi.mocked(readFileSync);
-const mockedExtractXPath = vi.mocked(await import('../../../src/xpath/extractXPath.js')).extractXPath;
+
+// Import modules with proper typing
+interface ExtractXPathModule {
+	extractXPath: ReturnType<typeof vi.fn>;
+}
+const extractXPathModule = await import('../../../src/xpath/extractXPath.js');
+const mockedExtractXPath = vi.mocked(
+	// eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- Dynamic import requires type assertion
+	(extractXPathModule as ExtractXPathModule).extractXPath,
+);
 
 // Mock fs.existsSync to return true
-vi.mocked(await import('fs')).existsSync.mockReturnValue(true);
+interface FsModule {
+	existsSync: ReturnType<typeof vi.fn>;
+}
+const fsModule = await import('fs');
+const mockedExistsSync = vi.mocked(
+	// eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- Dynamic import requires type assertion
+	(fsModule as FsModule).existsSync,
+);
+mockedExistsSync.mockReturnValue(true);
 
 describe('RuleTester', () => {
 	beforeEach(() => {
@@ -48,18 +85,19 @@ describe('RuleTester', () => {
 </rule>`;
 
 			mockedReadFileSync.mockReturnValue(xmlContent);
-			mockedExtractXPath.mockReturnValue({
-				success: true,
+			const xpathResult1: FileOperationResult<string | null> = {
 				data: "//Method[@Visibility='public']",
-			});
+				success: true,
+			};
+			mockedExtractXPath.mockReturnValue(xpathResult1);
 
 			const tester = new RuleTester('/path/to/test-rule.xml');
-			const metadata = tester['extractRuleMetadata']();
+			const metadata = tester.extractRuleMetadata();
 
 			expect(metadata).toEqual({
-				ruleName: 'TestRule',
-				message: 'Test message',
 				description: 'Test rule description',
+				message: 'Test message',
+				ruleName: 'TestRule',
 				xpath: "//Method[@Visibility='public']",
 			});
 		});
@@ -75,18 +113,19 @@ describe('RuleTester', () => {
 </rule>`;
 
 			mockedReadFileSync.mockReturnValue(xmlContent);
-			mockedExtractXPath.mockReturnValue({
-				success: false,
+			const xpathErrorResult: FileOperationResult<string | null> = {
 				error: 'XPath extraction failed',
-			});
+				success: false,
+			};
+			mockedExtractXPath.mockReturnValue(xpathErrorResult);
 
 			const tester = new RuleTester('/path/to/test-rule.xml');
-			const metadata = tester['extractRuleMetadata']();
+			const metadata = tester.extractRuleMetadata();
 
 			expect(metadata).toEqual({
-				ruleName: 'TestRule',
-				message: 'Test message',
 				description: 'Test rule description',
+				message: 'Test message',
+				ruleName: 'TestRule',
 				xpath: null,
 			});
 		});
@@ -106,18 +145,19 @@ describe('RuleTester', () => {
 </rule>`;
 
 			mockedReadFileSync.mockReturnValue(xmlContent);
-			mockedExtractXPath.mockReturnValue({
-				success: true,
+			const xpathResult: FileOperationResult<string | null> = {
 				data: "//Method[@Visibility='public']",
-			});
+				success: true,
+			};
+			mockedExtractXPath.mockReturnValue(xpathResult);
 
 			const tester = new RuleTester('/path/to/test-rule.xml');
-			const metadata = tester['extractRuleMetadata']();
+			const metadata = tester.extractRuleMetadata();
 
 			expect(metadata).toEqual({
-				ruleName: 'TestRule',
-				message: 'Test message',
 				description: null, // No description element
+				message: 'Test message',
+				ruleName: 'TestRule',
 				xpath: "//Method[@Visibility='public']",
 			});
 		});
@@ -140,18 +180,19 @@ describe('RuleTester', () => {
 </rule>`;
 
 			mockedReadFileSync.mockReturnValue(xmlContent);
-			mockedExtractXPath.mockReturnValue({
-				success: true,
+			const xpathResult: FileOperationResult<string | null> = {
 				data: "//Method[@Visibility='public']",
-			});
+				success: true,
+			};
+			mockedExtractXPath.mockReturnValue(xpathResult);
 
 			const tester = new RuleTester('/path/to/test-rule.xml');
-			const metadata = tester['extractRuleMetadata']();
+			const metadata = tester.extractRuleMetadata();
 
 			expect(metadata).toEqual({
-				ruleName: 'TestRule',
-				message: 'Test message',
 				description: null, // Empty description content
+				message: 'Test message',
+				ruleName: 'TestRule',
 				xpath: "//Method[@Visibility='public']",
 			});
 		});
@@ -173,7 +214,7 @@ describe('RuleTester', () => {
 			mockedReadFileSync.mockReturnValue(xmlContent);
 
 			const tester = new RuleTester('/path/to/test-rule.xml');
-			const examples = tester['extractExamples']();
+			const examples = tester.extractExamples();
 
 			expect(examples).toHaveLength(0); // Empty examples should be filtered out
 		});
@@ -191,15 +232,18 @@ describe('RuleTester', () => {
 </rule>`;
 
 			mockedReadFileSync.mockReturnValue(xmlContent);
-			mockedExtractXPath.mockReturnValue({
-				success: true,
+			const xpathResult: FileOperationResult<string | null> = {
 				data: null,
-			});
+				success: true,
+			};
+			mockedExtractXPath.mockReturnValue(xpathResult);
 
 			const tester = new RuleTester('/path/to/test-rule.xml');
 
 			// Should not throw an error
-			expect(() => tester.cleanup()).not.toThrow();
+			expect(() => {
+				tester.cleanup();
+			}).not.toThrow();
 		});
 	});
 });

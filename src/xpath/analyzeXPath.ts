@@ -1,23 +1,27 @@
+/**
+ * @file
+ * XPath analysis module. Analyzes XPath expressions and extracts components.
+ */
+import type { XPathAnalysis } from '../types/index.js';
 import { extractNodeTypes } from './extractors/extractNodeTypes.js';
 import { extractOperators } from './extractors/extractOperators.js';
 import { extractAttributes } from './extractors/extractAttributes.js';
 import { extractConditionals } from './extractors/extractConditionals.js';
-import type { XPathAnalysis } from '../types/index.js';
 
 /**
- * Analyze XPath expression and extract all components
- * @param xpath - XPath expression to analyze
- * @returns Complete XPath analysis result
+ * Analyze XPath expression and extract all components.
+ * @param xpath - XPath expression to analyze.
+ * @returns Complete XPath analysis result.
  */
-export function analyzeXPath(xpath: string): XPathAnalysis {
+export function analyzeXPath(xpath: Readonly<string>): XPathAnalysis {
 	if (!xpath) {
 		return {
-			nodeTypes: [],
-			operators: [],
 			attributes: [],
 			conditionals: [],
-			hasUnions: false,
 			hasLetExpressions: false,
+			hasUnions: false,
+			nodeTypes: [],
+			operators: [],
 			patterns: [],
 		};
 	}
@@ -31,12 +35,12 @@ export function analyzeXPath(xpath: string): XPathAnalysis {
 	const hasLetExpressions = xpath.includes('let ');
 
 	return {
-		nodeTypes,
-		operators,
 		attributes,
 		conditionals,
-		hasUnions,
 		hasLetExpressions,
+		hasUnions,
+		nodeTypes,
+		operators,
 		patterns: [], // Reserved for future pattern analysis
 	};
 }

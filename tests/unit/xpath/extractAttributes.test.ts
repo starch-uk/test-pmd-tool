@@ -1,3 +1,7 @@
+/**
+ * @file
+ * Unit tests for extractAttributes function.
+ */
 import { describe, it, expect } from 'vitest';
 import { extractAttributes } from '../../../src/xpath/extractors/extractAttributes.js';
 

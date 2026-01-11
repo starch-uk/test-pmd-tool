@@ -12,6 +12,34 @@ This is a TypeScript-based PMD rule testing tool that achieves 100% test coverag
 - Error handling patterns
 - Concurrent testing with Vitest
 
+**Design Philosophy:**
+- **Modular Architecture** - Cohesive modules (≤500 lines each)
+- **Low Complexity** - All functions maintain <10 cyclomatic complexity (target: <7)
+- **High Readability** - Low cognitive complexity, maximum nesting depth: 3 levels
+- **Single Responsibility** - One function, one purpose
+- **Self-Documenting Code** - Clear naming and structure over comments
+
+## Available Scripts
+
+All scripts are run via `pnpm` (package manager: pnpm@10.28.0). Node.js >=25.0.0 required.
+
+### Development Scripts
+- `pnpm build` - Compile TypeScript to JavaScript using `tsx scripts/build.ts`
+- `pnpm test` - Run all tests once using `vitest run`
+- `pnpm test:watch` - Run tests in watch mode using `vitest`
+- `pnpm test:coverage` - Run tests with coverage report using `vitest run --coverage`
+- `pnpm typecheck` - Type-check TypeScript without emitting files using `tsc --noEmit`
+
+### Code Quality Scripts
+- `pnpm lint` - Run ESLint on all TypeScript files (`src/**/*.ts`, `tests/**/*.ts`)
+- `pnpm lint:fix` - Run ESLint with auto-fix on all TypeScript files
+- `pnpm format` - Format code with Prettier (`src/**/*.ts`, `tests/**/*.ts`, `*.md`)
+- `pnpm format:check` - Check code formatting without modifying files
+
+### Pre-commit & CI Scripts
+- `pnpm pre-commit` - Run full pre-commit checks: `format:check && lint && test:coverage`
+- `pnpm prepare` - Setup Husky git hooks (runs automatically on install)
+
 ## Core Documentation References
 
 ### Tooling & Configuration
@@ -31,6 +59,33 @@ This is a TypeScript-based PMD rule testing tool that achieves 100% test coverag
 ### Domain-Specific Documentation
 - **[PMD.md](./docs/PMD.md)** - PMD integration, XML output parsing, CLI execution patterns
 - **[XPATH31.md](./docs/XPATH31.md)** - XPath expression analysis and AST node extraction
+
+## Complexity Requirements
+
+### Cyclomatic Complexity
+- **Maximum: 9** per function (target: <7)
+- Use early returns to reduce branching
+- Extract complex conditionals into separate functions
+- Use lookup tables/maps instead of long if/else chains
+- Strategy pattern for complex conditional logic
+- ESLint rule `complexity` enforces max 9
+
+### Cognitive Complexity
+- **Target: Low** - functions should be easy to read and understand
+- Maximum nesting depth: 3 levels
+- Single responsibility principle - one function, one purpose
+- Extract complex logic into named helper functions
+- Use descriptive function names that explain intent
+
+### Function Length
+- **Maximum: 39 lines** per function
+- Break down larger functions into smaller, focused functions
+- Split by responsibility, not arbitrarily
+
+### Module Size
+- **Maximum: ≤500 lines** per module
+- Decompose functionality into cohesive modules
+- Clear separation of concerns
 
 ## Critical Coding Patterns
 
@@ -89,13 +144,94 @@ function suppressConsoleOutput(fn: () => any) {
 }
 ```
 
+### 6. Strategy Pattern for Complex Conditionals
+```typescript
+// Pattern: Strategy map for conditional branches
+const conditionalCheckers = {
+    comparison: checkComparisonCoverage,
+    and_operator: checkAndOperatorCoverage,
+    not_condition: checkNotConditionCoverage,
+    or_branch: checkOrBranchCoverage,
+};
+
+function checkConditionalCoverage(
+    conditional: Conditional,
+    content: string,
+): CoverageResult {
+    const checker = conditionalCheckers[conditional.type];
+    if (!checker) {
+        return createUnknownCoverageResult(conditional);
+    }
+    return checker(conditional, content);
+}
+```
+
+### 7. Lookup Tables Instead of If/Else Chains
+```typescript
+// Pattern: Use lookup maps for multiple conditions
+const nodeTypeKeywords: Record<string, string[]> = {
+    IfBlockStatement: ['if', 'else if'],
+    WhileLoopStatement: ['while'],
+    ForLoopStatement: ['for'],
+};
+
+function checkNodeTypeCoverage(nodeType: string, content: string): boolean {
+    const keywords = nodeTypeKeywords[nodeType] || [];
+    return keywords.some((keyword) => content.toLowerCase().includes(keyword));
+}
+```
+
+### 8. Extract Complex Boolean Expressions
+```typescript
+// BAD: Complex boolean expression in condition
+if (expr.includes('@') && (expr.includes('!=') || expr.includes('=') || expr.includes('<') || expr.includes('>'))) {
+    // ...
+}
+
+// GOOD: Extract to named functions
+function isAttributeComparison(expr: string): boolean {
+    return expr.includes('@') && hasComparisonOperator(expr);
+}
+
+function hasComparisonOperator(expr: string): boolean {
+    const operators = ['!=', '==', '<', '>', '<=', '>='];
+    return operators.some(op => expr.includes(op));
+}
+
+if (isAttributeComparison(expr)) {
+    // ...
+}
+```
+
+### 9. Early Returns / Guard Clauses
+```typescript
+// Pattern: Use guard clauses to reduce nesting
+function checkCoverage(
+    conditional: Conditional,
+    content: string,
+): CoverageResult {
+    if (!content.trim()) {
+        return createEmptyCoverageResult('no content');
+    }
+    if (!conditional.expression) {
+        return createEmptyCoverageResult('no expression');
+    }
+    // Main logic here - already reduced nesting depth
+    return processCoverage(conditional, content);
+}
+```
+
 ## Quality Gates
 
 ### Pre-commit Requirements
-- ✅ All tests pass (`pnpm test`)
-- ✅ 100% test coverage (`pnpm test:coverage`)
+The `pnpm pre-commit` script runs all quality checks automatically:
+- ✅ Format check passes (`pnpm format:check`)
 - ✅ ESLint passes (`pnpm lint`)
-- ✅ TypeScript compilation succeeds (`pnpm build`)
+- ✅ 100% test coverage (`pnpm test:coverage`)
+
+**Manual verification (if needed):**
+- ✅ All tests pass (`pnpm test`)
+- ✅ TypeScript compilation succeeds (`pnpm build` or `pnpm typecheck`)
 - ✅ Prettier formatting applied (`pnpm format`)
 
 ### Code Review Checklist
@@ -105,6 +241,16 @@ function suppressConsoleOutput(fn: () => any) {
 - [ ] Console output is suppressed in tests for xmldom warnings
 - [ ] Functions are refactored for testability when needed
 - [ ] Unreachable code paths are removed
+- [ ] All functions have CC < 10 (ESLint complexity rule)
+- [ ] Maximum nesting depth: 3 levels
+- [ ] Complex conditionals extracted to named functions
+- [ ] Long if/else chains replaced with lookup tables
+- [ ] Strategy pattern used for conditional branches
+- [ ] Early returns used to reduce nesting
+- [ ] Functions have single responsibility
+- [ ] Complex logic extracted to helper functions
+- [ ] Functions are ≤39 lines
+- [ ] Modules are ≤500 lines
 
 ## File Organization Patterns
 
@@ -133,6 +279,8 @@ src/
 - Use concurrent test execution (`sequence: { concurrent: true }`)
 - Mock external I/O operations (fs, child_process)
 - Avoid unnecessary DOM operations in tests
+- Run `pnpm test:watch` during development for fast feedback
+- Run `pnpm test:coverage` before committing to verify 100% coverage
 
 ### Runtime Performance
 - Parse XML once and cache results
@@ -191,6 +339,99 @@ const value = obj.property?.optionalCall() ?? 'fallback';
 const value = obj.property.optionalCall();
 ```
 
+### ❌ Don't create functions with high complexity
+```typescript
+// BAD: High cyclomatic complexity, deep nesting
+function processData(data: Data): Result {
+    if (data.type === 'A') {
+        if (data.value > 0) {
+            if (data.flag) {
+                if (data.mode === 'fast') {
+                    // 4 levels deep, high CC
+                }
+            }
+        }
+    } else if (data.type === 'B') {
+        // more nesting...
+    }
+}
+
+// GOOD: Use strategy pattern, early returns, extract helpers
+const processors = {
+    A: processTypeA,
+    B: processTypeB,
+};
+
+function processData(data: Data): Result {
+    const processor = processors[data.type];
+    if (!processor) {
+        return createErrorResult('unknown type');
+    }
+    return processor(data);
+}
+
+function processTypeA(data: Data): Result {
+    if (data.value <= 0 || !data.flag) {
+        return createErrorResult('invalid data');
+    }
+    return data.mode === 'fast' ? processFast(data) : processNormal(data);
+}
+```
+
+### ❌ Don't create overly long functions
+```typescript
+// BAD: Function >39 lines, multiple responsibilities
+function validateAndProcess(data: Data): Result {
+    // 50+ lines of validation logic
+    // Then processing logic
+    // Then transformation logic
+    // Multiple responsibilities mixed together
+}
+
+// GOOD: Break into focused functions
+function validateAndProcess(data: Data): Result {
+    const validation = validateData(data);
+    if (!validation.success) {
+        return validation;
+    }
+    const processed = processData(data);
+    return transformResult(processed);
+}
+
+function validateData(data: Data): ValidationResult { /* ≤39 lines */ }
+function processData(data: Data): ProcessedData { /* ≤39 lines */ }
+function transformResult(data: ProcessedData): Result { /* ≤39 lines */ }
+```
+
+### ❌ Don't use long if/else chains
+```typescript
+// BAD: Long if/else chain, high complexity
+function getKeyword(nodeType: string): string {
+    if (nodeType === 'IfBlockStatement') {
+        return 'if';
+    } else if (nodeType === 'WhileLoopStatement') {
+        return 'while';
+    } else if (nodeType === 'ForLoopStatement') {
+        return 'for';
+    } else if (nodeType === 'DoLoopStatement') {
+        return 'do';
+    }
+    // ... many more else ifs
+}
+
+// GOOD: Use lookup table
+const nodeTypeKeywords: Record<string, string> = {
+    IfBlockStatement: 'if',
+    WhileLoopStatement: 'while',
+    ForLoopStatement: 'for',
+    DoLoopStatement: 'do',
+};
+
+function getKeyword(nodeType: string): string {
+    return nodeTypeKeywords[nodeType] || '';
+}
+```
+
 ## Migration & Refactoring Notes
 
 ### Recent Improvements
@@ -204,3 +445,24 @@ const value = obj.property.optionalCall();
 - Consider streaming XML parsing for large rule files
 - Evaluate caching strategies for repeated PMD executions
 - Implement parallel processing for multiple rule files
+
+## Complexity Validation
+
+### Tools
+- ESLint rule `complexity` with max 9 (enforced)
+- Manual code review for cognitive complexity
+- Function length monitoring (target: ≤39 lines)
+- Module size monitoring (target: ≤500 lines)
+
+### Complexity Checklist
+- [ ] All functions have CC < 10 (verified by ESLint)
+- [ ] Maximum nesting depth: 3 levels
+- [ ] Complex conditionals extracted to named functions
+- [ ] Long if/else chains replaced with lookup tables
+- [ ] Strategy pattern used for conditional branches
+- [ ] Early returns used to reduce nesting
+- [ ] Functions have single responsibility
+- [ ] Complex logic extracted to helper functions
+- [ ] Functions are ≤39 lines
+- [ ] Modules are ≤500 lines
+- [ ] Code is self-documenting through clear naming

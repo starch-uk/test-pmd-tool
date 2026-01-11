@@ -1,10 +1,16 @@
 /**
- * Extract AST node types from XPath expression
- * @param xpath - XPath expression to analyze
- * @returns Array of unique AST node types found
+ * @file
+ * Node type extraction from XPath expressions.
+ */
+
+/**
+ * Extract AST node types from XPath expression.
+ * @param xpath - XPath expression to analyze.
+ * @returns Array of unique AST node types found.
  */
 export function extractNodeTypes(xpath: string): string[] {
-	if (!xpath) return [];
+	const MIN_STRING_LENGTH = 0;
+	if (xpath.length === MIN_STRING_LENGTH) return [];
 
 	const nodeTypes = new Set<string>();
 
@@ -23,17 +29,23 @@ export function extractNodeTypes(xpath: string): string[] {
 		/(?:\.\/\/|\/\/|\s|\/|\(|\[|,|\|)([A-Z][a-zA-Z]*(?:Method|Class|Field|Condition|Loop|Type)[a-zA-Z]*)(?=\s|$|\[|\(|\/|\)|,|\||]|or|and|not|return|let)/g,
 	);
 
+	const MATCH_INDEX = 1;
+
 	// Add matches to the set
 	for (const match of nodeTypeMatches1) {
-		nodeTypes.add(match[1]);
+		// Regex capture groups require at least one character, so match[1] is always defined and length > 0
+		const nodeType = match[MATCH_INDEX];
+		nodeTypes.add(nodeType);
 	}
 
 	for (const match of nodeTypeMatches2) {
-		nodeTypes.add(match[1]);
+		const nodeType = match[MATCH_INDEX];
+		nodeTypes.add(nodeType);
 	}
 
 	for (const match of nodeTypeMatches3) {
-		nodeTypes.add(match[1]);
+		const nodeType = match[MATCH_INDEX];
+		nodeTypes.add(nodeType);
 	}
 
 	return Array.from(nodeTypes);

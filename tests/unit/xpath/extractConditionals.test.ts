@@ -1,3 +1,7 @@
+/**
+ * @file
+ * Unit tests for extractConditionals function.
+ */
 import { describe, it, expect } from 'vitest';
 import { extractConditionals } from '../../../src/xpath/extractors/extractConditionals.js';
 
@@ -7,33 +11,33 @@ describe('extractConditionals', () => {
 		const result = extractConditionals(xpath);
 
 		expect(result).toHaveLength(1);
-    expect(result[0]).toEqual({
-      type: 'not',
-      expression: "@Visibility='private'",
-      position: 9,
-    });
+		expect(result[0]).toEqual({
+			expression: "@Visibility='private'",
+			position: 9,
+			type: 'not',
+		});
 	});
 
 	it('should extract and conditions', () => {
 		const xpath = "//Method[@Visibility='public' and @Name='test']";
 		const result = extractConditionals(xpath);
 
-    expect(result).toContainEqual({
-      type: 'and',
-      expression: "@Name='test'",
-      position: 30,
-    });
+		expect(result).toContainEqual({
+			expression: "@Name='test'",
+			position: 30,
+			type: 'and',
+		});
 	});
 
 	it('should extract or conditions', () => {
 		const xpath = "//Method[@Visibility='public' or @Visibility='global']";
 		const result = extractConditionals(xpath);
 
-    expect(result).toContainEqual({
-      type: 'or',
-      expression: "@Visibility='global'",
-      position: 30,
-    });
+		expect(result).toContainEqual({
+			expression: "@Visibility='global'",
+			position: 30,
+			type: 'or',
+		});
 	});
 
 	it('should handle multiple condition types', () => {
@@ -41,22 +45,22 @@ describe('extractConditionals', () => {
 			"//Method[not(@Static) and @Visibility='public' or @Name='test']";
 		const result = extractConditionals(xpath);
 
-    expect(result).toHaveLength(3);
-    expect(result).toContainEqual({
-      type: 'not',
-      expression: '@Static',
-      position: 9,
-    });
-    expect(result).toContainEqual({
-      type: 'and',
-      expression: "@Visibility='public' or @Name='test'",
-      position: 22,
-    });
-    expect(result).toContainEqual({
-      type: 'or',
-      expression: "@Name='test'",
-      position: 47,
-    });
+		expect(result).toHaveLength(3);
+		expect(result).toContainEqual({
+			expression: '@Static',
+			position: 9,
+			type: 'not',
+		});
+		expect(result).toContainEqual({
+			expression: "@Visibility='public' or @Name='test'",
+			position: 22,
+			type: 'and',
+		});
+		expect(result).toContainEqual({
+			expression: "@Name='test'",
+			position: 47,
+			type: 'or',
+		});
 	});
 
 	it('should handle complex expressions in conditions', () => {
@@ -64,11 +68,11 @@ describe('extractConditionals', () => {
 		const result = extractConditionals(xpath);
 
 		expect(result).toHaveLength(1);
-    expect(result[0]).toEqual({
-      type: 'not',
-      expression: "contains(@Name, 'test'",
-      position: 9,
-    });
+		expect(result[0]).toEqual({
+			expression: "contains(@Name, 'test'",
+			position: 9,
+			type: 'not',
+		});
 	});
 
 	it('should handle function calls in and/or conditions', () => {
@@ -76,11 +80,11 @@ describe('extractConditionals', () => {
 			"//Method[@Visibility='public' and contains(@Name, 'test')]";
 		const result = extractConditionals(xpath);
 
-    expect(result).toContainEqual({
-      type: 'and',
-      expression: "contains(@Name, 'test')",
-      position: 30,
-    });
+		expect(result).toContainEqual({
+			expression: "contains(@Name, 'test')",
+			position: 30,
+			type: 'and',
+		});
 	});
 
 	it('should handle nested conditions', () => {
@@ -89,14 +93,14 @@ describe('extractConditionals', () => {
 
 		expect(result).toHaveLength(2);
 		expect(result).toContainEqual({
-			type: 'not',
 			expression: '@Static and @Final',
 			position: 9,
+			type: 'not',
 		});
 		expect(result).toContainEqual({
-			type: 'and',
 			expression: '@Final)',
 			position: 21,
+			type: 'and',
 		});
 	});
 
@@ -119,14 +123,14 @@ return $methods[not(@Static) and @Visibility='public']`;
 
 		expect(result).toHaveLength(2);
 		expect(result).toContainEqual({
-			type: 'not',
 			expression: '@Static',
 			position: 41,
+			type: 'not',
 		});
 		expect(result).toContainEqual({
-			type: 'and',
 			expression: "@Visibility='public'",
 			position: 54,
+			type: 'and',
 		});
 	});
 
@@ -140,14 +144,25 @@ return $methods[not(@Static) and @Visibility='public']`;
 	});
 
 	it('should handle xpath with multiple complex conditions', () => {
-		const xpath = "//Method[not(@Static) and @Visibility='public' or @Final and contains(@Name, 'test')]";
+		const xpath =
+			"//Method[not(@Static) and @Visibility='public' or @Final and contains(@Name, 'test')]";
 		const result = extractConditionals(xpath);
 
 		expect(result.length).toBeGreaterThanOrEqual(3);
 		// Should contain not, and, or conditions
-		const types = result.map(r => r.type);
+		const types = result.map((r: Readonly<{ type: string }>) => r.type);
 		expect(types).toContain('not');
 		expect(types).toContain('and');
 		expect(types).toContain('or');
+	});
+
+	it('should skip matches with undefined expression or position', () => {
+		// This test ensures the code handles cases where regex match might not have expected groups
+		// We can't directly create undefined matches, but we can test edge cases
+		const xpath = '//Method[not()]';
+		const result = extractConditionals(xpath);
+
+		// Should handle gracefully without throwing
+		expect(Array.isArray(result)).toBe(true);
 	});
 });

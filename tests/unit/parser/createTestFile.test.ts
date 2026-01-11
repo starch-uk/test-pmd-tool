@@ -1,13 +1,20 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { writeFileSync, readFileSync } from 'fs';
+/**
+ * @file
+ * Unit tests for createTestFile function.
+ */
+import { writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { createTestFile } from '../../../src/parser/createTestFile.js';
 
 // Mock file system operations
 vi.mock('fs', () => ({
+	readFileSync: vi.fn(
+		() =>
+			'public class TestClass {\n    private Integer violation = 42;\n}',
+	),
 	writeFileSync: vi.fn(),
-	readFileSync: vi.fn(() => 'public class TestClass {\n    private Integer violation = 42;\n}'),
 }));
 
 vi.mock('os', () => ({
@@ -15,14 +22,14 @@ vi.mock('os', () => ({
 }));
 
 vi.mock('path', () => ({
-	join: vi.fn((...args) => args.join('/')),
+	join: vi.fn((...args: readonly string[]) => args.join('/')),
 }));
 
 const mockedWriteFileSync = vi.mocked(writeFileSync);
 const mockedTmpdir = vi.mocked(tmpdir);
 const mockedJoin = vi.mocked(join);
 
-let capturedContent: string;
+let capturedContent = '';
 
 describe('createTestFile', () => {
 	beforeEach(() => {
@@ -30,11 +37,15 @@ describe('createTestFile', () => {
 		mockedWriteFileSync.mockClear();
 		mockedWriteFileSync.mock.calls.length = 0;
 		capturedContent = '';
-		mockedWriteFileSync.mockImplementation((filePath, content) => {
-			capturedContent = content as string;
-		});
+		mockedWriteFileSync.mockImplementation(
+			(filePath: Readonly<string>, content: Readonly<string>) => {
+				capturedContent = content;
+			},
+		);
 		mockedTmpdir.mockReturnValue('/tmp');
-		mockedJoin.mockImplementation((...args) => args.join('/'));
+		mockedJoin.mockImplementation((...args: readonly string[]) =>
+			args.join('/'),
+		);
 	});
 
 	afterEach(() => {
@@ -50,7 +61,12 @@ public class TestClass {
 }
 `;
 
-		const result = createTestFile(exampleContent, 1, true, true);
+		const result = createTestFile({
+			exampleContent,
+			exampleIndex: 1,
+			includeValids: true,
+			includeViolations: true,
+		});
 
 		expect(result.filePath).toContain('rule-test-example-1-');
 		expect(result.hasViolations).toBe(true);
@@ -78,7 +94,12 @@ public class ValidClass {
 }
 `;
 
-		const result = createTestFile(exampleContent, 2, true, true);
+		const result = createTestFile({
+			exampleContent,
+			exampleIndex: 2,
+			includeValids: true,
+			includeViolations: true,
+		});
 
 		expect(result.hasViolations).toBe(true);
 		expect(result.hasValids).toBe(true);
@@ -100,7 +121,12 @@ public class TestClass {
 }
 `;
 
-		const result = createTestFile(exampleContent, 3, true, false);
+		const result = createTestFile({
+			exampleContent,
+			exampleIndex: 3,
+			includeValids: false,
+			includeViolations: true,
+		});
 
 		expect(result.hasViolations).toBe(true);
 		expect(result.hasValids).toBe(true);
@@ -116,14 +142,18 @@ public class TestClass {
 }
 `;
 
-		const result = createTestFile(exampleContent, 4, false, true);
+		const result = createTestFile({
+			exampleContent,
+			exampleIndex: 4,
+			includeValids: true,
+			includeViolations: false,
+		});
 
 		expect(result.hasViolations).toBe(true);
 		expect(result.hasValids).toBe(true);
 		expect(result.violationCount).toBe(1);
 		expect(result.validCount).toBe(1);
 	});
-
 
 	it('should handle legacy format without inline markers', () => {
 		const exampleContent = `
@@ -138,7 +168,12 @@ public class ValidClass {
 }
 `;
 
-		const result = createTestFile(exampleContent, 5, true, false);
+		createTestFile({
+			exampleContent,
+			exampleIndex: 5,
+			includeValids: false,
+			includeViolations: true,
+		});
 
 		const writtenContent = capturedContent;
 		expect(writtenContent).toContain('public class TestClass5 {');
@@ -151,10 +186,10 @@ public class ValidClass {
 	it('should generate unique file names with timestamp', () => {
 		const exampleContent = 'public class Test {}';
 
-		createTestFile(exampleContent, 1);
-		createTestFile(exampleContent, 1);
+		createTestFile({ exampleContent, exampleIndex: 1 });
+		createTestFile({ exampleContent, exampleIndex: 1 });
 
-		const calls = mockedWriteFileSync.mock.calls;
+		const { calls } = mockedWriteFileSync.mock;
 		// Since we're mocking join and tmpdir, the paths will be the same
 		// But Date.now() should make them different in real usage
 		expect(calls[0][0]).toContain('rule-test-example-1-');
@@ -162,7 +197,7 @@ public class ValidClass {
 	});
 
 	it('should handle empty example content', () => {
-		const result = createTestFile('', 6);
+		const result = createTestFile({ exampleContent: '', exampleIndex: 6 });
 
 		expect(result.hasViolations).toBe(false);
 		expect(result.hasValids).toBe(false);
@@ -185,7 +220,12 @@ public class ValidClass {
 }
 `;
 
-		createTestFile(exampleContent, 7, true, true);
+		createTestFile({
+			exampleContent,
+			exampleIndex: 7,
+			includeValids: true,
+			includeViolations: true,
+		});
 
 		const writtenContent = capturedContent;
 		expect(writtenContent).not.toContain('// Violation:');
@@ -197,9 +237,11 @@ public class ValidClass {
 	it('should use correct file extension', () => {
 		const exampleContent = 'public class Test {}';
 
-		createTestFile(exampleContent, 8);
+		createTestFile({ exampleContent, exampleIndex: 8 });
 
-		const filePath = mockedWriteFileSync.mock.calls[0][0] as string;
-		expect(filePath).toMatch(/\.cls$/);
+		const filePath = mockedWriteFileSync.mock.calls[0]?.[0];
+		if (typeof filePath === 'string') {
+			expect(filePath).toMatch(/\.cls$/);
+		}
 	});
 });

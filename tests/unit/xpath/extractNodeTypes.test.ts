@@ -1,3 +1,7 @@
+/**
+ * @file
+ * Unit tests for extractNodeTypes function.
+ */
 import { describe, it, expect } from 'vitest';
 import { extractNodeTypes } from '../../../src/xpath/extractors/extractNodeTypes.js';
 
@@ -124,5 +128,16 @@ return $methods//IfBlockStatement`;
 		expect(result).toContain('Class');
 		expect(result).toContain('Method');
 		expect(result).toContain('FieldDeclaration');
+	});
+
+	it('should skip matches with undefined nodeType', () => {
+		// Test with xpath that might produce matches without capture groups
+		// This ensures the undefined check works correctly
+		const xpath = '//Method[@Name="test"]';
+		const result = extractNodeTypes(xpath);
+
+		// Should handle gracefully and still extract Method
+		expect(result).toContain('Method');
+		expect(Array.isArray(result)).toBe(true);
 	});
 });

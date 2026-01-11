@@ -1,31 +1,35 @@
+/**
+ * @file
+ * Unit tests for runQualityChecks function.
+ */
 import { describe, it, expect } from 'vitest';
 import { runQualityChecks } from '../../../src/tester/qualityChecks.js';
 
 describe('runQualityChecks', () => {
 	it('should return passed when all checks pass', () => {
 		const ruleMetadata = {
-			ruleName: 'TestRule',
-			message: 'Test message',
 			description:
 				'A comprehensive test rule description that is long enough',
+			message: 'Test message',
+			ruleName: 'TestRule',
 			xpath: '//Method[@Name="test"]',
 		};
 
 		const examples = [
 			{
-				exampleIndex: 1,
 				content: 'public class Test {}',
-				violations: ['public class Test {}'],
+				exampleIndex: 1,
+				validMarkers: [],
 				valids: [],
 				violationMarkers: [
 					{
-						lineNumber: 1,
 						description: 'Test violation',
-						isViolation: true,
 						index: 0,
+						isViolation: true,
+						lineNumber: 1,
 					},
 				],
-				validMarkers: [],
+				violations: ['public class Test {}'],
 			},
 		];
 
@@ -35,25 +39,27 @@ describe('runQualityChecks', () => {
 		expect(result.issues).toHaveLength(0);
 		expect(result.warnings).toHaveLength(2);
 		expect(result.warnings).toContain('Example 1 has no valid markers');
-		expect(result.warnings).toContain('XPath contains hardcoded values that should be parameterized');
+		expect(result.warnings).toContain(
+			'XPath contains hardcoded values that should be parameterized',
+		);
 	});
 
 	it('should return issues for missing rule metadata', () => {
 		const ruleMetadata = {
-			ruleName: null,
-			message: null,
 			description: null,
+			message: null,
+			ruleName: null,
 			xpath: null,
 		};
 
 		const examples = [
 			{
-				exampleIndex: 1,
 				content: 'public class Test {}',
-				violations: [],
+				exampleIndex: 1,
+				validMarkers: [],
 				valids: [],
 				violationMarkers: [],
-				validMarkers: [],
+				violations: [],
 			},
 		];
 
@@ -68,20 +74,27 @@ describe('runQualityChecks', () => {
 
 	it('should return warnings for short description', () => {
 		const ruleMetadata = {
-			ruleName: 'TestRule',
-			message: 'Test message',
 			description: 'Short',
+			message: 'Test message',
+			ruleName: 'TestRule',
 			xpath: '//Method',
 		};
 
 		const examples = [
 			{
-				exampleIndex: 1,
 				content: 'public class Test {}',
-				violations: ['public class Test {}'],
-				valids: [],
-				violationMarkers: [{ lineNumber: 1, description: 'Test', isViolation: true, index: 0 }],
+				exampleIndex: 1,
 				validMarkers: [],
+				valids: [],
+				violationMarkers: [
+					{
+						description: 'Test',
+						index: 0,
+						isViolation: true,
+						lineNumber: 1,
+					},
+				],
+				violations: ['public class Test {}'],
 			},
 		];
 
@@ -95,20 +108,27 @@ describe('runQualityChecks', () => {
 
 	it('should return warnings for hardcoded values in XPath', () => {
 		const ruleMetadata = {
-			ruleName: 'TestRule',
-			message: 'Test message',
 			description: 'A comprehensive test rule description',
+			message: 'Test message',
+			ruleName: 'TestRule',
 			xpath: '//Method[@Name="hardcoded"]',
 		};
 
 		const examples = [
 			{
-				exampleIndex: 1,
 				content: 'public class Test {}',
-				violations: ['public class Test {}'],
-				valids: [],
-				violationMarkers: [{ lineNumber: 1, description: 'Test', isViolation: true, index: 0 }],
+				exampleIndex: 1,
 				validMarkers: [],
+				valids: [],
+				violationMarkers: [
+					{
+						description: 'Test',
+						index: 0,
+						isViolation: true,
+						lineNumber: 1,
+					},
+				],
+				violations: ['public class Test {}'],
 			},
 		];
 
@@ -122,9 +142,9 @@ describe('runQualityChecks', () => {
 
 	it('should return issues when no examples provided', () => {
 		const ruleMetadata = {
-			ruleName: 'TestRule',
-			message: 'Test message',
 			description: 'A comprehensive test rule description',
+			message: 'Test message',
+			ruleName: 'TestRule',
 			xpath: '//Method',
 		};
 
@@ -136,20 +156,20 @@ describe('runQualityChecks', () => {
 
 	it('should aggregate issues and warnings from all checks', () => {
 		const ruleMetadata = {
-			ruleName: null,
-			message: 'Test message',
 			description: 'Short',
+			message: 'Test message',
+			ruleName: null,
 			xpath: '//Method[@Name="hardcoded"]',
 		};
 
 		const examples = [
 			{
-				exampleIndex: 1,
 				content: 'public class Test {}',
-				violations: [],
+				exampleIndex: 1,
+				validMarkers: [],
 				valids: [],
 				violationMarkers: [],
-				validMarkers: [],
+				violations: [],
 			},
 		];
 
