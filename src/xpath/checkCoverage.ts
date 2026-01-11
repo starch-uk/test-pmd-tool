@@ -111,9 +111,35 @@ function checkNodeTypeCoverage(
 	const missingNodeTypes: string[] = [];
 
 	for (const nodeType of nodeTypes) {
-		// Simple heuristic: check if keywords related to node type appear in content
-		const nodeTypeLower = nodeType.toLowerCase();
-		if (lowerContent.includes(nodeTypeLower)) {
+		let isCovered = false;
+
+		// Use intelligent heuristics to match AST node types to Apex code patterns
+		switch (nodeType) {
+			case 'LiteralExpression':
+				// Look for numeric literals (integers, decimals, doubles)
+				isCovered = /\b\d+(\.\d+)?\b/.test(content);
+				break;
+			case 'ModifierNode':
+				// Look for modifiers like static, final, public, private
+				isCovered = /\b(static|final|public|private|protected)\b/.test(
+					lowerContent,
+				);
+				break;
+			case 'Annotation':
+				// Look for @annotations
+				isCovered = /@\w+/.test(content);
+				break;
+			case 'AnnotationParameter':
+				// Look for annotation parameters like (key=value)
+				isCovered = /@\w+\([^)]+\)/.test(content);
+				break;
+			default:
+				// Fallback to simple string matching for unknown node types
+				isCovered = lowerContent.includes(nodeType.toLowerCase());
+				break;
+		}
+
+		if (isCovered) {
 			foundNodeTypes.push(nodeType);
 		} else {
 			missingNodeTypes.push(nodeType);
@@ -272,8 +298,52 @@ function checkAttributeCoverage(
 	const missingAttributes: string[] = [];
 
 	for (const attr of attributes) {
-		const attrLower = attr.toLowerCase();
-		if (lowerContent.includes(attrLower)) {
+		let isCovered = false;
+
+		// Use intelligent heuristics to match XPath attributes to Apex code patterns
+		switch (attr) {
+			case 'String':
+				// Look for string literals like 'hello' or "world"
+				isCovered = /'(?:[^'\\]|\\.)*'|"[^"]*"/.test(content);
+				break;
+			case 'Null':
+				// Look for null literals
+				isCovered = /\bnull\b/.test(lowerContent);
+				break;
+			case 'LiteralType':
+				// This is a derived attribute for literal expressions, covered by having numeric literals
+				isCovered = /\b\d+(\.\d+)?\b/.test(content);
+				break;
+			case 'Image':
+				// Look for literal values (numbers, strings, booleans, null)
+				isCovered =
+					/\b\d+(\.\d+)?\b|'(?:[^'\\]|\\.)*'|"[^"]*"|\bnull\b|\btrue\b|\bfalse\b/.test(
+						lowerContent,
+					);
+				break;
+			case 'Static':
+				// Look for static modifier
+				isCovered = /\bstatic\b/.test(lowerContent);
+				break;
+			case 'Final':
+				// Look for final modifier
+				isCovered = /\bfinal\b/.test(lowerContent);
+				break;
+			case 'Name':
+				// Look for parameter names in annotations like @IsTest(SeeAllData=...)
+				isCovered = /@\w+\([^)]*\w+\s*=/.test(content);
+				break;
+			case 'Value':
+				// Look for parameter values in annotations like @IsTest(...=false)
+				isCovered = /@\w+\([^)]*=\s*[^)]+\)/.test(content);
+				break;
+			default:
+				// Fallback to simple string matching for unknown attributes
+				isCovered = lowerContent.includes(attr.toLowerCase());
+				break;
+		}
+
+		if (isCovered) {
 			foundAttributes.push(attr);
 		} else {
 			missingAttributes.push(attr);
