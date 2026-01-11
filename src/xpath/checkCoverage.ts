@@ -331,7 +331,10 @@ function checkAttributeCoverage(
 				break;
 			case 'Name':
 				// Look for parameter names in annotations like @IsTest(SeeAllData=...)
-				isCovered = /@\w+\([^)]*\w+\s*=/.test(content);
+				// or general name attributes
+				isCovered =
+					/@\w+\([^)]*\w+\s*=/.test(content) ||
+					lowerContent.includes(attr.toLowerCase());
 				break;
 			case 'Value':
 				// Look for parameter values in annotations like @IsTest(...=false)

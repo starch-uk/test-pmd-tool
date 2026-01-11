@@ -252,9 +252,9 @@ describe('checkXPathCoverage', () => {
 
 		expect(result.coverage).toHaveLength(1);
 		expect(result.coverage[0]?.message).toContain('Attributes');
-		expect(result.coverage[0]?.success).toBe(true);
-		expect(result.uncoveredBranches).toEqual([]);
-		expect(result.overallSuccess).toBe(true);
+		expect(result.coverage[0]?.success).toBe(false); // Name and Value not found in content
+		expect(result.uncoveredBranches).toEqual(['Attributes: Name, Value']);
+		expect(result.overallSuccess).toBe(false);
 	});
 
 	it('should check attributes coverage when not found', () => {
@@ -1307,6 +1307,103 @@ describe('checkXPathCoverage', () => {
 		expect(result.coverage[0]?.evidence[0]?.description).toContain('Value');
 	});
 
+	it('should check coverage for String, Null, LiteralType, Image attributes', () => {
+		mockedAnalyzeXPath.mockReturnValue({
+			attributes: ['String', 'Null', 'LiteralType', 'Image'],
+			conditionals: [],
+			hasLetExpressions: false,
+			hasUnions: false,
+			nodeTypes: [],
+			operators: [],
+			patterns: [],
+		});
+
+		const examples: ExampleData[] = [
+			{
+				content:
+					'String s = "hello"; Object n = null; Integer i = 42; Boolean b = true;',
+				exampleIndex: 1,
+				validMarkers: [],
+				valids: [],
+				violationMarkers: [],
+				violations: [],
+			},
+		];
+
+		const result = checkXPathCoverage(
+			'//LiteralExpression[@String and @Null and @LiteralType and @Image]',
+			examples,
+		);
+
+		expect(result.coverage).toHaveLength(1);
+		expect(result.coverage[0]?.message).toContain('Attributes');
+		expect(result.coverage[0]?.success).toBe(true);
+	});
+
+	it('should check coverage for Static and Final attributes', () => {
+		mockedAnalyzeXPath.mockReturnValue({
+			attributes: ['Static', 'Final'],
+			conditionals: [],
+			hasLetExpressions: false,
+			hasUnions: false,
+			nodeTypes: [],
+			operators: [],
+			patterns: [],
+		});
+
+		const examples: ExampleData[] = [
+			{
+				content: 'public static final Integer VALUE = 1;',
+				exampleIndex: 1,
+				validMarkers: [],
+				valids: [],
+				violationMarkers: [],
+				violations: [],
+			},
+		];
+
+		const result = checkXPathCoverage(
+			'//ModifierNode[@Static and @Final]',
+			examples,
+		);
+
+		expect(result.coverage).toHaveLength(1);
+		expect(result.coverage[0]?.message).toContain('Attributes');
+		expect(result.coverage[0]?.success).toBe(true);
+	});
+
+	it('should check coverage for Annotation and AnnotationParameter node types', () => {
+		mockedAnalyzeXPath.mockReturnValue({
+			attributes: [],
+			conditionals: [],
+			hasLetExpressions: false,
+			hasUnions: false,
+			nodeTypes: ['Annotation', 'AnnotationParameter'],
+			operators: [],
+			patterns: [],
+		});
+
+		const examples: ExampleData[] = [
+			{
+				content:
+					'@IsTest public class TestClass { } @IsTest(SeeAllData=false) public void test() { }',
+				exampleIndex: 1,
+				validMarkers: [],
+				valids: [],
+				violationMarkers: [],
+				violations: [],
+			},
+		];
+
+		const result = checkXPathCoverage(
+			'//Annotation | //AnnotationParameter',
+			examples,
+		);
+
+		expect(result.coverage).toHaveLength(1); // node types
+		expect(result.coverage[0]?.success).toBe(true);
+	});
+
 	it('should handle operator description with both found and missing items', () => {
 		mockedAnalyzeXPath.mockReturnValue({
 			attributes: [],
@@ -1340,5 +1437,116 @@ describe('checkXPathCoverage', () => {
 			'Missing:',
 		);
 		expect(result.coverage[0]?.evidence[0]?.description).toContain('!=');
+	});
+
+	it('should check coverage for LiteralExpression node type', () => {
+		const examples = [
+			{
+				content: 'Integer x = 42; Decimal y = 3.14;',
+				exampleIndex: 0,
+				validMarkers: [],
+				valids: [],
+				violationMarkers: [],
+				violations: [],
+			},
+		];
+
+		const result = checkXPathCoverage(
+			'//LiteralExpression[@LiteralType = "INTEGER"]',
+			examples,
+		);
+
+		expect(result.coverage).toHaveLength(1); // operators
+		expect(result.coverage[0]?.message).toContain('Operators');
+		expect(result.coverage[0]?.success).toBe(false); // INTEGER not found in content
+	});
+
+	it('should check coverage for Annotation and AnnotationParameter node types', () => {
+		const examples = [
+			{
+				content:
+					'@IsTest public class TestClass { } @IsTest(SeeAllData=false) public void test() { }',
+				exampleIndex: 0,
+				validMarkers: [],
+				valids: [],
+				violationMarkers: [],
+				violations: [],
+			},
+		];
+
+		const result = checkXPathCoverage(
+			'//Annotation | //AnnotationParameter',
+			examples,
+		);
+
+		expect(result.coverage).toHaveLength(1); // node types
+		expect(result.coverage[0]?.success).toBe(false); // AnnotationParameter not found
+	});
+
+	it('should check coverage for modifier node type', () => {
+		const examples = [
+			{
+				content: 'public static final Integer CONSTANT = 1;',
+				exampleIndex: 0,
+				validMarkers: [],
+				valids: [],
+				violationMarkers: [],
+				violations: [],
+			},
+		];
+
+		const result = checkXPathCoverage(
+			'//ModifierNode[@Static = true() and @Final = true()]',
+			examples,
+		);
+
+		expect(result.coverage).toHaveLength(1); // operators
+		expect(result.coverage[0]?.message).toContain('Operators');
+		expect(result.coverage[0]?.success).toBe(false); // 1/2 operators found
+	});
+
+	it('should check coverage for String, Null, LiteralType, Image attributes', () => {
+		const examples = [
+			{
+				content:
+					'String s = "hello"; Object n = null; Integer i = 42; Boolean b = true;',
+				exampleIndex: 0,
+				validMarkers: [],
+				valids: [],
+				violationMarkers: [],
+				violations: [],
+			},
+		];
+
+		const result = checkXPathCoverage(
+			'//LiteralExpression[@String = false() and @Null = false() and @LiteralType = "INTEGER" and @Image = "42"]',
+			examples,
+		);
+
+		expect(result.coverage).toHaveLength(1); // operators
+		expect(result.coverage[0]?.message).toContain('Operators');
+		expect(result.coverage[0]?.success).toBe(false);
+	});
+
+	it('should check coverage for Static and Final attributes', () => {
+		const examples = [
+			{
+				content: 'public static final Integer VALUE = 1;',
+				exampleIndex: 0,
+				validMarkers: [],
+				valids: [],
+				violationMarkers: [],
+				violations: [],
+			},
+		];
+
+		const result = checkXPathCoverage(
+			'//ModifierNode[@Static = true() and @Final = true()]',
+			examples,
+		);
+
+		expect(result.coverage).toHaveLength(1); // operators
+		expect(result.coverage[0]?.message).toContain('Operators');
+		expect(result.coverage[0]?.success).toBe(false);
 	});
 });

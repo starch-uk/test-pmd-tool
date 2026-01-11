@@ -130,6 +130,28 @@ return $methods//IfBlockStatement`;
 		expect(result).toContain('FieldDeclaration');
 	});
 
+	it('should extract LiteralExpression node type', () => {
+		const xpath = '//LiteralExpression[@LiteralType = "INTEGER"]';
+		const result = extractNodeTypes(xpath);
+
+		expect(result).toContain('LiteralExpression');
+	});
+
+	it('should extract ModifierNode node type', () => {
+		const xpath = '//ModifierNode[@Static = true() and @Final = true()]';
+		const result = extractNodeTypes(xpath);
+
+		expect(result).toContain('ModifierNode');
+	});
+
+	it('should extract Annotation node types', () => {
+		const xpath = '//Annotation | //AnnotationParameter';
+		const result = extractNodeTypes(xpath);
+
+		expect(result).toContain('Annotation');
+		expect(result).toContain('AnnotationParameter');
+	});
+
 	it('should skip matches with undefined nodeType', () => {
 		// Test with xpath that might produce matches without capture groups
 		// This ensures the undefined check works correctly
