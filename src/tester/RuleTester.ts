@@ -5,6 +5,7 @@
 import { readFileSync, existsSync } from 'fs';
 import { DOMParser } from '@xmldom/xmldom';
 import { extractXPath } from '../xpath/extractXPath.js';
+import { checkXPathCoverage } from '../xpath/checkCoverage.js';
 import { parseExample } from '../parser/parseExample.js';
 import type {
 	RuleMetadata,
@@ -243,6 +244,13 @@ export class RuleTester {
 			(ex: Readonly<ExampleData>) =>
 				ex.violations.length > MIN_VIOLATIONS_COUNT,
 		);
+
+		// Check XPath coverage
+		const xpathCoverage = checkXPathCoverage(
+			this.ruleMetadata.xpath,
+			this.examples,
+		);
+		this.results.xpathCoverage = xpathCoverage;
 
 		// Determine overall success - for now, pass if we have examples and quality checks pass
 		this.results.success =

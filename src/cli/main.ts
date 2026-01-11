@@ -53,7 +53,87 @@ async function main(): Promise<void> {
 	const tester = new RuleTester(ruleFilePath);
 
 	try {
+		console.log(`\n🧪 Testing rule: ${ruleFilePath}\n`);
 		const result = await tester.runCoverageTest();
+
+		// Display results
+		const MIN_COUNT = 0;
+		const INDEX_OFFSET = 1;
+		console.log('\n📊 Test Results:');
+		console.log(`  Examples tested: ${String(result.examplesTested)}`);
+		console.log(`  Examples passed: ${String(result.examplesPassed)}`);
+		console.log(`  Total violations: ${String(result.totalViolations)}`);
+		console.log(
+			`  Rule triggers violations: ${result.ruleTriggersViolations ? '✅ Yes' : '❌ No'}`,
+		);
+
+		// XPath Coverage Details
+		console.log('\n🔍 XPath Coverage:');
+		if (result.xpathCoverage.overallSuccess) {
+			console.log('  Status: ✅ Complete');
+		} else {
+			console.log('  Status: ⚠️  Incomplete');
+		}
+
+		if (result.xpathCoverage.coverage.length > MIN_COUNT) {
+			console.log(
+				`  Coverage items: ${String(result.xpathCoverage.coverage.length)}`,
+			);
+			result.xpathCoverage.coverage.forEach(
+				// eslint-disable-next-line @typescript-eslint/prefer-readonly-parameter-types -- Callback parameters for forEach
+				(coverage, index) => {
+					const status = coverage.success ? '✅' : '❌';
+					const itemNumber = index + INDEX_OFFSET;
+					console.log(
+						`    ${String(itemNumber)}. ${status} ${coverage.message}`,
+					);
+					if (coverage.evidence.length > MIN_COUNT) {
+						coverage.evidence.forEach(
+							// eslint-disable-next-line @typescript-eslint/prefer-readonly-parameter-types -- Callback parameters for forEach
+							(evidence) => {
+								const evidenceStatus =
+									evidence.count >= evidence.required
+										? '✅'
+										: '⚠️';
+								console.log(
+									`       ${evidenceStatus} ${evidence.description} (${String(evidence.count)}/${String(evidence.required)})`,
+								);
+							},
+						);
+					}
+				},
+			);
+		}
+
+		if (result.xpathCoverage.uncoveredBranches.length > MIN_COUNT) {
+			console.log(
+				`\n  Uncovered branches (${String(result.xpathCoverage.uncoveredBranches.length)}):`,
+			);
+			result.xpathCoverage.uncoveredBranches.forEach((branch) => {
+				console.log(`    - ${branch}`);
+			});
+		}
+
+		if (result.hardcodedValues.length > MIN_COUNT) {
+			console.log(
+				`\n⚠️  Hardcoded values found: ${String(result.hardcodedValues.length)}`,
+			);
+			result.hardcodedValues.forEach(
+				// eslint-disable-next-line @typescript-eslint/prefer-readonly-parameter-types -- Callback parameters for forEach
+				(issue) => {
+					console.log(
+						`  - ${issue.type}: ${issue.value} (${issue.severity})`,
+					);
+				},
+			);
+		}
+
+		if (result.success) {
+			console.log('\n✅ All tests passed!');
+		} else {
+			console.log('\n❌ Some tests failed');
+		}
+
 		tester.cleanup();
 		process.exit(result.success ? EXIT_CODE_SUCCESS : EXIT_CODE_ERROR);
 	} catch (error: unknown) {
