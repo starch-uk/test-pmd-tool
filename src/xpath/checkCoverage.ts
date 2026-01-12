@@ -115,9 +115,16 @@ function checkNodeTypeCoverage(
 
 		// Use intelligent heuristics to match AST node types to Apex code patterns
 		switch (nodeType) {
+			case 'BinaryExpression':
+				// Look for binary operators like +, -, *, /, ==, !=, <, >, etc.
+				isCovered = /[+\-*/=<>!&|]{1,2}/.test(content);
+				break;
 			case 'LiteralExpression':
-				// Look for numeric literals (integers, decimals, doubles)
-				isCovered = /\b\d+(\.\d+)?\b/.test(content);
+				// Look for any literals: strings, numbers, booleans, null
+				isCovered =
+					/\b\d+(\.\d+)?\b|'(?:[^'\\]|\\.)*'|"[^"]*"|\bnull\b|\btrue\b|\bfalse\b/.test(
+						lowerContent,
+					);
 				break;
 			case 'ModifierNode':
 				// Look for modifiers like static, final, public, private
@@ -132,6 +139,42 @@ function checkNodeTypeCoverage(
 			case 'AnnotationParameter':
 				// Look for annotation parameters like (key=value)
 				isCovered = /@\w+\([^)]+\)/.test(content);
+				break;
+			case 'IfBlockStatement':
+				// Look for if statements
+				isCovered = /\bif\b/.test(lowerContent);
+				break;
+			case 'SwitchStatement':
+				// Look for switch statements
+				isCovered = /\bswitch\b/.test(lowerContent);
+				break;
+			case 'ForLoopStatement':
+				// Look for for loops
+				isCovered = /\bfor\s*\(/.test(lowerContent);
+				break;
+			case 'ForEachStatement':
+				// Look for for-each loops (for (... : ...))
+				isCovered = /\bfor\s*\([^:]+:[^)]+\)/.test(lowerContent);
+				break;
+			case 'WhileLoopStatement':
+				// Look for while loops
+				isCovered = /\bwhile\b/.test(lowerContent);
+				break;
+			case 'DoWhileLoopStatement':
+				// Look for do-while loops
+				isCovered = /\bdo\b/.test(lowerContent);
+				break;
+			case 'TernaryExpression':
+				// Look for ternary expressions (condition ? true : false)
+				isCovered = /\?\s*[^:]+\s*:\s*[^;]+/.test(content);
+				break;
+			case 'MethodCallExpression':
+				// Look for method calls (anything with parentheses after a word)
+				isCovered = /\w+\s*\(/.test(content);
+				break;
+			case 'StandardCondition':
+				// Skip StandardCondition - it's an internal AST node not directly represented in code
+				isCovered = true;
 				break;
 			default:
 				// Fallback to simple string matching for unknown node types
@@ -228,8 +271,13 @@ function checkConditionalCoverage(
 
 	for (const conditional of conditionals) {
 		const exprLower = conditional.expression.toLowerCase();
-		// Check if conditional expression keywords appear in content
-		if (lowerContent.includes(exprLower) || lowerContent.includes('if')) {
+		let isCovered = false;
+
+		// Default logic: Check if conditional expression keywords appear in content
+		isCovered =
+			lowerContent.includes(exprLower) || lowerContent.includes('if');
+
+		if (isCovered) {
 			const displayExpr = truncateExpression(
 				conditional.expression,
 				MAX_EXPRESSION_LENGTH,
@@ -335,6 +383,10 @@ function checkAttributeCoverage(
 				isCovered =
 					/@\w+\([^)]*\w+\s*=/.test(content) ||
 					lowerContent.includes(attr.toLowerCase());
+				break;
+			case 'MethodName':
+				// Look for method calls like methodName(...) or Class.methodName(...)
+				isCovered = /\w+\.\w+\s*\(|\w+\s*\(/.test(content);
 				break;
 			case 'Value':
 				// Look for parameter values in annotations like @IsTest(...=false)

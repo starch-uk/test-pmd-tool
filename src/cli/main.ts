@@ -56,16 +56,46 @@ async function main(): Promise<void> {
 		console.log(`\n🧪 Testing rule: ${ruleFilePath}\n`);
 		const result = await tester.runCoverageTest();
 
-		// Display results
+		// Display detailed test results
+		const MIN_DETAILED_RESULTS_COUNT = 0;
+		if (
+			result.detailedTestResults &&
+			result.detailedTestResults.length > MIN_DETAILED_RESULTS_COUNT
+		) {
+			console.log('📋 Test Details:');
+			for (const testResult of result.detailedTestResults) {
+				const status = testResult.passed ? '✅' : '❌';
+				const testType =
+					testResult.testType === 'violation' ? 'Violation' : 'Valid';
+				const lineInfo =
+					testResult.lineNumber !== undefined
+						? ` Line: ${String(testResult.lineNumber)}`
+						: '';
+				console.log(
+					`   - Example ${String(testResult.exampleIndex)} Test: ${testType} ${status}${lineInfo}`,
+				);
+			}
+		}
+
+		// Display summary
 		const MIN_COUNT = 0;
 		const INDEX_OFFSET = 1;
-		console.log('📊 Test Results:');
-		console.log(`  Examples tested: ${String(result.examplesTested)}`);
-		console.log(`  Examples passed: ${String(result.examplesPassed)}`);
-		console.log(`  Total violations: ${String(result.totalViolations)}`);
-		console.log(
-			`  Rule triggers violations: ${result.ruleTriggersViolations ? '✅ Yes' : '❌ No'}`,
-		);
+
+		// Show overall success
+		if (result.success) {
+			console.log('\n📊 Test Summary:');
+			console.log(`  Examples tested: ${String(result.examplesTested)}`);
+			console.log(`  Examples passed: ${String(result.examplesPassed)}`);
+			console.log(
+				`  Total violations: ${String(result.totalViolations)}`,
+			);
+			console.log(
+				`  Rule triggers violations: ${result.ruleTriggersViolations ? '✅ Yes' : '❌ No'}`,
+			);
+			console.log('\n✅ All tests passed!');
+		} else {
+			console.log('\n❌ Some tests failed');
+		}
 
 		// XPath Coverage Details
 		console.log('\n🔍 XPath Coverage:');

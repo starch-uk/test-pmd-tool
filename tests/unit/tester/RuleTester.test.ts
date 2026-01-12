@@ -246,4 +246,54 @@ describe('RuleTester', () => {
 			}).not.toThrow();
 		});
 	});
+
+	describe('getRuleMetadata and getExamples', () => {
+		it('should return rule metadata', () => {
+			const xmlContent = `<?xml version="1.0" encoding="UTF-8"?>
+<rule name="TestRule"
+      language="apex"
+      message="Test message"
+      class="net.sourceforge.pmd.lang.apex.rule.TestRule">
+  <description>Test rule description</description>
+  <priority>3</priority>
+</rule>`;
+
+			mockedReadFileSync.mockReturnValue(xmlContent);
+			const xpathResult: FileOperationResult<string | null> = {
+				data: null,
+				success: true,
+			};
+			mockedExtractXPath.mockReturnValue(xpathResult);
+
+			const tester = new RuleTester('/path/to/test-rule.xml');
+			const metadata = tester.getRuleMetadata();
+
+			expect(metadata).toBeDefined();
+			expect(metadata.ruleName).toBe('TestRule');
+		});
+
+		it('should return examples array', () => {
+			const xmlContent = `<?xml version="1.0" encoding="UTF-8"?>
+<rule name="TestRule"
+      language="apex"
+      message="Test message"
+      class="net.sourceforge.pmd.lang.apex.rule.TestRule">
+  <description>Test rule description</description>
+  <priority>3</priority>
+  <example>test content</example>
+</rule>`;
+
+			mockedReadFileSync.mockReturnValue(xmlContent);
+			const xpathResult: FileOperationResult<string | null> = {
+				data: null,
+				success: true,
+			};
+			mockedExtractXPath.mockReturnValue(xpathResult);
+
+			const tester = new RuleTester('/path/to/test-rule.xml');
+			const examples = tester.getExamples();
+
+			expect(Array.isArray(examples)).toBe(true);
+		});
+	});
 });

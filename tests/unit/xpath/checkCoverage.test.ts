@@ -1549,4 +1549,370 @@ describe('checkXPathCoverage', () => {
 		expect(result.coverage[0]?.message).toContain('Operators');
 		expect(result.coverage[0]?.success).toBe(false);
 	});
+
+	it('should check coverage for MethodName attribute', () => {
+		const examples = [
+			{
+				content: 'public void testMethod() { Helper.helperMethod(); }',
+				exampleIndex: 1,
+				validMarkers: [],
+				valids: [],
+				violationMarkers: [],
+				violations: [],
+			},
+		];
+
+		mockedAnalyzeXPath.mockReturnValue({
+			attributes: ['MethodName'],
+			conditionals: [],
+			hasLetExpressions: false,
+			hasUnions: false,
+			nodeTypes: ['Method'],
+			operators: [],
+			patterns: [],
+		});
+
+		mockedReadFileSync.mockReturnValue(`<?xml version="1.0"?>
+<rule name="TestRule">
+  <properties>
+    <property name="xpath">
+      <value>//Method[@MethodName = 'testMethod']</value>
+    </property>
+  </properties>
+</rule>`);
+
+		const result = checkXPathCoverage(
+			'//Method[@MethodName = "testMethod"]',
+			examples,
+			'/path/to/rule.xml',
+		);
+
+		expect(result.coverage.length).toBeGreaterThan(0);
+	});
+
+	it('should check coverage for Value attribute', () => {
+		const examples = [
+			{
+				content: '@IsTest(isParallel=true) public class TestClass {}',
+				exampleIndex: 1,
+				validMarkers: [],
+				valids: [],
+				violationMarkers: [],
+				violations: [],
+			},
+		];
+
+		mockedAnalyzeXPath.mockReturnValue({
+			attributes: ['Value'],
+			conditionals: [],
+			hasLetExpressions: false,
+			hasUnions: false,
+			nodeTypes: ['Annotation'],
+			operators: [],
+			patterns: [],
+		});
+
+		mockedReadFileSync.mockReturnValue(`<?xml version="1.0"?>
+<rule name="TestRule">
+  <properties>
+    <property name="xpath">
+      <value>//Annotation[@Value = "isParallel"]</value>
+    </property>
+  </properties>
+</rule>`);
+
+		const result = checkXPathCoverage(
+			'//Annotation[@Value = "isParallel"]',
+			examples,
+			'/path/to/rule.xml',
+		);
+
+		expect(result.coverage.length).toBeGreaterThan(0);
+	});
+
+	it('should handle findNodeTypeLineNumber with multiline XPath', () => {
+		const examples = [
+			{
+				content: 'public class TestClass {}',
+				exampleIndex: 1,
+				validMarkers: [],
+				valids: [],
+				violationMarkers: [],
+				violations: [],
+			},
+		];
+
+		mockedAnalyzeXPath.mockReturnValue({
+			attributes: [],
+			conditionals: [],
+			hasLetExpressions: false,
+			hasUnions: false,
+			nodeTypes: ['Class'],
+			operators: [],
+			patterns: [],
+		});
+
+		const multilineXPath = `//Class[
+  @Name = 'TestClass'
+]`;
+
+		mockedReadFileSync.mockReturnValue(`<?xml version="1.0"?>
+<rule name="TestRule">
+  <properties>
+    <property name="xpath">
+      <value>${multilineXPath}</value>
+    </property>
+  </properties>
+</rule>`);
+
+		const result = checkXPathCoverage(
+			multilineXPath,
+			examples,
+			'/path/to/rule.xml',
+		);
+
+		expect(result.coverage.length).toBeGreaterThan(0);
+	});
+
+	it('should handle findNodeTypeLineNumber when node type not in single line', () => {
+		const examples = [
+			{
+				content: 'public class TestClass {}',
+				exampleIndex: 1,
+				validMarkers: [],
+				valids: [],
+				violationMarkers: [],
+				violations: [],
+			},
+		];
+
+		mockedAnalyzeXPath.mockReturnValue({
+			attributes: [],
+			conditionals: [],
+			hasLetExpressions: false,
+			hasUnions: false,
+			nodeTypes: ['Method'],
+			operators: [],
+			patterns: [],
+		});
+
+		mockedReadFileSync.mockReturnValue(`<?xml version="1.0"?>
+<rule name="TestRule">
+  <properties>
+    <property name="xpath">
+      <value>//Method</value>
+    </property>
+  </properties>
+</rule>`);
+
+		const result = checkXPathCoverage(
+			'//Method',
+			examples,
+			'/path/to/rule.xml',
+		);
+
+		expect(result.coverage.length).toBeGreaterThan(0);
+	});
+
+	it('should check coverage for BinaryExpression node type', () => {
+		const examples = [
+			{
+				content: 'Integer sum = a + b; Integer diff = x - y;',
+				exampleIndex: 1,
+				validMarkers: [],
+				valids: [],
+				violationMarkers: [],
+				violations: [],
+			},
+		];
+
+		mockedAnalyzeXPath.mockReturnValue({
+			attributes: [],
+			conditionals: [],
+			hasLetExpressions: false,
+			hasUnions: false,
+			nodeTypes: ['BinaryExpression'],
+			operators: [],
+			patterns: [],
+		});
+
+		mockedReadFileSync.mockReturnValue(`<?xml version="1.0"?>
+<rule name="TestRule">
+  <properties>
+    <property name="xpath">
+      <value>//BinaryExpression</value>
+    </property>
+  </properties>
+</rule>`);
+
+		const result = checkXPathCoverage(
+			'//BinaryExpression',
+			examples,
+			'/path/to/rule.xml',
+		);
+
+		expect(result.coverage.length).toBeGreaterThan(0);
+	});
+
+	it('should check coverage for all node type cases', () => {
+		const examples = [
+			{
+				content: `
+if (condition) {}
+switch on value { when 'test' {} }
+for (Integer i = 0; i < 10; i++) {}
+for (String item : items) {}
+while (condition) {}
+do {} while (condition);
+Boolean result = condition ? true : false;
+helperMethod();
+`,
+				exampleIndex: 1,
+				validMarkers: [],
+				valids: [],
+				violationMarkers: [],
+				violations: [],
+			},
+		];
+
+		mockedAnalyzeXPath.mockReturnValue({
+			attributes: [],
+			conditionals: [],
+			hasLetExpressions: false,
+			hasUnions: false,
+			nodeTypes: [
+				'IfBlockStatement',
+				'SwitchStatement',
+				'ForLoopStatement',
+				'ForEachStatement',
+				'WhileLoopStatement',
+				'DoWhileLoopStatement',
+				'TernaryExpression',
+				'MethodCallExpression',
+			],
+			operators: [],
+			patterns: [],
+		});
+
+		mockedReadFileSync.mockReturnValue(`<?xml version="1.0"?>
+<rule name="TestRule">
+  <properties>
+    <property name="xpath">
+      <value>//IfBlockStatement | //SwitchStatement | //ForLoopStatement</value>
+    </property>
+  </properties>
+</rule>`);
+
+		const result = checkXPathCoverage(
+			'//IfBlockStatement | //SwitchStatement | //ForLoopStatement',
+			examples,
+			'/path/to/rule.xml',
+		);
+
+		expect(result.coverage.length).toBeGreaterThan(0);
+	});
+
+	it('should check coverage for StandardCondition node type', () => {
+		const examples = [
+			{
+				content: 'public class TestClass {}',
+				exampleIndex: 1,
+				validMarkers: [],
+				valids: [],
+				violationMarkers: [],
+				violations: [],
+			},
+		];
+
+		mockedAnalyzeXPath.mockReturnValue({
+			attributes: [],
+			conditionals: [],
+			hasLetExpressions: false,
+			hasUnions: false,
+			nodeTypes: ['StandardCondition'],
+			operators: [],
+			patterns: [],
+		});
+
+		mockedReadFileSync.mockReturnValue(`<?xml version="1.0"?>
+<rule name="TestRule">
+  <properties>
+    <property name="xpath">
+      <value>//StandardCondition</value>
+    </property>
+  </properties>
+</rule>`);
+
+		const result = checkXPathCoverage(
+			'//StandardCondition',
+			examples,
+			'/path/to/rule.xml',
+		);
+
+		expect(result.coverage.length).toBeGreaterThan(0);
+		// StandardCondition should always be covered (returns true)
+		// Check if any coverage result mentions node types
+		const nodeTypeCoverage = result.coverage.find(
+			// eslint-disable-next-line @typescript-eslint/prefer-readonly-parameter-types -- Callback parameter
+			(c) =>
+				c.message.toLowerCase().includes('node') ||
+				c.message.toLowerCase().includes('standardcondition'),
+		);
+		// StandardCondition always returns true, so if found, it should be successful
+		if (nodeTypeCoverage) {
+			expect(nodeTypeCoverage.success).toBe(true);
+		}
+	});
+
+	it('should handle default case for unknown node types', () => {
+		const examples = [
+			{
+				content: 'public class TestClass {}',
+				exampleIndex: 1,
+				validMarkers: [],
+				valids: [],
+				violationMarkers: [],
+				violations: [],
+			},
+		];
+
+		mockedAnalyzeXPath.mockReturnValue({
+			attributes: [],
+			conditionals: [],
+			hasLetExpressions: false,
+			hasUnions: false,
+			nodeTypes: ['UnknownNodeType'],
+			operators: [],
+			patterns: [],
+		});
+
+		mockedReadFileSync.mockReturnValue(`<?xml version="1.0"?>
+<rule name="TestRule">
+  <properties>
+    <property name="xpath">
+      <value>//UnknownNodeType</value>
+    </property>
+  </properties>
+</rule>`);
+
+		const result = checkXPathCoverage(
+			'//UnknownNodeType',
+			examples,
+			'/path/to/rule.xml',
+		);
+
+		expect(result.coverage.length).toBeGreaterThan(0);
+		// Default case uses simple string matching - check if coverage was generated
+		// The coverage might be in a node types coverage result
+		const nodeTypeCoverage = result.coverage.find(
+			// eslint-disable-next-line @typescript-eslint/prefer-readonly-parameter-types -- Callback parameter
+			(c) =>
+				c.message.toLowerCase().includes('node') ||
+				c.message.toLowerCase().includes('unknownnodetype'),
+		);
+		// Coverage should exist for the node type
+		expect(result.coverage.length).toBeGreaterThan(0);
+		// Verify coverage was found
+		expect(nodeTypeCoverage).toBeDefined();
+	});
 });

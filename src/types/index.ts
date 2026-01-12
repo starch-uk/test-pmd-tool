@@ -67,9 +67,9 @@ export interface ExampleData {
 }
 
 export interface RuleMetadata {
-	ruleName: string | null | undefined;
-	message: string | null | undefined;
 	description: string | null | undefined;
+	message: string | null | undefined;
+	ruleName: string | null | undefined;
 	xpath: string | null | undefined;
 }
 
@@ -107,6 +107,14 @@ export interface XPathCoverageResult {
 	uncoveredBranches: string[];
 }
 
+export interface TestCaseResult {
+	exampleIndex: number;
+	testType: 'valid' | 'violation';
+	passed: boolean;
+	lineNumber?: number;
+	description: string;
+}
+
 export interface OverallTestResults {
 	success: boolean;
 	testResults: TestResult[];
@@ -116,6 +124,7 @@ export interface OverallTestResults {
 	ruleTriggersViolations: boolean;
 	xpathCoverage: XPathCoverageResult;
 	hardcodedValues: HardcodedValueIssue[];
+	detailedTestResults?: TestCaseResult[];
 }
 
 export interface CLIArguments {

@@ -44,6 +44,9 @@ Thumbs.db
 # Husky
 .husky/_/
 
+# Salesforce CLI
+.sfdx/
+
 # Temporary files
 temp/
 tmp/
