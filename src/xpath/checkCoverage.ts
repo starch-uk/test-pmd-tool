@@ -24,6 +24,80 @@ interface NodeTypeCoverageOptions {
 }
 
 /**
+ * Find line number for an attribute in the XPath within the XML file.
+ * @param ruleFilePath - Path to the rule XML file.
+ * @param xpath - XPath expression.
+ * @param attribute - Attribute to find (e.g., "Image", "Nested").
+ * @returns Line number where attribute appears, or null if not found.
+ */
+function findAttributeLineNumber(
+	ruleFilePath: Readonly<string>,
+	xpath: Readonly<string>,
+	attribute: Readonly<string>,
+): number | null {
+	try {
+		const content = readFileSync(ruleFilePath, 'utf-8');
+		const lines = content.split('\n');
+
+		// Search for @AttributeName pattern in XPath section
+		const attributePattern = `@${attribute}`;
+
+		// Find the line containing the XPath value element
+		for (let i = 0; i < lines.length; i++) {
+			const line = lines[i];
+			// Check if this line contains the XPath and the attribute
+			const hasXPath = line.includes('xpath');
+			const hasValue = line.includes('value');
+			const hasAttribute = line.includes(attributePattern);
+			if (hasXPath && hasValue && hasAttribute) {
+				return i + LINE_OFFSET;
+			}
+		}
+
+		// If not found in a single line, search for the XPath section and then the attribute
+		let inXPathSection = false;
+		for (let i = 0; i < lines.length; i++) {
+			const line = lines[i];
+			if (line.includes('<property') && line.includes('name="xpath"')) {
+				inXPathSection = true;
+			}
+			if (inXPathSection && line.includes(attributePattern)) {
+				return i + LINE_OFFSET;
+			}
+			if (inXPathSection && line.includes('</property>')) {
+				inXPathSection = false;
+			}
+		}
+
+		// Fallback: find position in XPath string and estimate line
+		const xpathIndex = xpath.indexOf(attributePattern);
+		if (xpathIndex !== NOT_FOUND_INDEX) {
+			// Find the value element and count lines
+			for (let i = 0; i < lines.length; i++) {
+				if (lines[i].includes('<value>')) {
+					// Count newlines in XPath up to the attribute position
+					const xpathBeforeAttribute = xpath.substring(
+						MIN_COUNT,
+						xpathIndex,
+					);
+					const newlineMatches = xpathBeforeAttribute.match(/\n/g);
+					// match() returns null if no match, or array if match found
+					// Use 0 if no matches found (null case)
+					const newlineCount = newlineMatches
+						? newlineMatches.length
+						: MIN_COUNT;
+					return i + LINE_OFFSET + newlineCount;
+				}
+			}
+		}
+
+		return null;
+	} catch {
+		return null;
+	}
+}
+
+/**
  * Find line number for a node type in the XPath within the XML file.
  * @param ruleFilePath - Path to the rule XML file.
  * @param xpath - XPath expression.
@@ -294,33 +368,17 @@ function checkConditionalCoverage(
 
 	// For conditionals, we'll format them line by line in the CLI
 	// Store them as arrays for better formatting
-	const foundList =
-		foundConditionals.length > MIN_COUNT ? foundConditionals : [];
 	const missingList =
 		missingConditionals.length > MIN_COUNT ? missingConditionals : [];
 
-	const foundText = foundList.length > MIN_COUNT ? foundList.join('\n') : '';
 	const missingText =
 		missingList.length > MIN_COUNT
 			? `Missing:\n${missingList.join('\n')}`
 			: '';
 
-	// Format with "Covered:" prefix for conditionals
-	const coveredText =
-		foundText.length > MIN_COUNT ? `Covered:\n${foundText}` : '';
-
 	// Only include description if there are items to show
-	const hasCovered = coveredText.length > MIN_COUNT;
-	const hasMissing = missingText.length > MIN_COUNT;
-	let description = '';
-	if (hasCovered) {
-		description = hasMissing
-			? `${coveredText}\n${missingText}`
-			: coveredText;
-	}
-	if (!hasCovered && hasMissing) {
-		description = missingText;
-	}
+	// For conditionals, only show Missing section
+	const description = missingText.length > MIN_COUNT ? missingText : '';
 	// Note: If both are empty, description remains empty string (unreachable in practice)
 
 	return {
@@ -332,14 +390,24 @@ function checkConditionalCoverage(
 }
 
 /**
+ * Options for attribute coverage checking.
+ */
+interface AttributeCoverageOptions {
+	ruleFilePath?: Readonly<string>;
+	xpath?: Readonly<string>;
+}
+
+/**
  * Check if attributes from XPath are covered in example content.
  * @param attributes - Attributes to check.
  * @param content - Example content to search.
+ * @param options - Optional rule file path and XPath for line number tracking.
  * @returns Coverage evidence.
  */
 function checkAttributeCoverage(
 	attributes: readonly string[],
 	content: Readonly<string>,
+	options?: Readonly<AttributeCoverageOptions>,
 ): CoverageEvidence {
 	const lowerContent = content.toLowerCase();
 	const foundAttributes: string[] = [];
@@ -405,30 +473,37 @@ function checkAttributeCoverage(
 		}
 	}
 
-	const foundList =
-		foundAttributes.length > MIN_COUNT
-			? foundAttributes.map((item) => ` - ${item}`).join('\n')
-			: '';
+	// Format missing attributes with line numbers if available
 	const missingList =
 		missingAttributes.length > MIN_COUNT
-			? missingAttributes.map((item) => ` - ${item}`).join('\n')
+			? missingAttributes
+					.map((item) => {
+						const ruleFilePath = options?.ruleFilePath;
+						const xpathValue = options?.xpath;
+						const hasOptions =
+							ruleFilePath !== undefined &&
+							xpathValue !== undefined;
+						if (hasOptions) {
+							const lineNumber = findAttributeLineNumber(
+								ruleFilePath,
+								xpathValue,
+								item,
+							);
+							return lineNumber !== null
+								? ` - Line ${String(lineNumber)}: ${item}`
+								: ` - ${item}`;
+						}
+						return ` - ${item}`;
+					})
+					.join('\n')
 			: '';
 
-	const foundText = foundList;
 	const missingText =
 		missingAttributes.length > MIN_COUNT ? `Missing:\n${missingList}` : '';
 
 	// Only include description if there are items to show
-	// For attributes, show found items directly (no "Found:" prefix) and missing items
-	const hasFound = foundText.length > MIN_COUNT;
-	const hasMissing = missingText.length > MIN_COUNT;
-	let description = '';
-	if (hasFound) {
-		description = hasMissing ? `${foundText}\n${missingText}` : foundText;
-	}
-	if (!hasFound && hasMissing) {
-		description = missingText;
-	}
+	// For attributes, only show Missing section
+	const description = missingText.length > MIN_COUNT ? missingText : '';
 	// Note: If both are empty, description remains empty string (unreachable in practice)
 
 	return {
@@ -587,9 +662,21 @@ export function checkXPathCoverage(
 
 	// Check attributes coverage
 	if (analysis.attributes.length > MIN_COUNT) {
+		const ruleFilePathValue = ruleFilePath;
+		// xpath is guaranteed to be non-null at this point due to earlier check
+		const xpathValue: Readonly<string> = xpath;
+		const hasRuleFilePath =
+			ruleFilePathValue !== undefined &&
+			ruleFilePathValue.length > MIN_COUNT;
+		const hasXpathValue = xpathValue.length > MIN_COUNT;
+		const attributeOptions: AttributeCoverageOptions | undefined =
+			hasRuleFilePath && hasXpathValue
+				? { ruleFilePath: ruleFilePathValue, xpath: xpathValue }
+				: undefined;
 		const attributeEvidence = checkAttributeCoverage(
 			analysis.attributes,
 			allContent,
+			attributeOptions,
 		);
 		const attributeSuccess =
 			attributeEvidence.count >= attributeEvidence.required;

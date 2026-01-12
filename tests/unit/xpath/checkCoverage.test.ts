@@ -889,19 +889,11 @@ describe('checkXPathCoverage', () => {
 		);
 
 		expect(result.coverage).toHaveLength(1);
-		expect(result.coverage[0]?.evidence[0]?.description).toContain(
-			'Covered:',
-		);
-		// Should be truncated to 50 characters + "..."
+		// Conditionals now only show Missing items, not Covered items
+		// Since the conditional is covered, description should be empty or not contain Missing
 		const description = result.coverage[0]?.evidence[0]?.description;
-		const coveredLine = description
-			?.split('\n')
-			.find((line) => line.includes('not:'));
-		expect(coveredLine).toBeDefined();
-		if (coveredLine !== undefined) {
-			expect(coveredLine.length).toBeLessThanOrEqual(61); // 50 + "not: " + "..."
-			expect(coveredLine).toContain('...');
-		}
+		expect(description).not.toContain('Missing:');
+		expect(description).not.toContain('Covered:');
 	});
 
 	it('should handle conditional coverage when only "if" keyword is found', () => {
@@ -935,10 +927,11 @@ describe('checkXPathCoverage', () => {
 		const result = checkXPathCoverage('//Method[@Value = 5]', examples);
 
 		expect(result.coverage).toHaveLength(1);
-		expect(result.coverage[0]?.evidence[0]?.description).toContain(
-			'Covered:',
-		);
-		expect(result.coverage[0]?.evidence[0]?.description).toContain('and:');
+		// Conditionals now only show Missing items, not Covered items
+		// Since the conditional is covered, description should be empty or not contain Missing
+		const description = result.coverage[0]?.evidence[0]?.description;
+		expect(description).not.toContain('Missing:');
+		expect(description).not.toContain('Covered:');
 	});
 
 	it('should handle newline counting when match returns null', () => {
@@ -1188,10 +1181,11 @@ describe('checkXPathCoverage', () => {
 		const result = checkXPathCoverage('//Method[@Name]', examples);
 
 		expect(result.coverage).toHaveLength(1);
-		expect(result.coverage[0]?.evidence[0]?.description).toContain('Name');
-		expect(result.coverage[0]?.evidence[0]?.description).not.toContain(
-			'Missing:',
-		);
+		// Attributes now only show Missing items, not found items
+		// Since Name is found, description should be empty (no Missing section)
+		const description = result.coverage[0]?.evidence[0]?.description;
+		expect(description).not.toContain('Missing:');
+		expect(description).not.toContain('Name');
 	});
 
 	it('should handle operator description with only found items', () => {
@@ -1265,11 +1259,12 @@ describe('checkXPathCoverage', () => {
 
 		expect(result.coverage).toHaveLength(1);
 		const description = result.coverage[0]?.evidence[0]?.description;
-		expect(description).toContain('Covered:');
-		// The first conditional should be covered (contains "@value = 5")
-		// The second conditional should be missing (doesn't contain "@name = "test"" and no "if")
+		// Conditionals now only show Missing items, not Covered items
+		// The first conditional should be covered (contains "@value = 5") - not shown
+		// The second conditional should be missing (doesn't contain "@name = "test"" and no "if") - shown
 		expect(description).toContain('Missing:');
 		expect(description).toContain('or:');
+		expect(description).not.toContain('Covered:');
 	});
 
 	it('should handle attribute description with both found and missing items', () => {
@@ -1300,11 +1295,314 @@ describe('checkXPathCoverage', () => {
 		);
 
 		expect(result.coverage).toHaveLength(1);
-		expect(result.coverage[0]?.evidence[0]?.description).toContain('Name');
+		// Attributes now only show Missing items, not found items
+		// Name is found (not shown), Value is missing (shown)
+		const description = result.coverage[0]?.evidence[0]?.description;
+		expect(description).toContain('Missing:');
+		expect(description).toContain('Value');
+		expect(description).not.toContain('Name');
+	});
+
+	it('should include line numbers for missing attributes when ruleFilePath is provided', () => {
+		mockedAnalyzeXPath.mockReturnValue({
+			attributes: ['BeginLine', 'Nested'],
+			conditionals: [],
+			hasLetExpressions: false,
+			hasUnions: false,
+			nodeTypes: [],
+			operators: [],
+			patterns: [],
+		});
+
+		// Mock XML file content with XPath containing the attribute on same line as xpath and value
+		const mockXmlContent = `<?xml version="1.0" encoding="UTF-8"?>
+<rule name="TestRule">
+  <properties>
+    <property name="xpath" value="//Method[@BeginLine > 10 and @Nested]"></property>
+  </properties>
+</rule>`;
+		mockedReadFileSync.mockReturnValue(mockXmlContent);
+
+		const examples: ExampleData[] = [
+			{
+				content: 'some content without any matching attributes',
+				exampleIndex: 1,
+				validMarkers: [],
+				valids: [],
+				violationMarkers: [],
+				violations: [],
+			},
+		];
+
+		const result = checkXPathCoverage(
+			'//Method[@BeginLine > 10 and @Nested]',
+			examples,
+			'/path/to/rule.xml',
+		);
+
+		expect(result.coverage).toHaveLength(1);
 		expect(result.coverage[0]?.evidence[0]?.description).toContain(
 			'Missing:',
 		);
-		expect(result.coverage[0]?.evidence[0]?.description).toContain('Value');
+		expect(result.coverage[0]?.evidence[0]?.description).toContain('Line');
+		expect(result.coverage[0]?.evidence[0]?.description).toContain(
+			'BeginLine',
+		);
+		expect(result.coverage[0]?.evidence[0]?.description).toContain(
+			'Nested',
+		);
+		expect(mockedReadFileSync).toHaveBeenCalledWith(
+			'/path/to/rule.xml',
+			'utf-8',
+		);
+	});
+
+	it('should handle findAttributeLineNumber when attribute is in XPath section (not on same line)', () => {
+		mockedAnalyzeXPath.mockReturnValue({
+			attributes: ['Image'],
+			conditionals: [],
+			hasLetExpressions: false,
+			hasUnions: false,
+			nodeTypes: [],
+			operators: [],
+			patterns: [],
+		});
+
+		// Mock XML with attribute in XPath section but not on same line as xpath/value
+		const mockXmlContent = `<?xml version="1.0" encoding="UTF-8"?>
+<rule name="TestRule">
+  <properties>
+    <property name="xpath">
+      <value>
+        //Method[@Image = 'test']
+      </value>
+    </property>
+  </properties>
+</rule>`;
+		mockedReadFileSync.mockReturnValue(mockXmlContent);
+
+		const examples: ExampleData[] = [
+			{
+				content: 'some content',
+				exampleIndex: 1,
+				validMarkers: [],
+				valids: [],
+				violationMarkers: [],
+				violations: [],
+			},
+		];
+
+		const result = checkXPathCoverage(
+			"//Method[@Image = 'test']",
+			examples,
+			'/path/to/rule.xml',
+		);
+
+		expect(result.coverage).toHaveLength(1);
+		expect(result.coverage[0]?.evidence[0]?.description).toContain(
+			'Missing:',
+		);
+		expect(result.coverage[0]?.evidence[0]?.description).toContain('Line');
+		expect(result.coverage[0]?.evidence[0]?.description).toContain('Image');
+	});
+
+	it('should handle findAttributeLineNumber fallback with newline counting for attributes', () => {
+		mockedAnalyzeXPath.mockReturnValue({
+			attributes: ['Nested'],
+			conditionals: [],
+			hasLetExpressions: false,
+			hasUnions: false,
+			nodeTypes: [],
+			operators: [],
+			patterns: [],
+		});
+
+		// Mock XML where attribute is NOT found in first two paths
+		// This triggers the fallback path that uses XPath string position
+		const mockXmlContent = `<?xml version="1.0" encoding="UTF-8"?>
+<rule name="TestRule">
+  <properties>
+    <property name="xpath">
+      <value>//Method
+//SomeOtherNode
+[@Name='test']</value>
+    </property>
+  </properties>
+</rule>`;
+		mockedReadFileSync.mockReturnValue(mockXmlContent);
+
+		const examples: ExampleData[] = [
+			{
+				content: 'some content',
+				exampleIndex: 1,
+				validMarkers: [],
+				valids: [],
+				violationMarkers: [],
+				violations: [],
+			},
+		];
+
+		// XPath with newlines before the attribute - triggers fallback
+		const xpath = `//Method
+//SomeOtherNode
+[@Nested='test']`;
+		const result = checkXPathCoverage(xpath, examples, '/path/to/rule.xml');
+
+		expect(result.coverage).toHaveLength(1);
+		expect(result.coverage[0]?.evidence[0]?.description).toContain(
+			'Missing:',
+		);
+		expect(result.coverage[0]?.evidence[0]?.description).toContain('Line');
+		expect(result.coverage[0]?.evidence[0]?.description).toContain(
+			'Nested',
+		);
+	});
+
+	it('should handle findAttributeLineNumber when attribute not found in XPath', () => {
+		mockedAnalyzeXPath.mockReturnValue({
+			attributes: ['NonExistent'],
+			conditionals: [],
+			hasLetExpressions: false,
+			hasUnions: false,
+			nodeTypes: [],
+			operators: [],
+			patterns: [],
+		});
+
+		const mockXmlContent = `<?xml version="1.0" encoding="UTF-8"?>
+<rule name="TestRule">
+  <properties>
+    <property name="xpath">
+      <value>//Method[@Name='test']</value>
+    </property>
+  </properties>
+</rule>`;
+		mockedReadFileSync.mockReturnValue(mockXmlContent);
+
+		const examples: ExampleData[] = [
+			{
+				content: 'some content',
+				exampleIndex: 1,
+				validMarkers: [],
+				valids: [],
+				violationMarkers: [],
+				violations: [],
+			},
+		];
+
+		// XPath that doesn't contain the attribute - tests return null path
+		const xpath = "//Method[@Name='test']";
+		const result = checkXPathCoverage(xpath, examples, '/path/to/rule.xml');
+
+		expect(result.coverage).toHaveLength(1);
+		expect(result.coverage[0]?.evidence[0]?.description).toContain(
+			'Missing:',
+		);
+		expect(result.coverage[0]?.evidence[0]?.description).toContain(
+			'NonExistent',
+		);
+		// Should not contain "Line" since attribute not found in XPath
+		expect(result.coverage[0]?.evidence[0]?.description).not.toContain(
+			'Line',
+		);
+	});
+
+	it('should handle findAttributeLineNumber error gracefully', () => {
+		mockedAnalyzeXPath.mockReturnValue({
+			attributes: ['SomeAttr'],
+			conditionals: [],
+			hasLetExpressions: false,
+			hasUnions: false,
+			nodeTypes: [],
+			operators: [],
+			patterns: [],
+		});
+
+		// Mock readFileSync to throw an error
+		mockedReadFileSync.mockImplementation(() => {
+			throw new Error('File read error');
+		});
+
+		const examples: ExampleData[] = [
+			{
+				content: 'some content',
+				exampleIndex: 1,
+				validMarkers: [],
+				valids: [],
+				violationMarkers: [],
+				violations: [],
+			},
+		];
+
+		const result = checkXPathCoverage(
+			'//Method[@SomeAttr]',
+			examples,
+			'/path/to/rule.xml',
+		);
+
+		// Should still work, just without line numbers
+		expect(result.coverage).toHaveLength(1);
+		expect(result.coverage[0]?.evidence[0]?.description).toContain(
+			'Missing:',
+		);
+		expect(result.coverage[0]?.evidence[0]?.description).toContain(
+			'SomeAttr',
+		);
+		// Should not contain "Line" since error occurred
+		expect(result.coverage[0]?.evidence[0]?.description).not.toContain(
+			'Line',
+		);
+	});
+
+	it('should handle findAttributeLineNumber when property closes before attribute found', () => {
+		mockedAnalyzeXPath.mockReturnValue({
+			attributes: ['MissingAttr'],
+			conditionals: [],
+			hasLetExpressions: false,
+			hasUnions: false,
+			nodeTypes: [],
+			operators: [],
+			patterns: [],
+		});
+
+		// Mock XML where property closes before attribute is found in XPath section
+		// This tests the inXPathSection = false path (line 68)
+		const mockXmlContent = `<?xml version="1.0" encoding="UTF-8"?>
+<rule name="TestRule">
+  <properties>
+    <property name="xpath">
+      <value>//Method[@Name='test']</value>
+    </property>
+    <property name="other">
+      <value>@MissingAttr</value>
+    </property>
+  </properties>
+</rule>`;
+		mockedReadFileSync.mockReturnValue(mockXmlContent);
+
+		const examples: ExampleData[] = [
+			{
+				content: 'some content',
+				exampleIndex: 1,
+				validMarkers: [],
+				valids: [],
+				violationMarkers: [],
+				violations: [],
+			},
+		];
+
+		// XPath contains MissingAttr, but it's not in the xpath property section
+		// This will trigger the fallback path
+		const xpath = '//Method[@MissingAttr]';
+		const result = checkXPathCoverage(xpath, examples, '/path/to/rule.xml');
+
+		expect(result.coverage).toHaveLength(1);
+		expect(result.coverage[0]?.evidence[0]?.description).toContain(
+			'Missing:',
+		);
+		expect(result.coverage[0]?.evidence[0]?.description).toContain(
+			'MissingAttr',
+		);
 	});
 
 	it('should check coverage for String, Null, LiteralType, Image attributes', () => {

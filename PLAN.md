@@ -892,50 +892,82 @@ The `docs/` folder will be symlinked from `node_modules/agent-docs/docs`, provid
 
 ### Phase 1: Project Setup
 
-1. Create TypeScript project structure
-2. Set up pnpm configuration (`.npmrc`, `package.json` with `packageManager`)
-3. Install dependencies with pnpm: `pnpm install`
-4. Set up Prettier (`.prettierrc` with tabs, 80 width, XML plugin)
-5. Set up ESLint (`eslint.config.ts` with TypeScript ESLint and JSDoc plugin)
-6. Set up Husky for pre-commit hooks (`.husky/pre-commit`)
-7. Set up lint-staged configuration
-8. Set up build tools (TypeScript, esbuild - build script in TypeScript)
-9. Configure Vitest (100% coverage thresholds)
-10. Define all types/interfaces
-11. Install agent-docs: `pnpm add -D agent-docs`
-12. Create `scripts/symlink-docs.js` and add `postinstall` script
-13. Create `scripts/build.ts` (TypeScript build script for Node 25+)
-14. Create GitHub Actions workflow (`.github/workflows/ci.yml`)
-15. Create project documentation files (README.md, CONTRIBUTING.md, etc.) inspired by sca-extra
-16. Create GitHub templates (issue template, PR template)
+- [ ] Create TypeScript project structure
+- [ ] Set up pnpm configuration (`.npmrc`, `package.json` with `packageManager`)
+- [ ] Install dependencies with pnpm: `pnpm install`
+- [ ] Set up Prettier (`.prettierrc` with tabs, 80 width, XML plugin)
+- [ ] Set up ESLint (`eslint.config.ts` with TypeScript ESLint and JSDoc plugin)
+- [ ] Set up Husky for pre-commit hooks (`.husky/pre-commit`)
+- [ ] Set up lint-staged configuration
+- [ ] Set up build tools (TypeScript, esbuild - build script in TypeScript)
+- [ ] Configure Vitest (100% coverage thresholds)
+- [ ] Define all types/interfaces
+- [ ] Install agent-docs: `pnpm add -D agent-docs`
+- [ ] Create `scripts/symlink-docs.js` and add `postinstall` script
+- [ ] Create `scripts/build.ts` (TypeScript build script for Node 25+)
+- [ ] Create GitHub Actions workflow (`.github/workflows/ci.yml`)
+- [ ] Create project documentation files (README.md, CONTRIBUTING.md, etc.) inspired by sca-extra
+- [ ] Create GitHub templates (issue template, PR template)
 
 ### Phase 2: Simple Modules First
 
-1. Types and utilities
-2. PMD module (simple I/O)
-3. Parser module (simple parsing)
-4. CLI module (minimal logic)
+- [ ] Types and utilities (`src/types/index.ts`)
+- [ ] PMD module (simple I/O)
+    - [ ] `src/pmd/runPMD.ts` - PMD CLI execution
+    - [ ] `src/pmd/parseViolations.ts` - XML violation parsing
+- [ ] Parser module (simple parsing)
+    - [ ] `src/parser/parseExample.ts` - Example code parsing
+    - [ ] `src/parser/extractMarkers.ts` - Violation/valid marker extraction
+    - [ ] `src/parser/createTestFile.ts` - Test file generation
+- [ ] CLI module (minimal logic)
+    - [ ] `src/cli/main.ts` - CLI entry point
 
 ### Phase 3: Complex Modules (Refactored)
 
-1. XPath extractors (split from analyzeXPath)
-2. Coverage checkers (split by conditional type)
-3. Quality checks (split by check type)
-4. RuleTester (split large methods)
+- [ ] XPath extractors (split from analyzeXPath)
+    - [ ] `src/xpath/extractXPath.ts` - XPath extraction from XML
+    - [ ] `src/xpath/analyzeXPath.ts` - Main orchestration
+    - [ ] `src/xpath/extractors/extractNodeTypes.ts` - Node type extraction
+    - [ ] `src/xpath/extractors/extractOperators.ts` - Operator extraction
+    - [ ] `src/xpath/extractors/extractAttributes.ts` - Attribute extraction
+    - [ ] `src/xpath/extractors/extractConditionals.ts` - Conditional extraction
+- [ ] Coverage checkers (split by conditional type)
+    - [ ] `src/xpath/checkCoverage.ts` - Main coverage orchestration
+    - [ ] Implement line number tracking for missing items
+    - [ ] Add support for showing line numbers in XML files for attributes and node types
+- [ ] Quality checks (split by check type)
+    - [ ] `src/tester/qualityChecks.ts` - Quality validation entry
+    - [ ] `src/tester/quality/checkRuleMetadata.ts` - Rule metadata checks
+    - [ ] `src/tester/quality/checkExamples.ts` - Example validation
+    - [ ] `src/tester/quality/checkDuplicates.ts` - Duplicate detection
+- [ ] RuleTester (split large methods)
+    - [ ] `src/tester/RuleTester.ts` - Main tester class
+    - [ ] Ensure all methods are ≤39 lines, CC < 10
+    - [ ] Split large methods into private helpers
 
 ### Phase 4: Testing
 
-1. Unit tests for each module
-2. Integration tests
-3. Refactor based on test feedback
-4. Complexity analysis (verify CC < 10)
+- [ ] Unit tests for each module
+    - [ ] XPath extraction tests
+    - [ ] PMD execution tests
+    - [ ] Parser tests
+    - [ ] Coverage checker tests
+    - [ ] Quality check tests
+    - [ ] RuleTester tests
+- [ ] Integration tests
+    - [ ] End-to-end workflow tests
+    - [ ] Test with real rule XML files
+- [ ] Refactor based on test feedback
+- [ ] Complexity analysis (verify CC < 10)
+- [ ] Achieve 100% test coverage (lines, functions, branches, statements)
 
 ### Phase 5: Polish
 
-1. Documentation (JSDoc comments)
-2. Error messages
-3. Build and distribution
-4. Final verification
+- [ ] Documentation (JSDoc comments for all public APIs)
+- [ ] Error messages (clear and helpful)
+- [ ] Build and distribution (verify single-file bundle works)
+- [ ] Output formatting (clean, readable CLI output)
+- [ ] Final verification (all tests pass, 100% coverage, no lint errors)
 
 ## Complexity Validation
 
@@ -947,7 +979,7 @@ The `docs/` folder will be symlinked from `node_modules/agent-docs/docs`, provid
 
 ### Checklist
 
-- [ ] All functions have CC < 10
+- [ ] All functions have CC < 10 (target: <7)
 - [ ] Maximum nesting depth: 3 levels
 - [ ] Complex conditionals extracted to named functions
 - [ ] Long if/else chains replaced with lookup tables
@@ -955,6 +987,11 @@ The `docs/` folder will be symlinked from `node_modules/agent-docs/docs`, provid
 - [ ] Early returns used to reduce nesting
 - [ ] Functions have single responsibility
 - [ ] Complex logic extracted to helper functions
+- [ ] All functions are ≤39 lines
+- [ ] All modules are ≤500 lines
+- [ ] 100% test coverage achieved (lines, functions, branches, statements)
+- [ ] All lint checks pass
+- [ ] All formatting checks pass
 
 ## Notes
 

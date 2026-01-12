@@ -92,9 +92,6 @@ async function main(): Promise<void> {
 			console.log(
 				`  Rule triggers violations: ${result.ruleTriggersViolations ? '✅ Yes' : '❌ No'}`,
 			);
-			console.log('\n✅ All tests passed!');
-		} else {
-			console.log('\n❌ Some tests failed');
 		}
 
 		// XPath Coverage Details
@@ -102,7 +99,7 @@ async function main(): Promise<void> {
 		if (result.xpathCoverage.overallSuccess) {
 			console.log('  Status: ✅ Complete');
 		} else {
-			console.log('  Status: ⚠️  Incomplete');
+			console.log('  Status: ⚠️ Incomplete');
 		}
 
 		if (result.xpathCoverage.coverage.length > MIN_COUNT) {
@@ -157,40 +154,6 @@ async function main(): Promise<void> {
 			);
 		}
 
-		if (result.xpathCoverage.uncoveredBranches.length > MIN_COUNT) {
-			console.log(
-				`\n  Uncovered branches (${String(result.xpathCoverage.uncoveredBranches.length)}):`,
-			);
-			result.xpathCoverage.uncoveredBranches.forEach(
-				(branch: Readonly<string>) => {
-					// Parse branch format: "Node types: item1, item2, ..." or "Conditionals: ..."
-					const NOT_FOUND_INDEX = -1;
-					const COLON_OFFSET = 1;
-					const START_INDEX = 0;
-					const colonIndex = branch.indexOf(':');
-					if (colonIndex !== NOT_FOUND_INDEX) {
-						const branchType = branch.substring(
-							START_INDEX,
-							colonIndex,
-						);
-						const branchItems = branch
-							.substring(colonIndex + COLON_OFFSET)
-							.trim();
-						console.log(`    ${branchType}:`);
-						// Split items by comma and display each on its own line
-						branchItems
-							.split(',')
-							.forEach((item: Readonly<string>) => {
-								console.log(`     - ${item.trim()}`);
-							});
-					} else {
-						// Fallback: display as-is
-						console.log(`    - ${branch}`);
-					}
-				},
-			);
-		}
-
 		if (result.hardcodedValues.length > MIN_COUNT) {
 			console.log(
 				`\n⚠️  Hardcoded values found: ${String(result.hardcodedValues.length)}`,
@@ -211,8 +174,6 @@ async function main(): Promise<void> {
 			console.log('\n✅ All tests passed!');
 		} else if (isCoverageIncomplete) {
 			console.log('\n❌ Tests failed, incomplete coverage');
-		} else {
-			console.log('\n❌ Some tests failed');
 		}
 
 		tester.cleanup();
