@@ -170,14 +170,14 @@ test-pmd-tool/
 #### extractors/ (New - to reduce complexity)
 
 - **extractNodeTypes.ts**: Extract AST node types
-  - **Target CC: 4-5** - use regex patterns, extract to helpers
+    - **Target CC: 4-5** - use regex patterns, extract to helpers
 - **extractOperators.ts**: Extract operators (@Op)
-  - **Target CC: 3-4** - simple regex matching
+    - **Target CC: 3-4** - simple regex matching
 - **extractAttributes.ts**: Extract attribute checks
-  - **Target CC: 3-4** - simple regex matching
+    - **Target CC: 3-4** - simple regex matching
 - **extractConditionals.ts**: Extract conditionals (not, and, or, etc.)
-  - **Target CC: 6-7** - use strategy pattern for different conditional types
-  - Split complex extraction into helper functions
+    - **Target CC: 6-7** - use strategy pattern for different conditional types
+    - Split complex extraction into helper functions
 
 #### checkHardcodedValues.ts
 
@@ -274,11 +274,11 @@ test-pmd-tool/
 #### quality/ (New - to reduce complexity)
 
 - **checkRuleMetadata.ts**: Rule name, message, version checks
-  - **Target CC: 4-5** - one function per check type
+    - **Target CC: 4-5** - one function per check type
 - **checkExamples.ts**: Example format validation
-  - **Target CC: 5-6** - split by validation type
+    - **Target CC: 5-6** - split by validation type
 - **checkDuplicates.ts**: Duplicate message/branch detection
-  - **Target CC: 5-6** - use Sets and Maps for efficient checking
+    - **Target CC: 5-6** - use Sets and Maps for efficient checking
 
 #### branchTracking.ts
 
@@ -295,25 +295,28 @@ test-pmd-tool/
 ### 7. Utils Module (`src/utils/`)
 
 - **fileUtils.ts**: File I/O helpers, temporary file management
-  - **Target CC: 2-3** - simple wrappers
+    - **Target CC: 2-3** - simple wrappers
 - **validationUtils.ts**: Validation helpers
-  - **Target CC: 2-3** - simple predicates
+    - **Target CC: 2-3** - simple predicates
 - **stringUtils.ts** (New): String manipulation helpers
-  - **Target CC: 3-4** - extract common string operations
+    - **Target CC: 3-4** - extract common string operations
 
 ## Key Implementation Patterns
 
 ### Early Returns / Guard Clauses
 
 ```typescript
-function checkCoverage(conditional: Conditional, content: string): CoverageResult {
-  if (!content.trim()) {
-    return createEmptyCoverageResult('no content');
-  }
-  if (!conditional.expression) {
-    return createEmptyCoverageResult('no expression');
-  }
-  // Main logic here - already reduced nesting
+function checkCoverage(
+	conditional: Conditional,
+	content: string,
+): CoverageResult {
+	if (!content.trim()) {
+		return createEmptyCoverageResult('no content');
+	}
+	if (!conditional.expression) {
+		return createEmptyCoverageResult('no expression');
+	}
+	// Main logic here - already reduced nesting
 }
 ```
 
@@ -321,18 +324,21 @@ function checkCoverage(conditional: Conditional, content: string): CoverageResul
 
 ```typescript
 const conditionalCheckers = {
-  comparison: checkComparisonCoverage,
-  and_operator: checkAndOperatorCoverage,
-  not_condition: checkNotConditionCoverage,
-  // ...
+	comparison: checkComparisonCoverage,
+	and_operator: checkAndOperatorCoverage,
+	not_condition: checkNotConditionCoverage,
+	// ...
 };
 
-function checkConditionalCoverage(conditional: Conditional, content: string): CoverageResult {
-  const checker = conditionalCheckers[conditional.type];
-  if (!checker) {
-    return createUnknownCoverageResult(conditional);
-  }
-  return checker(conditional, content);
+function checkConditionalCoverage(
+	conditional: Conditional,
+	content: string,
+): CoverageResult {
+	const checker = conditionalCheckers[conditional.type];
+	if (!checker) {
+		return createUnknownCoverageResult(conditional);
+	}
+	return checker(conditional, content);
 }
 ```
 
@@ -340,14 +346,14 @@ function checkConditionalCoverage(conditional: Conditional, content: string): Co
 
 ```typescript
 const nodeTypeKeywords: Record<string, string[]> = {
-  IfBlockStatement: ['if', 'else if'],
-  WhileLoopStatement: ['while'],
-  // ...
+	IfBlockStatement: ['if', 'else if'],
+	WhileLoopStatement: ['while'],
+	// ...
 };
 
 function checkNodeTypeCoverage(nodeType: string, content: string): boolean {
-  const keywords = nodeTypeKeywords[nodeType] || [];
-  return keywords.some(keyword => content.toLowerCase().includes(keyword));
+	const keywords = nodeTypeKeywords[nodeType] || [];
+	return keywords.some((keyword) => content.toLowerCase().includes(keyword));
 }
 ```
 
@@ -374,25 +380,28 @@ function hasComparisonOperator(expr: string): boolean {
 
 ```typescript
 // Instead of one large function, break down:
-function checkNotConditionCoverage(conditional: Conditional, content: string): CoverageResult {
-  const patternType = detectNotPatternType(conditional.expression);
-  switch (patternType) {
-    case 'list_literal':
-      return checkNotListLiteralCoverage(conditional, content);
-    case 'map_literal':
-      return checkNotMapLiteralCoverage(conditional, content);
-    case 'union':
-      return checkNotUnionCoverage(conditional, content);
-    default:
-      return checkNotGenericCoverage(conditional, content);
-  }
+function checkNotConditionCoverage(
+	conditional: Conditional,
+	content: string,
+): CoverageResult {
+	const patternType = detectNotPatternType(conditional.expression);
+	switch (patternType) {
+		case 'list_literal':
+			return checkNotListLiteralCoverage(conditional, content);
+		case 'map_literal':
+			return checkNotMapLiteralCoverage(conditional, content);
+		case 'union':
+			return checkNotUnionCoverage(conditional, content);
+		default:
+			return checkNotGenericCoverage(conditional, content);
+	}
 }
 
 function detectNotPatternType(expression: string): string {
-  if (expression.includes('NewListLiteralExpression')) return 'list_literal';
-  if (expression.includes('NewMapLiteralExpression')) return 'map_literal';
-  if (expression.includes('/(') && expression.includes('|')) return 'union';
-  return 'generic';
+	if (expression.includes('NewListLiteralExpression')) return 'list_literal';
+	if (expression.includes('NewMapLiteralExpression')) return 'map_literal';
+	if (expression.includes('/(') && expression.includes('|')) return 'union';
+	return 'generic';
 }
 ```
 
@@ -414,16 +423,16 @@ Since Node 25+ supports TypeScript natively, build script can be TypeScript:
 import { build } from 'esbuild';
 
 build({
-  entryPoints: ['src/cli/main.ts'],
-  bundle: true,
-  platform: 'node',
-  outfile: 'dist/test-pmd-rule.js',
-  external: ['@xmldom/xmldom'],
-  banner: { js: '#!/usr/bin/env node' },
-  format: 'esm',
-  target: 'node25',
-  sourcemap: true,
-  minify: false,
+	entryPoints: ['src/cli/main.ts'],
+	bundle: true,
+	platform: 'node',
+	outfile: 'dist/test-pmd-rule.js',
+	external: ['@xmldom/xmldom'],
+	banner: { js: '#!/usr/bin/env node' },
+	format: 'esm',
+	target: 'node25',
+	sourcemap: true,
+	minify: false,
 }).catch(() => process.exit(1));
 ```
 
@@ -443,54 +452,54 @@ Based on PNPM.md, use pnpm as package manager:
 
 ```json
 {
-  "name": "@your-org/test-pmd-rule",
-  "version": "1.0.0",
-  "packageManager": "pnpm@10.0.0",
-  "engines": {
-    "node": ">=25.0.0",
-    "pnpm": ">=10"
-  },
-  "bin": {
-    "test-pmd-rule": "./dist/test-pmd-rule.js"
-  },
-  "files": ["dist"],
-  "dependencies": {
-    "@xmldom/xmldom": "^0.8.10"
-  },
-  "devDependencies": {
-    "@types/node": "^25.x",
-    "typescript": "^5.x",
-    "vitest": "^1.x",
-    "esbuild": "^0.19.x",
-    "@vitest/coverage-v8": "^1.x",
-    "agent-docs": "^1.x",
-    "husky": "^9.x",
-    "prettier": "^3.x",
-    "@prettier/plugin-xml": "^3.x",
-    "lint-staged": "^15.x",
-    "tsx": "^4.x",
-    "eslint": "^9.x",
-    "@eslint/js": "^9.x",
-    "typescript-eslint": "^8.x",
-    "eslint-plugin-jsdoc": "^50.x"
-  },
-  "scripts": {
-    "build": "tsx scripts/build.ts",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage",
-    "typecheck": "tsc --noEmit",
-    "format": "prettier --write .",
-    "format:check": "prettier --check .",
-    "lint": "eslint .",
-    "lint:fix": "eslint --fix .",
-    "prepare": "husky",
-    "postinstall": "node scripts/symlink-docs.js",
-    "pre-commit": "pnpm format:check && pnpm lint && pnpm test"
-  },
-  "pnpm": {
-    "overrides": {}
-  }
+	"name": "@your-org/test-pmd-rule",
+	"version": "1.0.0",
+	"packageManager": "pnpm@10.0.0",
+	"engines": {
+		"node": ">=25.0.0",
+		"pnpm": ">=10"
+	},
+	"bin": {
+		"test-pmd-rule": "./dist/test-pmd-rule.js"
+	},
+	"files": ["dist"],
+	"dependencies": {
+		"@xmldom/xmldom": "^0.8.10"
+	},
+	"devDependencies": {
+		"@types/node": "^25.x",
+		"typescript": "^5.x",
+		"vitest": "^1.x",
+		"esbuild": "^0.19.x",
+		"@vitest/coverage-v8": "^1.x",
+		"agent-docs": "^1.x",
+		"husky": "^9.x",
+		"prettier": "^3.x",
+		"@prettier/plugin-xml": "^3.x",
+		"lint-staged": "^15.x",
+		"tsx": "^4.x",
+		"eslint": "^9.x",
+		"@eslint/js": "^9.x",
+		"typescript-eslint": "^8.x",
+		"eslint-plugin-jsdoc": "^50.x"
+	},
+	"scripts": {
+		"build": "tsx scripts/build.ts",
+		"test": "vitest run",
+		"test:watch": "vitest",
+		"test:coverage": "vitest run --coverage",
+		"typecheck": "tsc --noEmit",
+		"format": "prettier --write .",
+		"format:check": "prettier --check .",
+		"lint": "eslint .",
+		"lint:fix": "eslint --fix .",
+		"prepare": "husky",
+		"postinstall": "node scripts/symlink-docs.js",
+		"pre-commit": "pnpm format:check && pnpm lint && pnpm test"
+	},
+	"pnpm": {
+		"overrides": {}
+	}
 }
 ```
 
@@ -526,20 +535,20 @@ const docsPath = path.join(__dirname, '../docs');
 
 // Remove existing docs if it exists (but not if it's already the symlink target)
 try {
-  const stats = fs.lstatSync(docsPath);
-  if (stats.isSymbolicLink()) {
-    fs.unlinkSync(docsPath);
-  }
+	const stats = fs.lstatSync(docsPath);
+	if (stats.isSymbolicLink()) {
+		fs.unlinkSync(docsPath);
+	}
 } catch (err) {
-  // docs doesn't exist, which is fine
+	// docs doesn't exist, which is fine
 }
 
 // Create symlink
 if (fs.existsSync(agentDocsPath)) {
-  fs.symlinkSync(agentDocsPath, docsPath, 'dir');
-  console.log('✓ Symlinked docs from agent-docs');
+	fs.symlinkSync(agentDocsPath, docsPath, 'dir');
+	console.log('✓ Symlinked docs from agent-docs');
 } else {
-  console.warn('⚠ agent-docs not found, skipping docs symlink');
+	console.warn('⚠ agent-docs not found, skipping docs symlink');
 }
 ```
 
@@ -549,23 +558,23 @@ Based on PRETTIER.md:
 
 ```json
 {
-  "useTabs": true,
-  "tabWidth": 4,
-  "printWidth": 80,
-  "semi": true,
-  "singleQuote": true,
-  "trailingComma": "all",
-  "endOfLine": "lf",
-  "overrides": [
-    {
-      "files": ["*.yml", "*.yaml"],
-      "options": {
-        "useTabs": false,
-        "tabWidth": 4
-      }
-    }
-  ],
-  "plugins": ["@prettier/plugin-xml"]
+	"useTabs": true,
+	"tabWidth": 4,
+	"printWidth": 80,
+	"semi": true,
+	"singleQuote": true,
+	"trailingComma": "all",
+	"endOfLine": "lf",
+	"overrides": [
+		{
+			"files": ["*.yml", "*.yaml"],
+			"options": {
+				"useTabs": false,
+				"tabWidth": 4
+			}
+		}
+	],
+	"plugins": ["@prettier/plugin-xml"]
 }
 ```
 
@@ -586,32 +595,32 @@ import tseslint from 'typescript-eslint';
 import { jsdoc } from 'eslint-plugin-jsdoc';
 
 export default tseslint.config(
-  eslint.configs.recommended,
-  ...tseslint.configs.recommended,
-  ...tseslint.configs.strict,
-  jsdoc({
-    config: 'flat/recommended-typescript-error',
-    rules: {
-      'jsdoc/require-description': 'error',
-      'jsdoc/require-param': 'error',
-      'jsdoc/require-returns': 'error',
-      'jsdoc/require-param-description': 'error',
-      'jsdoc/require-returns-description': 'error',
-      'jsdoc/check-types': 'error',
-      'jsdoc/check-param-names': 'error',
-    },
-  }),
-  {
-    files: ['**/*.ts'],
-    rules: {
-      'complexity': ['error', { max: 9 }],
-      '@typescript-eslint/no-explicit-any': 'error',
-      '@typescript-eslint/explicit-function-return-type': 'warn',
-    },
-  },
-  {
-    ignores: ['dist/**', 'node_modules/**', 'coverage/**'],
-  },
+	eslint.configs.recommended,
+	...tseslint.configs.recommended,
+	...tseslint.configs.strict,
+	jsdoc({
+		config: 'flat/recommended-typescript-error',
+		rules: {
+			'jsdoc/require-description': 'error',
+			'jsdoc/require-param': 'error',
+			'jsdoc/require-returns': 'error',
+			'jsdoc/require-param-description': 'error',
+			'jsdoc/require-returns-description': 'error',
+			'jsdoc/check-types': 'error',
+			'jsdoc/check-param-names': 'error',
+		},
+	}),
+	{
+		files: ['**/*.ts'],
+		rules: {
+			complexity: ['error', { max: 9 }],
+			'@typescript-eslint/no-explicit-any': 'error',
+			'@typescript-eslint/explicit-function-return-type': 'warn',
+		},
+	},
+	{
+		ignores: ['dist/**', 'node_modules/**', 'coverage/**'],
+	},
 );
 ```
 
@@ -644,8 +653,8 @@ pnpm format:check && pnpm lint && pnpm test
 
 ```typescript
 export default {
-  '*.{ts,js}': ['prettier --write', 'eslint --fix'],
-  '*.{md,xml,yml,yaml}': ['prettier --write'],
+	'*.{ts,js}': ['prettier --write', 'eslint --fix'],
+	'*.{md,xml,yml,yaml}': ['prettier --write'],
 };
 ```
 
@@ -657,21 +666,21 @@ Based on VITEST.md:
 import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
-  test: {
-    globals: false,
-    environment: 'node',
-    include: ['tests/**/*.test.ts'],
-    coverage: {
-      provider: 'v8',
-      reporter: ['text', 'html', 'json'],
-      thresholds: {
-        lines: 100,
-        functions: 100,
-        branches: 100,
-        statements: 100,
-      },
-    },
-  },
+	test: {
+		globals: false,
+		environment: 'node',
+		include: ['tests/**/*.test.ts'],
+		coverage: {
+			provider: 'v8',
+			reporter: ['text', 'html', 'json'],
+			thresholds: {
+				lines: 100,
+				functions: 100,
+				branches: 100,
+				statements: 100,
+			},
+		},
+	},
 });
 ```
 
@@ -742,50 +751,50 @@ Create `.github/workflows/ci.yml`:
 name: CI
 
 on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
+    push:
+        branches: [main]
+    pull_request:
+        branches: [main]
 
 jobs:
-  test:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        node-version: [25.x]
-    
-    steps:
-      - uses: actions/checkout@v4
-      
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 10
-      
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ matrix.node-version }}
-          cache: 'pnpm'
-      
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-      
-      - name: Check formatting
-        run: pnpm format:check
-      
-      - name: Run linter
-        run: pnpm lint
-      
-      - name: Run type check
-        run: pnpm typecheck
-      
-      - name: Run tests with coverage
-        run: pnpm test:coverage
-      
-      - name: Upload coverage
-        uses: codecov/codecov-action@v4
-        with:
-          fail_ci_if_error: true
-          files: ./coverage/coverage-final.json
+    test:
+        runs-on: ubuntu-latest
+        strategy:
+            matrix:
+                node-version: [25.x]
+
+        steps:
+            - uses: actions/checkout@v4
+
+            - uses: pnpm/action-setup@v4
+              with:
+                  version: 10
+
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: ${{ matrix.node-version }}
+                  cache: 'pnpm'
+
+            - name: Install dependencies
+              run: pnpm install --frozen-lockfile
+
+            - name: Check formatting
+              run: pnpm format:check
+
+            - name: Run linter
+              run: pnpm lint
+
+            - name: Run type check
+              run: pnpm typecheck
+
+            - name: Run tests with coverage
+              run: pnpm test:coverage
+
+            - name: Upload coverage
+              uses: codecov/codecov-action@v4
+              with:
+                  fail_ci_if_error: true
+                  files: ./coverage/coverage-final.json
 ```
 
 **Key requirements:**
@@ -883,50 +892,82 @@ The `docs/` folder will be symlinked from `node_modules/agent-docs/docs`, provid
 
 ### Phase 1: Project Setup
 
-1. Create TypeScript project structure
-2. Set up pnpm configuration (`.npmrc`, `package.json` with `packageManager`)
-3. Install dependencies with pnpm: `pnpm install`
-4. Set up Prettier (`.prettierrc` with tabs, 80 width, XML plugin)
-5. Set up ESLint (`eslint.config.ts` with TypeScript ESLint and JSDoc plugin)
-6. Set up Husky for pre-commit hooks (`.husky/pre-commit`)
-7. Set up lint-staged configuration
-8. Set up build tools (TypeScript, esbuild - build script in TypeScript)
-9. Configure Vitest (100% coverage thresholds)
-10. Define all types/interfaces
-11. Install agent-docs: `pnpm add -D agent-docs`
-12. Create `scripts/symlink-docs.js` and add `postinstall` script
-13. Create `scripts/build.ts` (TypeScript build script for Node 25+)
-14. Create GitHub Actions workflow (`.github/workflows/ci.yml`)
-15. Create project documentation files (README.md, CONTRIBUTING.md, etc.) inspired by sca-extra
-16. Create GitHub templates (issue template, PR template)
+- [ ] Create TypeScript project structure
+- [ ] Set up pnpm configuration (`.npmrc`, `package.json` with `packageManager`)
+- [ ] Install dependencies with pnpm: `pnpm install`
+- [ ] Set up Prettier (`.prettierrc` with tabs, 80 width, XML plugin)
+- [ ] Set up ESLint (`eslint.config.ts` with TypeScript ESLint and JSDoc plugin)
+- [ ] Set up Husky for pre-commit hooks (`.husky/pre-commit`)
+- [ ] Set up lint-staged configuration
+- [ ] Set up build tools (TypeScript, esbuild - build script in TypeScript)
+- [ ] Configure Vitest (100% coverage thresholds)
+- [ ] Define all types/interfaces
+- [ ] Install agent-docs: `pnpm add -D agent-docs`
+- [ ] Create `scripts/symlink-docs.js` and add `postinstall` script
+- [ ] Create `scripts/build.ts` (TypeScript build script for Node 25+)
+- [ ] Create GitHub Actions workflow (`.github/workflows/ci.yml`)
+- [ ] Create project documentation files (README.md, CONTRIBUTING.md, etc.) inspired by sca-extra
+- [ ] Create GitHub templates (issue template, PR template)
 
 ### Phase 2: Simple Modules First
 
-1. Types and utilities
-2. PMD module (simple I/O)
-3. Parser module (simple parsing)
-4. CLI module (minimal logic)
+- [ ] Types and utilities (`src/types/index.ts`)
+- [ ] PMD module (simple I/O)
+    - [ ] `src/pmd/runPMD.ts` - PMD CLI execution
+    - [ ] `src/pmd/parseViolations.ts` - XML violation parsing
+- [ ] Parser module (simple parsing)
+    - [ ] `src/parser/parseExample.ts` - Example code parsing
+    - [ ] `src/parser/extractMarkers.ts` - Violation/valid marker extraction
+    - [ ] `src/parser/createTestFile.ts` - Test file generation
+- [ ] CLI module (minimal logic)
+    - [ ] `src/cli/main.ts` - CLI entry point
 
 ### Phase 3: Complex Modules (Refactored)
 
-1. XPath extractors (split from analyzeXPath)
-2. Coverage checkers (split by conditional type)
-3. Quality checks (split by check type)
-4. RuleTester (split large methods)
+- [ ] XPath extractors (split from analyzeXPath)
+    - [ ] `src/xpath/extractXPath.ts` - XPath extraction from XML
+    - [ ] `src/xpath/analyzeXPath.ts` - Main orchestration
+    - [ ] `src/xpath/extractors/extractNodeTypes.ts` - Node type extraction
+    - [ ] `src/xpath/extractors/extractOperators.ts` - Operator extraction
+    - [ ] `src/xpath/extractors/extractAttributes.ts` - Attribute extraction
+    - [ ] `src/xpath/extractors/extractConditionals.ts` - Conditional extraction
+- [ ] Coverage checkers (split by conditional type)
+    - [ ] `src/xpath/checkCoverage.ts` - Main coverage orchestration
+    - [ ] Implement line number tracking for missing items
+    - [ ] Add support for showing line numbers in XML files for attributes and node types
+- [ ] Quality checks (split by check type)
+    - [ ] `src/tester/qualityChecks.ts` - Quality validation entry
+    - [ ] `src/tester/quality/checkRuleMetadata.ts` - Rule metadata checks
+    - [ ] `src/tester/quality/checkExamples.ts` - Example validation
+    - [ ] `src/tester/quality/checkDuplicates.ts` - Duplicate detection
+- [ ] RuleTester (split large methods)
+    - [ ] `src/tester/RuleTester.ts` - Main tester class
+    - [ ] Ensure all methods are ≤39 lines, CC < 10
+    - [ ] Split large methods into private helpers
 
 ### Phase 4: Testing
 
-1. Unit tests for each module
-2. Integration tests
-3. Refactor based on test feedback
-4. Complexity analysis (verify CC < 10)
+- [ ] Unit tests for each module
+    - [ ] XPath extraction tests
+    - [ ] PMD execution tests
+    - [ ] Parser tests
+    - [ ] Coverage checker tests
+    - [ ] Quality check tests
+    - [ ] RuleTester tests
+- [ ] Integration tests
+    - [ ] End-to-end workflow tests
+    - [ ] Test with real rule XML files
+- [ ] Refactor based on test feedback
+- [ ] Complexity analysis (verify CC < 10)
+- [ ] Achieve 100% test coverage (lines, functions, branches, statements)
 
 ### Phase 5: Polish
 
-1. Documentation (JSDoc comments)
-2. Error messages
-3. Build and distribution
-4. Final verification
+- [ ] Documentation (JSDoc comments for all public APIs)
+- [ ] Error messages (clear and helpful)
+- [ ] Build and distribution (verify single-file bundle works)
+- [ ] Output formatting (clean, readable CLI output)
+- [ ] Final verification (all tests pass, 100% coverage, no lint errors)
 
 ## Complexity Validation
 
@@ -938,7 +979,7 @@ The `docs/` folder will be symlinked from `node_modules/agent-docs/docs`, provid
 
 ### Checklist
 
-- [ ] All functions have CC < 10
+- [ ] All functions have CC < 10 (target: <7)
 - [ ] Maximum nesting depth: 3 levels
 - [ ] Complex conditionals extracted to named functions
 - [ ] Long if/else chains replaced with lookup tables
@@ -946,6 +987,11 @@ The `docs/` folder will be symlinked from `node_modules/agent-docs/docs`, provid
 - [ ] Early returns used to reduce nesting
 - [ ] Functions have single responsibility
 - [ ] Complex logic extracted to helper functions
+- [ ] All functions are ≤39 lines
+- [ ] All modules are ≤500 lines
+- [ ] 100% test coverage achieved (lines, functions, branches, statements)
+- [ ] All lint checks pass
+- [ ] All formatting checks pass
 
 ## Notes
 
