@@ -195,31 +195,30 @@ You can include multiple `<example>` tags in a single rule XML file. Each exampl
 ## Installation
 
 ```bash
-# Clone the repository
-git clone https://github.com/your-org/test-pmd-rule.git
-cd test-pmd-rule
+# Install from npm
+npm install -g test-pmd-rule
 
-# Install dependencies
-pnpm install
-
-# Build the project
-pnpm build
+# Or use npx to run without installing globally
+npx test-pmd-rule path/to/rule.xml
 ```
 
 ## Usage
 
 ```bash
 # Test a single rule
-node dist/test-pmd-rule.js path/to/rule.xml
+test-pmd-rule path/to/rule.xml
 
 # Test all XML files in a directory (recursive)
-node dist/test-pmd-rule.js ../sca-extra/rulesets
+test-pmd-rule ../sca-extra/rulesets
 
 # Generate LCOV coverage reports
-node dist/test-pmd-rule.js rulesets/code-style/AvoidMagicNumbers.xml --coverage
+test-pmd-rule rulesets/code-style/AvoidMagicNumbers.xml --coverage
 
 # Test directory with coverage reports
-node dist/test-pmd-rule.js ../sca-extra/rulesets --coverage
+test-pmd-rule ../sca-extra/rulesets --coverage
+
+# Or use npx without installing globally
+npx test-pmd-rule path/to/rule.xml
 ```
 
 **Arguments:**
