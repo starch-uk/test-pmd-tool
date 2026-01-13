@@ -120,6 +120,7 @@ vi.mock('fs', () => ({
 - **Refactor hard-to-test functions** to improve testability
 - **Concurrent test execution** for performance
 - **NO EXCEPTIONS** - All code must be fully tested
+- **Never mention line numbers** in test files - they can change and make tests brittle
 
 ### 4. XML Processing Best Practices
 ```typescript
@@ -259,6 +260,7 @@ The `pnpm pre-commit` script runs all quality checks automatically:
 - [ ] Console output is suppressed in tests for xmldom warnings
 - [ ] Functions are refactored for testability when needed
 - [ ] Unreachable code paths are removed
+- [ ] Test files never mention line numbers (they can change and make tests brittle)
 - [ ] All functions have CC < 10 (ESLint complexity rule)
 - [ ] Maximum nesting depth: 3 levels
 - [ ] Complex conditionals extracted to named functions
