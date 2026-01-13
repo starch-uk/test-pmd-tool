@@ -33,9 +33,14 @@ function checkComparisonDemonstration(
 			new RegExp(`${attr}\\s*:\\s*([^\\s\\n]+)`, 'gi'),
 		);
 		if (valueMatches !== null) {
-			attrValues[attr] = valueMatches.map(
-				(match) => match.split(':')[ATTR_PREFIX_LENGTH]?.trim() ?? '',
-			);
+			// split(':') always returns at least 2 elements when regex matches (regex requires colon)
+			// So [1] is always defined
+			attrValues[attr] = valueMatches.map((match) => {
+				const parts = match.split(':');
+				// parts[1] is always defined when regex matches (regex requires colon before value)
+				// eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- split(':') with colon always has [1]
+				return parts[ATTR_PREFIX_LENGTH]!.trim();
+			});
 		}
 	}
 

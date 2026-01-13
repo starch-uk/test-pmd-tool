@@ -934,6 +934,45 @@ describe('checkXPathCoverage', () => {
 		expect(description).not.toContain('Covered:');
 	});
 
+	it('should handle conditional coverage with unknown checker type fallback', () => {
+		mockedAnalyzeXPath.mockReturnValue({
+			attributes: [],
+			conditionals: [
+				{
+					expression: '@SomeAttr = value',
+					position: 0,
+					type: 'unknown_type',
+				},
+			],
+			hasLetExpressions: false,
+			hasUnions: false,
+			nodeTypes: [],
+			operators: [],
+			patterns: [],
+		});
+
+		const examples: ExampleData[] = [
+			{
+				content: 'if (condition) { }',
+				exampleIndex: 1,
+				validMarkers: [],
+				valids: [],
+				violationMarkers: [],
+				violations: [],
+			},
+		];
+
+		const result = checkXPathCoverage(
+			'//Method[@SomeAttr = value]',
+			examples,
+		);
+
+		expect(result.coverage).toHaveLength(1);
+		// Unknown type should use fallback and find "if" keyword
+		const description = result.coverage[0]?.evidence[0]?.description;
+		expect(description).not.toContain('Missing:');
+	});
+
 	it('should handle newline counting when match returns null', () => {
 		mockedAnalyzeXPath.mockReturnValue({
 			attributes: [],

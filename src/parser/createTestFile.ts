@@ -318,9 +318,6 @@ export function createTestFile({
 	// Parse the example to get violation and valid code
 	const parsed = parseExample(exampleContent);
 
-	// Always use the parsed approach for consistency
-	let classContent = `public class TestClass${String(exampleIndex)} {\n`;
-
 	// Choose which code to include based on parameters
 	let codeToInclude: string[] = [];
 	if (includeViolations && !includeValids) {
@@ -333,97 +330,235 @@ export function createTestFile({
 		codeToInclude = [...parsed.violations, ...parsed.valids];
 	}
 
-	// Check if code contains class definition (which would be invalid inside a method)
-	const hasClassDefinition = codeToInclude.some(
-		(line) =>
-			line.trim().startsWith('public class ') ||
-			line.trim().startsWith('class '),
-	);
+	// Determine the structure of the code to decide how to wrap it
+	// Check the original example content, not just parsed violations/valids,
+	// because class definitions might not have markers
+	const TEST_CLASS_NAME = `TestClass${String(exampleIndex)}`;
+	const fullExampleContent = parsed.content;
 
-	if (hasClassDefinition) {
-		// Extract only the content inside methods, skip class/method definitions and closing braces
-		const extractedCode: string[] = [];
-		let insideMethod = false;
-		let braceDepth = 0;
-
-		for (const line of codeToInclude) {
+	// Check for top-level class (not inner class) in the original content
+	const ZERO_BRACE_DEPTH = 0;
+	const hasTopLevelClass = ((): boolean => {
+		let foundTopLevelClass = false;
+		let braceDepth = ZERO_BRACE_DEPTH;
+		const exampleLines = fullExampleContent.split('\n');
+		for (const line of exampleLines) {
 			const trimmed = line.trim();
-
-			// Skip class definitions
-			if (
+			const isClassDef =
 				trimmed.startsWith('public class ') ||
 				trimmed.startsWith('class ') ||
-				trimmed.startsWith('private class ')
-			) {
-				continue;
+				trimmed.startsWith('private class ');
+
+			if (isClassDef && braceDepth === ZERO_BRACE_DEPTH) {
+				foundTopLevelClass = true;
+				break;
 			}
 
-			// Detect method start (but not method calls)
+			// Track brace depth to detect inner classes
+			const openBracesMatch = line.match(/{/g);
+			const closeBracesMatch = line.match(/}/g);
+			const openBraces = openBracesMatch
+				? openBracesMatch.length
+				: ZERO_BRACE_DEPTH;
+			const closeBraces = closeBracesMatch
+				? closeBracesMatch.length
+				: ZERO_BRACE_DEPTH;
+			braceDepth += openBraces - closeBraces;
+		}
+		return foundTopLevelClass;
+	})();
+
+	// Check for class-like structures (attributes, methods, inner classes) without top-level class
+	const hasClassLikeStructures = ((): boolean => {
+		if (hasTopLevelClass) {
+			return false;
+		}
+		const fieldDeclarationRegex =
+			/^\s*(public|private|protected)\s+\w+\s+\w+\s*[;=]/;
+		return codeToInclude.some((line) => {
+			const trimmed = line.trim();
+			// Method signatures (but not class definitions)
 			const isMethodSignature =
 				(trimmed.startsWith('public ') ||
 					trimmed.startsWith('private ') ||
 					trimmed.startsWith('protected ')) &&
 				trimmed.includes('() {') &&
-				!insideMethod;
+				!trimmed.includes('class ');
+			// Field declarations
+			const fieldMatch = fieldDeclarationRegex.exec(trimmed);
+			const isFieldDeclaration = Boolean(fieldMatch);
+			// Inner class
+			const isInnerClass =
+				trimmed.includes('class ') && trimmed.includes('{');
+			return isMethodSignature || isFieldDeclaration || isInnerClass;
+		});
+	})();
 
-			const INITIAL_BRACE_DEPTH = 1;
-			const ZERO_BRACE_DEPTH = 0;
-			if (isMethodSignature) {
-				// Start of method - skip the signature line
-				insideMethod = true;
-				braceDepth = INITIAL_BRACE_DEPTH; // Opening brace from method signature
-				continue;
+	let classContent = '';
+
+	if (hasTopLevelClass) {
+		// Case 1: Has top-level class - extract from original content and rename the class
+		// We need to extract the full class structure from the original content,
+		// but only include lines that match our includeViolations/includeValids criteria
+		const exampleLines = fullExampleContent.split('\n');
+		const extractedCode: string[] = [];
+		let insideClass = false;
+		let classBraceDepth = ZERO_BRACE_DEPTH;
+		let currentMode: 'valid' | 'violation' | null = null;
+
+		for (const line of exampleLines) {
+			const trimmed = line.trim();
+
+			// Determine mode based on markers or section headers
+			if (trimmed.includes('// ❌')) {
+				currentMode = 'violation';
+			} else if (trimmed.includes('// ✅')) {
+				currentMode = 'valid';
+			} else if (trimmed.startsWith('// Violation:')) {
+				currentMode = 'violation';
+			} else if (trimmed.startsWith('// Valid:')) {
+				currentMode = 'valid';
 			}
 
-			// Track brace depth to know when we exit a method
-			if (insideMethod) {
-				const openBraces = (line.match(/{/g) ?? []).length;
-				const closeBraces = (line.match(/}/g) ?? []).length;
-				braceDepth += openBraces - closeBraces;
-
-				// Include the line if we're inside a method (but not the final closing brace)
-				if (braceDepth > ZERO_BRACE_DEPTH) {
-					extractedCode.push(line);
-				}
-
-				// If brace depth reaches 0, we've exited the method
-				if (braceDepth <= ZERO_BRACE_DEPTH) {
-					insideMethod = false;
-					braceDepth = ZERO_BRACE_DEPTH;
-				}
-			} else if (
-				!trimmed.startsWith('}') &&
+			// Check if this line should be included based on includeViolations/includeValids
+			const shouldInclude =
+				!trimmed.startsWith('//') &&
 				trimmed.length > EMPTY_LENGTH &&
-				!trimmed.startsWith('public ') &&
-				!trimmed.startsWith('private ')
+				((includeViolations && currentMode === 'violation') ||
+					(includeValids && currentMode === 'valid'));
+
+			// Replace class definition with our test class name
+			if (
+				trimmed.startsWith('public class ') ||
+				trimmed.startsWith('class ') ||
+				trimmed.startsWith('private class ')
 			) {
-				// Include standalone code lines (variable declarations, etc.) outside methods
-				// but skip method signatures and class definitions
-				extractedCode.push(line);
+				// Only replace if we're at the top level (classBraceDepth === 0)
+				const INITIAL_BRACE_DEPTH = 1;
+				const CLASS_PREFIX_GROUP_INDEX = 1;
+				if (classBraceDepth === ZERO_BRACE_DEPTH) {
+					const classRegex = /^(public\s+|private\s+)?class\s+(\w+)/;
+					const classMatch = classRegex.exec(trimmed);
+					if (classMatch) {
+						const classPrefix =
+							classMatch[CLASS_PREFIX_GROUP_INDEX] ?? '';
+						const newClassLine = `${classPrefix}class ${TEST_CLASS_NAME} {`;
+						extractedCode.push(newClassLine);
+						insideClass = true;
+						classBraceDepth = INITIAL_BRACE_DEPTH;
+						continue;
+					}
+				}
+			}
+
+			if (insideClass || classBraceDepth > ZERO_BRACE_DEPTH) {
+				// Count braces in the line
+				const openBracesMatch = line.match(/{/g);
+				const closeBracesMatch = line.match(/}/g);
+				const openBraces = openBracesMatch
+					? openBracesMatch.length
+					: ZERO_BRACE_DEPTH;
+				const closeBraces = closeBracesMatch
+					? closeBracesMatch.length
+					: ZERO_BRACE_DEPTH;
+				classBraceDepth += openBraces - closeBraces;
+
+				// Include line if it matches our criteria or is structural (braces, etc.)
+				if (shouldInclude || trimmed === '{' || trimmed === '}') {
+					// Remove inline markers from code lines
+					let codeLine = line;
+					const FIRST_ELEMENT_INDEX = 0;
+					if (line.includes('// ❌')) {
+						const splitResult = line.split('// ❌');
+						// split() always returns at least one element, so [0] is always defined
+						// eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+						codeLine = splitResult[FIRST_ELEMENT_INDEX]!.trim();
+					} else if (line.includes('// ✅')) {
+						const splitResult = line.split('// ✅');
+						// split() always returns at least one element, so [0] is always defined
+						// eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+						codeLine = splitResult[FIRST_ELEMENT_INDEX]!.trim();
+					}
+					extractedCode.push(codeLine);
+				}
+
+				if (classBraceDepth <= ZERO_BRACE_DEPTH) {
+					insideClass = false;
+					classBraceDepth = ZERO_BRACE_DEPTH;
+				}
+			} else if (shouldInclude) {
+				// Include standalone lines outside classes
+				let codeLine = line;
+				const FIRST_ELEMENT_INDEX = 0;
+				if (line.includes('// ❌')) {
+					const splitResult = line.split('// ❌');
+					// split() always returns at least one element, so [0] is always defined
+					// eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+					codeLine = splitResult[FIRST_ELEMENT_INDEX]!.trim();
+				} else if (line.includes('// ✅')) {
+					const splitResult = line.split('// ✅');
+					// split() always returns at least one element, so [0] is always defined
+					// eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+					codeLine = splitResult[FIRST_ELEMENT_INDEX]!.trim();
+				}
+				extractedCode.push(codeLine);
 			}
 		}
 
-		codeToInclude =
-			extractedCode.length > EMPTY_LENGTH ? extractedCode : codeToInclude;
-	}
+		// Add helper methods before the final closing brace
+		const helperMethods = extractHelperMethods(codeToInclude);
+		const classContentStr = extractedCode.join('\n');
+		// The logic at line 465 always includes braces, so classContentStr will always have '}'
+		const lastBraceIndex = classContentStr.lastIndexOf('}');
 
-	// Wrap code in a method for valid Apex syntax
-	if (codeToInclude.length > EMPTY_LENGTH) {
-		classContent += `    public void testMethod${String(exampleIndex)}() {\n`;
-		// Process all the parsed code lines
+		if (helperMethods.length > EMPTY_LENGTH) {
+			const beforeLastBrace = classContentStr.substring(
+				ZERO_BRACE_DEPTH,
+				lastBraceIndex,
+			);
+			const afterLastBrace = classContentStr.substring(lastBraceIndex);
+			classContent = beforeLastBrace + '\n';
+			for (const method of helperMethods) {
+				classContent += `    ${method}\n`;
+			}
+			classContent += afterLastBrace + '\n';
+		} else {
+			classContent = classContentStr + '\n';
+		}
+	} else if (hasClassLikeStructures) {
+		// Case 2: Has attributes/methods/inner-class - wrap in a class
+		classContent = `public class ${TEST_CLASS_NAME} {\n`;
 		codeToInclude.forEach((line) => {
-			classContent += `        ${line}\n`;
+			classContent += `    ${line}\n`;
 		});
-		classContent += `    }\n`;
-	}
 
-	// Dynamically generate helper methods based on method calls in the test code
-	const helperMethods = extractHelperMethods(codeToInclude);
-	for (const method of helperMethods) {
-		classContent += `    ${method}\n`;
-	}
+		// Add helper methods
+		const helperMethods = extractHelperMethods(codeToInclude);
+		for (const method of helperMethods) {
+			classContent += `    ${method}\n`;
+		}
 
-	classContent += '}\n';
+		classContent += '}\n';
+	} else {
+		// Case 3: Just normal lines - wrap in a method inside a class
+		classContent = `public class ${TEST_CLASS_NAME} {\n`;
+
+		if (codeToInclude.length > EMPTY_LENGTH) {
+			classContent += `    public void testMethod${String(exampleIndex)}() {\n`;
+			codeToInclude.forEach((line) => {
+				classContent += `        ${line}\n`;
+			});
+			classContent += `    }\n`;
+		}
+
+		// Add helper methods
+		const helperMethods = extractHelperMethods(codeToInclude);
+		for (const method of helperMethods) {
+			classContent += `    ${method}\n`;
+		}
+
+		classContent += '}\n';
+	}
 
 	writeFileSync(tempFile, classContent, 'utf-8');
 
