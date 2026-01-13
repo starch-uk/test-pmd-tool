@@ -388,7 +388,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE.md) f
 
 ## Security
 
-Please report security vulnerabilities to [security@starch.uk](mailto:security@starch.uk). See our [Security Policy](SECURITY.md) for more information.
+See our [Security Policy](SECURITY.md) for more information.
 
 ## Related Projects
 
