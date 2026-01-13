@@ -73,15 +73,8 @@ async function testRuleFile(
 		const result = await tester.runCoverageTest(false, maxConcurrency);
 
 		// Record coverage data if tracker is provided
-		const hasCoverageTracker = coverageTracker !== null;
-		const MIN_COVERED_LINES_COUNT = 0;
-		const coveredLines = result.xpathCoverage.coveredLineNumbers;
-		if (
-			hasCoverageTracker &&
-			coveredLines &&
-			coveredLines.length > MIN_COVERED_LINES_COUNT
-		) {
-			for (const lineNumber of coveredLines) {
+		if (coverageTracker && result.xpathCoverage.coveredLineNumbers) {
+			for (const lineNumber of result.xpathCoverage.coveredLineNumbers) {
 				coverageTracker.recordXPathLine(lineNumber);
 			}
 		}
@@ -134,8 +127,7 @@ async function testRuleFile(
 		if (result.xpathCoverage.overallSuccess) {
 			console.log('  Status: ✅ Complete');
 		} else {
-			const INCOMPLETE_STATUS_MESSAGE = '  Status: ⚠️ Incomplete';
-			console.log(INCOMPLETE_STATUS_MESSAGE);
+			console.log('  Status: ⚠️ Incomplete');
 		}
 
 		if (result.xpathCoverage.coverage.length > MIN_COUNT) {
@@ -213,10 +205,9 @@ async function testRuleFile(
 		}
 
 		tester.cleanup();
-		const coverageData: CoverageData | undefined =
-			coverageTracker !== null
-				? coverageTracker.getCoverageData()
-				: undefined;
+		const coverageData = coverageTracker
+			? coverageTracker.getCoverageData()
+			: undefined;
 		return {
 			coverageData,
 			filePath: ruleFilePath,
@@ -264,12 +255,9 @@ async function main(): Promise<void> {
 	}
 
 	// Check for --coverage flag
-	// Validate against fixed string to prevent user-controlled bypass
-	// This is a feature flag, not a security check - coverage generation is safe
-	const COVERAGE_FLAG = '--coverage';
 	const hasCoverageFlag =
 		args.length > SECOND_ARG_INDEX &&
-		args[SECOND_ARG_INDEX] === COVERAGE_FLAG;
+		args[SECOND_ARG_INDEX] === '--coverage';
 
 	// Validate input path
 	if (!existsSync(pathArg)) {
@@ -318,8 +306,9 @@ async function main(): Promise<void> {
 	);
 
 	// Create coverage trackers if coverage is enabled
-	const coverageTrackers: Map<string, CoverageTracker> | null =
-		hasCoverageFlag ? new Map<string, CoverageTracker>() : null;
+	const coverageTrackers = hasCoverageFlag
+		? new Map<string, CoverageTracker>()
+		: null;
 
 	// Create tasks for each file
 	interface TaskResult {
@@ -330,12 +319,11 @@ async function main(): Promise<void> {
 	}
 	const tasks: (() => Promise<TaskResult>)[] = xmlFiles.map(
 		(filePath: Readonly<string>) => async (): Promise<TaskResult> => {
-			const tracker =
-				coverageTrackers !== null
-					? (coverageTrackers.get(filePath) ??
-						new CoverageTracker(filePath))
-					: null;
-			if (tracker !== null && coverageTrackers !== null) {
+			const tracker = coverageTrackers
+				? (coverageTrackers.get(filePath) ??
+					new CoverageTracker(filePath))
+				: null;
+			if (tracker && coverageTrackers) {
 				coverageTrackers.set(filePath, tracker);
 			}
 			return testRuleFile(filePath, tracker, maxExampleConcurrency);
@@ -380,21 +368,13 @@ async function main(): Promise<void> {
 	}
 
 	// Generate coverage report if --coverage flag is set
-	// Note: hasCoverageFlag is validated against fixed string '--coverage' above
-	// This is a feature flag, not a security boundary - file path is hardcoded
-	if (hasCoverageFlag && coverageTrackers !== null) {
-		const coverageData: CoverageData[] = Array.from(
-			coverageTrackers.values(),
-		).map((tracker: Readonly<CoverageTracker>) =>
-			tracker.getCoverageData(),
+	if (hasCoverageFlag && coverageTrackers) {
+		const coverageData = Array.from(coverageTrackers.values()).map(
+			(tracker: Readonly<CoverageTracker>) => tracker.getCoverageData(),
 		);
-		// File path is hardcoded, not user-controlled
-		const COVERAGE_REPORT_PATH = 'coverage/lcov.info';
 		try {
-			generateLcovReport(coverageData, COVERAGE_REPORT_PATH);
-			console.log(
-				`\n📊 Coverage report generated: ${COVERAGE_REPORT_PATH}`,
-			);
+			generateLcovReport(coverageData, 'coverage/lcov.info');
+			console.log('\n📊 Coverage report generated: coverage/lcov.info');
 		} catch (error: unknown) {
 			const errorMessage =
 				error instanceof Error ? error.message : String(error);

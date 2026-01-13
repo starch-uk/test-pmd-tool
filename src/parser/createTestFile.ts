@@ -10,6 +10,52 @@ import { parseExample } from './parseExample.js';
 const EMPTY_LENGTH = 0;
 const FIRST_CAPTURE_GROUP_INDEX = 1;
 const SECOND_CAPTURE_GROUP_INDEX = 2;
+const TAB_CHAR = '\t';
+const SPACE_CHAR = ' ';
+const DEFAULT_INDENT = '    ';
+const FIRST_ELEMENT_INDEX = 0;
+
+/**
+ * Removes inline markers from a code line while preserving leading indentation.
+ * @param line - The line to process.
+ * @returns The line with markers removed and trailing whitespace trimmed.
+ */
+function removeInlineMarkers(line: string): string {
+	if (line.includes('// ❌')) {
+		const splitResult = line.split('// ❌');
+		// split() always returns at least one element, so [0] is always defined
+		// eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+		const codeLine = splitResult[FIRST_ELEMENT_INDEX]!;
+		// Remove trailing whitespace but preserve leading indentation
+		return codeLine.replace(/\s+$/, '');
+	}
+	if (line.includes('// ✅')) {
+		const splitResult = line.split('// ✅');
+		// split() always returns at least one element, so [0] is always defined
+		// eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+		const codeLine = splitResult[FIRST_ELEMENT_INDEX]!;
+		// Remove trailing whitespace but preserve leading indentation
+		return codeLine.replace(/\s+$/, '');
+	}
+	return line;
+}
+
+/**
+ * Formats method declaration with appropriate indentation.
+ * @param methodDecl - The method declaration string.
+ * @returns The method declaration with preserved or default indentation.
+ */
+function formatMethodDeclarationIndent(methodDecl: string): string {
+	const startsWithTab = methodDecl.startsWith(TAB_CHAR);
+	if (startsWithTab) {
+		return methodDecl;
+	}
+	const startsWithSpace = methodDecl.startsWith(SPACE_CHAR);
+	if (startsWithSpace) {
+		return methodDecl;
+	}
+	return `${DEFAULT_INDENT}${methodDecl}`;
+}
 
 /**
  * Infers the return type of a method based on its usage context in the code.
@@ -404,9 +450,19 @@ export function createTestFile({
 		const extractedCode: string[] = [];
 		let insideClass = false;
 		let classBraceDepth = ZERO_BRACE_DEPTH;
+		const INITIAL_BRACE_DEPTH = 1;
+		let methodBraceDepth = ZERO_BRACE_DEPTH;
 		let currentMode: 'valid' | 'violation' | null = null;
+		let insideMethod = false;
+		let methodDeclaration: string | null = null;
+		let methodDeclarationOriginal: string | null = null;
+		let hasIncludedMethodContent = false;
 
-		for (const line of exampleLines) {
+		// eslint-disable-next-line @typescript-eslint/prefer-for-of -- Need index for method tracking
+		for (let lineIndex = 0; lineIndex < exampleLines.length; lineIndex++) {
+			// Array access with valid index always returns a value, never undefined
+			// eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Loop condition ensures valid index
+			const line = exampleLines[lineIndex]!;
 			const trimmed = line.trim();
 
 			// Determine mode based on markers or section headers
@@ -434,7 +490,6 @@ export function createTestFile({
 				trimmed.startsWith('private class ')
 			) {
 				// Only replace if we're at the top level (classBraceDepth === 0)
-				const INITIAL_BRACE_DEPTH = 1;
 				const CLASS_PREFIX_GROUP_INDEX = 1;
 				if (classBraceDepth === ZERO_BRACE_DEPTH) {
 					const classRegex = /^(public\s+|private\s+)?class\s+(\w+)/;
@@ -461,46 +516,111 @@ export function createTestFile({
 				const closeBraces = closeBracesMatch
 					? closeBracesMatch.length
 					: ZERO_BRACE_DEPTH;
+				const prevClassBraceDepth = classBraceDepth;
 				classBraceDepth += openBraces - closeBraces;
+
+				// Detect method declarations (lines with opening brace that increase depth from 1 to 2)
+				const methodRegex = /\w+\s*\(/;
+				const methodMatch = methodRegex.exec(trimmed);
+				const hasMethodPattern = methodMatch !== null;
+				const isMethodDeclaration =
+					prevClassBraceDepth === INITIAL_BRACE_DEPTH &&
+					classBraceDepth > INITIAL_BRACE_DEPTH &&
+					!trimmed.startsWith('{') &&
+					trimmed.includes('{') &&
+					(trimmed.includes('void') ||
+						trimmed.includes('(') ||
+						hasMethodPattern);
+
+				if (isMethodDeclaration) {
+					insideMethod = true;
+					methodBraceDepth = classBraceDepth - INITIAL_BRACE_DEPTH;
+					methodDeclaration = trimmed;
+					methodDeclarationOriginal = line;
+					hasIncludedMethodContent = false;
+				}
+
+				// Track method brace depth
+				if (insideMethod) {
+					methodBraceDepth += openBraces - closeBraces;
+					if (methodBraceDepth <= ZERO_BRACE_DEPTH) {
+						// Method ended
+						insideMethod = false;
+						methodDeclaration = null;
+						methodDeclarationOriginal = null;
+						hasIncludedMethodContent = false;
+					}
+				}
 
 				// Include line if it matches our criteria or is structural (braces, etc.)
 				if (shouldInclude || trimmed === '{' || trimmed === '}') {
-					// Remove inline markers from code lines
-					let codeLine = line;
-					const FIRST_ELEMENT_INDEX = 0;
-					if (line.includes('// ❌')) {
-						const splitResult = line.split('// ❌');
-						// split() always returns at least one element, so [0] is always defined
-						// eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-						codeLine = splitResult[FIRST_ELEMENT_INDEX]!.trim();
-					} else if (line.includes('// ✅')) {
-						const splitResult = line.split('// ✅');
-						// split() always returns at least one element, so [0] is always defined
-						// eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-						codeLine = splitResult[FIRST_ELEMENT_INDEX]!.trim();
+					// Check if this is the method declaration line itself (with or without marker)
+					const hasMethodDeclaration =
+						methodDeclaration !== null &&
+						methodDeclarationOriginal !== null;
+					const markerRegex = /\s*\/\/\s*[❌✅].*$/;
+					const trimmedWithoutMarker = trimmed
+						.replace(markerRegex, '')
+						.trim();
+					const isMethodDeclarationLine =
+						insideMethod &&
+						hasMethodDeclaration &&
+						(trimmed === methodDeclaration ||
+							trimmedWithoutMarker === methodDeclaration);
+
+					if (
+						shouldInclude &&
+						insideMethod &&
+						hasMethodDeclaration &&
+						!hasIncludedMethodContent
+					) {
+						// First time including content from this method
+						if (isMethodDeclarationLine) {
+							// This IS the method declaration line - include it once with marker removed but preserve indentation
+							const codeLine = removeInlineMarkers(line);
+							extractedCode.push(codeLine);
+							hasIncludedMethodContent = true;
+						} else {
+							// This is method body content - include method declaration first, then this line
+							// Preserve indentation for method declaration
+							// methodDeclarationOriginal is checked by hasMethodDeclaration (both are non-null)
+							/* eslint-disable @typescript-eslint/no-non-null-assertion */
+							const methodDeclOriginal =
+								methodDeclarationOriginal!;
+							/* eslint-enable @typescript-eslint/no-non-null-assertion */
+							const methodDeclWithIndent =
+								formatMethodDeclarationIndent(
+									methodDeclOriginal,
+								);
+							extractedCode.push(methodDeclWithIndent);
+							// Remove inline markers from code lines but preserve indentation
+							const codeLine = removeInlineMarkers(line);
+							extractedCode.push(codeLine);
+							hasIncludedMethodContent = true;
+						}
+					} else if (shouldInclude && !isMethodDeclarationLine) {
+						// Regular content line - remove inline markers but preserve indentation
+						const codeLine = removeInlineMarkers(line);
+						extractedCode.push(codeLine);
+					} else {
+						// Structural braces - preserve original line to maintain indentation
+						// This handles braces when shouldInclude is false but braces are needed for structure
+						// We're inside the outer if (shouldInclude || trimmed === '{' || trimmed === '}'),
+						// and shouldInclude is false, so trimmed must be '{' or '}'
+						extractedCode.push(line);
 					}
-					extractedCode.push(codeLine);
 				}
 
 				if (classBraceDepth <= ZERO_BRACE_DEPTH) {
 					insideClass = false;
 					classBraceDepth = ZERO_BRACE_DEPTH;
+					insideMethod = false;
+					methodDeclaration = null;
+					methodDeclarationOriginal = null;
 				}
 			} else if (shouldInclude) {
 				// Include standalone lines outside classes
-				let codeLine = line;
-				const FIRST_ELEMENT_INDEX = 0;
-				if (line.includes('// ❌')) {
-					const splitResult = line.split('// ❌');
-					// split() always returns at least one element, so [0] is always defined
-					// eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-					codeLine = splitResult[FIRST_ELEMENT_INDEX]!.trim();
-				} else if (line.includes('// ✅')) {
-					const splitResult = line.split('// ✅');
-					// split() always returns at least one element, so [0] is always defined
-					// eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-					codeLine = splitResult[FIRST_ELEMENT_INDEX]!.trim();
-				}
+				const codeLine = removeInlineMarkers(line).trim();
 				extractedCode.push(codeLine);
 			}
 		}

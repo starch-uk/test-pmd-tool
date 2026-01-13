@@ -646,7 +646,7 @@ public class Example {
 		expect(writtenContent).toContain('public class TestClass36 {');
 		expect(writtenContent).toContain('public void emptyMethod() {');
 		expect(writtenContent).not.toContain('public void testMethod36() {');
-		// Tests else branch at line 527 (no helper methods when helperMethods.length === 0)
+		// Tests case when no helper methods are needed (helperMethods.length === 0)
 	});
 
 	it('should handle class-like structures without top-level class', () => {
@@ -722,12 +722,12 @@ public class Example {
 	});
 
 	it('should add closing brace when missing and insert helper methods', () => {
-		// This tests the branch at line 509 when extractedCode doesn't contain '}'
+		// Tests case when extractedCode doesn't contain '}'
 		// We need a scenario where:
 		// 1. hasTopLevelClass is true
 		// 2. extractedCode.join('\n') doesn't contain '}' (so lastBraceIndex === -1)
-		// 3. helperMethods.length > 0 (so we enter the if at line 513)
-		// The logic at line 465 includes braces with `trimmed === '}'`, but if the class
+		// 3. helperMethods.length > 0
+		// The logic includes braces with `trimmed === '}'`, but if the class
 		// is missing its closing brace entirely, and we finish processing while still inside
 		// the class (classBraceDepth > 0), then extractedCode won't have '}'.
 		// We also need the method to be missing its closing brace, otherwise the method's
@@ -752,8 +752,7 @@ public class Example {
 		expect(writtenContent).toContain('public class TestClass41 {');
 		expect(writtenContent).toContain('public Boolean getValue()');
 		expect(writtenContent).toContain('public Boolean getName()');
-		// The closing brace should be added (branch at line 509), and helper methods
-		// should be inserted before it
+		// The closing brace should be added, and helper methods should be inserted before it
 		expect(writtenContent).toContain('}'); // Should have closing brace added
 		// Verify helper methods are before the closing brace
 		const getValueIndex = writtenContent.indexOf(
@@ -789,7 +788,7 @@ public void testMethod() {
 	});
 
 	it('should handle standalone lines outside class with inline markers', () => {
-		// This tests lines 492-493 and 495-496: standalone lines outside class with markers
+		// Tests standalone lines outside class with markers
 		const exampleContent = `
 // Violation: Test
 public class Example {
@@ -819,8 +818,7 @@ String message = 'test'; // ✅
 	});
 
 	it('should handle class without access modifier (class keyword only)', () => {
-		// This tests the branch at line 438-443 when class has no access modifier
-		// and classBraceDepth === ZERO_BRACE_DEPTH
+		// Tests case when class has no access modifier and classBraceDepth === ZERO_BRACE_DEPTH
 		const exampleContent = `
 // Violation: Test
 class Example {
@@ -845,8 +843,7 @@ class Example {
 	});
 
 	it('should handle lines without braces in hasTopLevelClass check', () => {
-		// This tests the ternary branches at lines 360-365 when openBracesMatch or
-		// closeBracesMatch is falsy in the hasTopLevelClass function
+		// Tests ternary branches when openBracesMatch or closeBracesMatch is falsy in hasTopLevelClass
 		// We need a line that doesn't contain any braces before the class definition
 		const exampleContent = `
 // Violation: Test
@@ -873,8 +870,7 @@ public class Example {
 	});
 
 	it('should handle lines without braces in class extraction', () => {
-		// This tests the ternary branches at lines 456-461 when openBracesMatch or
-		// closeBracesMatch is falsy during class extraction
+		// Tests ternary branches when openBracesMatch or closeBracesMatch is falsy during class extraction
 		const exampleContent = `
 // Violation: Test
 public class Example {
@@ -899,9 +895,8 @@ public class Example {
 		expect(writtenContent).toContain("String message = 'test';");
 	});
 
-	it('should handle field declarations in hasClassLikeStructures (branch at 381)', () => {
-		// This tests the branch at line 381 when fieldMatch is truthy
-		// (field declarations without top-level class)
+	it('should handle field declarations in hasClassLikeStructures', () => {
+		// Tests case when fieldMatch is truthy (field declarations without top-level class)
 		const exampleContent = `
 // Violation: Test
 public Integer value = 42;
@@ -922,10 +917,8 @@ private String name = 'test';
 		expect(writtenContent).toContain("private String name = 'test';");
 	});
 
-	it('should handle class match when classBraceDepth is zero (branch at 438-441)', () => {
-		// This tests the branch at lines 438-441 when classBraceDepth === ZERO_BRACE_DEPTH
-		// and classMatch is truthy - this should be covered by existing tests, but let's
-		// make sure we have a test that explicitly exercises this path
+	it('should handle class match when classBraceDepth is zero', () => {
+		// Tests case when classBraceDepth === ZERO_BRACE_DEPTH and classMatch is truthy
 		const exampleContent = `
 // Violation: Test
 public class Example {
@@ -948,8 +941,8 @@ public class Example {
 		expect(writtenContent).not.toContain('public class Example {');
 	});
 
-	it('should handle inner class detection in hasClassLikeStructures (branch at 392)', () => {
-		// This tests the branch at line 392: trimmed.includes('class ') && trimmed.includes('{')
+	it('should handle inner class detection in hasClassLikeStructures', () => {
+		// Tests case when trimmed.includes('class ') && trimmed.includes('{')
 		// To test this, we need a line that contains "class " and "{" but is NOT detected as top-level
 		// We can use a line that contains the pattern but doesn't start with class keywords
 		// For example: a string literal that contains the pattern
@@ -973,8 +966,8 @@ public class Example {
 		expect(writtenContent).toContain('Integer value = 5;');
 	});
 
-	it('should handle class definition when classBraceDepth is not zero (branch at 439)', () => {
-		// This tests the branch at line 439 when classBraceDepth !== ZERO_BRACE_DEPTH
+	it('should handle class definition when classBraceDepth is not zero', () => {
+		// Tests case when classBraceDepth !== ZERO_BRACE_DEPTH
 		// This happens when we're already inside a class and encounter another class (inner class)
 		const exampleContent = `public class Outer {
   public void method() {
@@ -1002,8 +995,8 @@ public class Example {
 		expect(writtenContent).toContain('Integer innerValue = 10;');
 	});
 
-	it('should handle class definition when classMatch is falsy (branch at 442)', () => {
-		// This tests the branch at line 442 when classMatch is falsy
+	it('should handle class definition when classMatch is falsy', () => {
+		// Tests case when classMatch is falsy
 		// This happens when the regex doesn't match - e.g., "public class {" (no class name)
 		// The line passes startsWith('public class ') but regex fails because \w+ requires a name
 		const exampleContent = `public class {
@@ -1025,5 +1018,147 @@ public class Example {
 		expect(writtenContent).toBeDefined();
 		// The malformed class line should be included as-is (defensive path)
 		expect(writtenContent).toContain('Integer value = 5;');
+	});
+
+	it('should handle method body content with valid marker when including valids only', () => {
+		// Tests method body content with // ✅ marker when includeValids is true and includeViolations is false
+		const exampleContent = `
+public class Example {
+    public void method() {
+        Integer value = 5; // ❌
+        String name = 'test'; // ✅
+    }
+}
+`;
+
+		createTestFile({
+			exampleContent,
+			exampleIndex: 50,
+			includeValids: true,
+			includeViolations: false,
+		});
+
+		const writtenContent = capturedContent;
+		// Should include method declaration and the valid line
+		expect(writtenContent).toContain('public void method()');
+		expect(writtenContent).toContain("String name = 'test';");
+		expect(writtenContent).not.toContain('Integer value = 5;');
+		expect(writtenContent).not.toContain('// ✅');
+		expect(writtenContent).not.toContain('// ❌');
+	});
+
+	it('should handle method body content with valid marker and tab-indented method declaration', () => {
+		// Tests methodDecl.startsWith(TAB_CHAR) branch and method body content with // ✅ marker
+		// The method declaration must start with tab AND we must be including method body content
+		// (not the declaration line itself - declaration has no marker)
+		const exampleContent = `
+public class Example {
+	public void method() {
+		String name = 'test'; // ✅
+	}
+}
+`;
+
+		createTestFile({
+			exampleContent,
+			exampleIndex: 51,
+			includeValids: true,
+			includeViolations: false,
+		});
+
+		const writtenContent = capturedContent;
+		// Should include method declaration (with tab) and the valid line
+		expect(writtenContent).toContain('public void method()');
+		expect(writtenContent).toContain("String name = 'test';");
+		// Verify the method declaration is included (not just the body)
+		// The method body content path includes the declaration first
+		const methodIndex = writtenContent.indexOf('public void method()');
+		const nameIndex = writtenContent.indexOf("String name = 'test';");
+		expect(methodIndex).toBeLessThan(nameIndex);
+	});
+
+	it('should handle method body content with valid marker and space-indented method declaration', () => {
+		// Tests methodDecl.startsWith(SPACE_CHAR) branch and method body content with // ✅ marker
+		// The method declaration must start with space AND we must be including method body content
+		// (not the declaration line itself - declaration has no marker)
+		const exampleContent = `
+public class Example {
+ public void method() {
+  String name = 'test'; // ✅
+ }
+}
+`;
+
+		createTestFile({
+			exampleContent,
+			exampleIndex: 52,
+			includeValids: true,
+			includeViolations: false,
+		});
+
+		const writtenContent = capturedContent;
+		// Should include method declaration (with space) and the valid line
+		expect(writtenContent).toContain('public void method()');
+		expect(writtenContent).toContain("String name = 'test';");
+	});
+
+	it('should handle method declaration with no indentation (default indent path)', () => {
+		// Tests else branch when neither tab nor space
+		// Method declaration has no leading whitespace, so default indent is used
+		const exampleContent = `
+public class Example {
+public void method() {
+    String name = 'test'; // ✅
+}
+}
+`;
+
+		createTestFile({
+			exampleContent,
+			exampleIndex: 54,
+			includeValids: true,
+			includeViolations: false,
+		});
+
+		const writtenContent = capturedContent;
+		// Should include method declaration with default indent
+		expect(writtenContent).toContain('public void method()');
+		expect(writtenContent).toContain("String name = 'test';");
+	});
+
+	it('should handle structural braces when shouldInclude is false', () => {
+		// Tests case when shouldInclude is false but braces are needed for structure
+		// This path is reached when:
+		// - shouldInclude is false (content not included)
+		// - isMethodDeclarationLine is false
+		// - We're not in the first-time-including-method-content path
+		// - We're not in the regular-content-line path
+		// - trimmed is '{' or '}'
+		const exampleContent = `
+public class Example {
+    public void violationMethod() {
+        Integer value = 5; // ❌
+    }
+    public void validMethod() {
+        String name = 'test'; // ✅
+    }
+}
+`;
+
+		createTestFile({
+			exampleContent,
+			exampleIndex: 53,
+			includeValids: true,
+			includeViolations: false,
+		});
+
+		const writtenContent = capturedContent;
+		// Should still have class structure with braces even if violations not included
+		expect(writtenContent).toContain('public class TestClass53');
+		expect(writtenContent).toContain('public void validMethod()');
+		expect(writtenContent).toContain("String name = 'test';");
+		expect(writtenContent).not.toContain('Integer value = 5;');
+		// Should have closing braces for structure
+		expect(writtenContent.split('}').length).toBeGreaterThan(1);
 	});
 });
