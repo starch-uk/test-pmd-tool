@@ -588,4 +588,59 @@ UnknownType value = getUnknown(); // ❌ Violation
 		expect(writtenContent).toContain('public Boolean getUnknown()');
 		expect(writtenContent).toContain('return true;');
 	});
+
+	it('should extract method body content when class definition is present', () => {
+		const exampleContent = `
+// Violation: Variables that are never reassigned should be declared as final
+public class Example {
+  public void invalidMethod() {
+    Integer value = 5;
+    String message = 'Hello'; // ❌
+    System.debug(message);
+  }
+}
+`;
+
+		createTestFile({
+			exampleContent,
+			exampleIndex: 35,
+			includeValids: false,
+			includeViolations: true,
+		});
+
+		const writtenContent = capturedContent;
+		// Should not contain the class definition
+		expect(writtenContent).not.toContain('public class Example {');
+		// Should not contain the method signature
+		expect(writtenContent).not.toContain('public void invalidMethod() {');
+		// Should contain the method body content
+		expect(writtenContent).toContain('Integer value = 5;');
+		expect(writtenContent).toContain("String message = 'Hello';");
+		expect(writtenContent).toContain('System.debug(message);');
+		// Should be wrapped in test class and method
+		expect(writtenContent).toContain('public class TestClass35 {');
+		expect(writtenContent).toContain('public void testMethod35() {');
+	});
+
+	it('should handle empty extracted code when class definition extraction removes everything', () => {
+		const exampleContent = `
+// Violation: Test
+public class Example {
+  public void method() {
+  }
+}
+`;
+
+		createTestFile({
+			exampleContent,
+			exampleIndex: 36,
+			includeValids: false,
+			includeViolations: true,
+		});
+
+		const writtenContent = capturedContent;
+		// Should still create valid class structure even if extracted code is empty
+		expect(writtenContent).toContain('public class TestClass36 {');
+		expect(writtenContent).toContain('public void testMethod36() {');
+	});
 });
