@@ -333,6 +333,80 @@ export function createTestFile({
 		codeToInclude = [...parsed.violations, ...parsed.valids];
 	}
 
+	// Check if code contains class definition (which would be invalid inside a method)
+	const hasClassDefinition = codeToInclude.some(
+		(line) =>
+			line.trim().startsWith('public class ') ||
+			line.trim().startsWith('class '),
+	);
+
+	if (hasClassDefinition) {
+		// Extract only the content inside methods, skip class/method definitions and closing braces
+		const extractedCode: string[] = [];
+		let insideMethod = false;
+		let braceDepth = 0;
+
+		for (const line of codeToInclude) {
+			const trimmed = line.trim();
+
+			// Skip class definitions
+			if (
+				trimmed.startsWith('public class ') ||
+				trimmed.startsWith('class ') ||
+				trimmed.startsWith('private class ')
+			) {
+				continue;
+			}
+
+			// Detect method start (but not method calls)
+			const isMethodSignature =
+				(trimmed.startsWith('public ') ||
+					trimmed.startsWith('private ') ||
+					trimmed.startsWith('protected ')) &&
+				trimmed.includes('() {') &&
+				!insideMethod;
+
+			const INITIAL_BRACE_DEPTH = 1;
+			const ZERO_BRACE_DEPTH = 0;
+			if (isMethodSignature) {
+				// Start of method - skip the signature line
+				insideMethod = true;
+				braceDepth = INITIAL_BRACE_DEPTH; // Opening brace from method signature
+				continue;
+			}
+
+			// Track brace depth to know when we exit a method
+			if (insideMethod) {
+				const openBraces = (line.match(/{/g) ?? []).length;
+				const closeBraces = (line.match(/}/g) ?? []).length;
+				braceDepth += openBraces - closeBraces;
+
+				// Include the line if we're inside a method (but not the final closing brace)
+				if (braceDepth > ZERO_BRACE_DEPTH) {
+					extractedCode.push(line);
+				}
+
+				// If brace depth reaches 0, we've exited the method
+				if (braceDepth <= ZERO_BRACE_DEPTH) {
+					insideMethod = false;
+					braceDepth = ZERO_BRACE_DEPTH;
+				}
+			} else if (
+				!trimmed.startsWith('}') &&
+				trimmed.length > EMPTY_LENGTH &&
+				!trimmed.startsWith('public ') &&
+				!trimmed.startsWith('private ')
+			) {
+				// Include standalone code lines (variable declarations, etc.) outside methods
+				// but skip method signatures and class definitions
+				extractedCode.push(line);
+			}
+		}
+
+		codeToInclude =
+			extractedCode.length > EMPTY_LENGTH ? extractedCode : codeToInclude;
+	}
+
 	// Wrap code in a method for valid Apex syntax
 	if (codeToInclude.length > EMPTY_LENGTH) {
 		classContent += `    public void testMethod${String(exampleIndex)}() {\n`;
