@@ -193,4 +193,18 @@ public class TestClass {
 			'private Integer y = getDefaultValue();',
 		]);
 	});
+
+	it('should handle edge case where split result index is undefined', () => {
+		// This test covers the defensive ?? line fallback branches
+		// by using a line that starts with the marker (edge case)
+		const content = `// ❌
+public class TestClass {
+    private Integer value = 42;
+}`;
+
+		const result = parseExample(content);
+
+		// The marker line itself should be handled
+		expect(result.violationMarkers.length).toBeGreaterThan(0);
+	});
 });

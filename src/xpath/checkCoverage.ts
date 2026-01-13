@@ -44,7 +44,9 @@ function findAttributeLineNumber(
 
 		// Find the line containing the XPath value element
 		for (let i = 0; i < lines.length; i++) {
-			const line = lines[i];
+			// split('\n') always returns a dense array, so lines[i] is always defined
+			// eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Loop condition ensures i < length, split() returns dense array
+			const line = lines[i]!;
 			// Check if this line contains the XPath and the attribute
 			const hasXPath = line.includes('xpath');
 			const hasValue = line.includes('value');
@@ -57,7 +59,9 @@ function findAttributeLineNumber(
 		// If not found in a single line, search for the XPath section and then the attribute
 		let inXPathSection = false;
 		for (let i = 0; i < lines.length; i++) {
-			const line = lines[i];
+			// split('\n') always returns a dense array, so lines[i] is always defined
+			// eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Loop condition ensures i < length, split() returns dense array
+			const line = lines[i]!;
 			if (line.includes('<property') && line.includes('name="xpath"')) {
 				inXPathSection = true;
 			}
@@ -74,7 +78,10 @@ function findAttributeLineNumber(
 		if (xpathIndex !== NOT_FOUND_INDEX) {
 			// Find the value element and count lines
 			for (let i = 0; i < lines.length; i++) {
-				if (lines[i].includes('<value>')) {
+				// split('\n') always returns a dense array, so lines[i] is always defined
+				// eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Loop condition ensures i < length, split() returns dense array
+				const line = lines[i]!;
+				if (line.includes('<value>')) {
 					// Count newlines in XPath up to the attribute position
 					const xpathBeforeAttribute = xpath.substring(
 						MIN_COUNT,
@@ -115,7 +122,9 @@ function findNodeTypeLineNumber(
 
 		// Find the line containing the XPath value element
 		for (let i = 0; i < lines.length; i++) {
-			const line = lines[i];
+			// split('\n') always returns a dense array, so lines[i] is always defined
+			// eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Loop condition ensures i < length, split() returns dense array
+			const line = lines[i]!;
 			// Check if this line contains the XPath and the node type
 			const hasXPath = line.includes('xpath');
 			const hasValue = line.includes('value');
@@ -128,7 +137,9 @@ function findNodeTypeLineNumber(
 		// If not found in a single line, search for the XPath section and then the node type
 		let inXPathSection = false;
 		for (let i = 0; i < lines.length; i++) {
-			const line = lines[i];
+			// split('\n') always returns a dense array, so lines[i] is always defined
+			// eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Loop condition ensures i < length, split() returns dense array
+			const line = lines[i]!;
 			if (line.includes('<property') && line.includes('name="xpath"')) {
 				inXPathSection = true;
 			}
@@ -145,7 +156,10 @@ function findNodeTypeLineNumber(
 		if (xpathIndex !== NOT_FOUND_INDEX) {
 			// Find the value element and count lines
 			for (let i = 0; i < lines.length; i++) {
-				if (lines[i].includes('<value>')) {
+				// split('\n') always returns a dense array, so lines[i] is always defined
+				// eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Loop condition ensures i < length, split() returns dense array
+				const line = lines[i]!;
+				if (line.includes('<value>')) {
 					// Count newlines in XPath up to the node type position
 					const xpathBeforeNodeType = xpath.substring(
 						MIN_COUNT,

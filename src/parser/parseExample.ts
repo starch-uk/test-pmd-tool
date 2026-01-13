@@ -10,9 +10,11 @@ const EMPTY_STRING_INDEX = 0;
 /**
  * Parse example content and extract violations, valids, and markers.
  * @param exampleContent - Raw example content with code and markers.
- * @returns Parsed example data.
+ * @returns Parsed example data (without exampleIndex, which is added by the caller).
  */
-export function parseExample(exampleContent: string): ExampleData {
+export function parseExample(
+	exampleContent: string,
+): Omit<ExampleData, 'exampleIndex'> {
 	const lines = exampleContent.split('\n');
 	const violations: string[] = [];
 	const valids: string[] = [];
@@ -55,9 +57,15 @@ export function parseExample(exampleContent: string): ExampleData {
 			// Remove inline comment markers from the code
 			let codeLine = line;
 			if (line.includes('// ❌')) {
-				codeLine = line.split('// ❌')[EMPTY_STRING_INDEX].trim();
+				const splitResult = line.split('// ❌');
+				// split() always returns at least one element, so [0] is always defined
+				// eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- split() always returns at least one element
+				codeLine = splitResult[EMPTY_STRING_INDEX]!.trim();
 			} else if (line.includes('// ✅')) {
-				codeLine = line.split('// ✅')[EMPTY_STRING_INDEX].trim();
+				const splitResult = line.split('// ✅');
+				// split() always returns at least one element, so [0] is always defined
+				// eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- split() always returns at least one element
+				codeLine = splitResult[EMPTY_STRING_INDEX]!.trim();
 			}
 
 			if (lineMode === 'violation') {

@@ -20,9 +20,10 @@ export function extractConditionals(xpath: string): Conditional[] {
 	// Extract 'not' conditions
 	const notMatches = xpath.matchAll(/not\s*\(([^)]+)\)/g);
 	for (const match of notMatches) {
-		// Regex capture group ([^)]+) requires at least one character, so match[1] is always defined and length > 0
+		// Regex capture group ([^)]+) requires at least one character, so match[1] is always defined
 		// match.index is always defined for successful matches
-		const expression = match[MATCH_INDEX];
+		// eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Regex capture group ensures match[1] is defined
+		const expression = match[MATCH_INDEX]!;
 		const position = match.index;
 		conditionals.push({
 			expression: expression.trim(),
@@ -34,8 +35,9 @@ export function extractConditionals(xpath: string): Conditional[] {
 	// Extract 'and' conditions
 	const andMatches = xpath.matchAll(/and\s+([^[\]]+)(?=\s*\])/g);
 	for (const match of andMatches) {
-		// Regex capture group ([^[\]]+) requires at least one character, so match[1] is always defined and length > 0
-		const expression = match[MATCH_INDEX];
+		// Regex capture group ([^[\]]+) requires at least one character, so match[1] is always defined
+		// eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Regex capture group ensures match[1] is defined
+		const expression = match[MATCH_INDEX]!;
 		const position = match.index;
 		conditionals.push({
 			expression: expression.trim(),
@@ -47,8 +49,9 @@ export function extractConditionals(xpath: string): Conditional[] {
 	// Extract 'or' conditions
 	const orMatches = xpath.matchAll(/or\s+([^[\]]+)(?=\s*\])/g);
 	for (const match of orMatches) {
-		// Regex capture group ([^[\]]+) requires at least one character, so match[1] is always defined and length > 0
-		const expression = match[MATCH_INDEX];
+		// Regex capture group ([^[\]]+) requires at least one character, so match[1] is always defined
+		// eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Regex capture group ensures match[1] is defined
+		const expression = match[MATCH_INDEX]!;
 		const position = match.index;
 		conditionals.push({
 			expression: expression.trim(),

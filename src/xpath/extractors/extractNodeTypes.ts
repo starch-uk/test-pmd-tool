@@ -99,8 +99,9 @@ export function extractNodeTypes(xpath: string): string[] {
 
 	for (const matches of allMatches) {
 		for (const match of matches) {
-			// Regex capture groups require at least one character, so match[1] is always defined and length > 0
-			const nodeType = match[MATCH_INDEX];
+			// Regex capture groups require at least one character, so match[1] is always defined
+			// eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Regex capture group ensures match[1] is defined
+			const nodeType = match[MATCH_INDEX]!;
 			nodeTypes.add(nodeType);
 		}
 	}

@@ -28,15 +28,14 @@ vi.mock(
 		}) as { extractXPath: ReturnType<typeof vi.fn> },
 );
 
-vi.mock(
-	'../../../src/pmd/runPMD.js',
-	() =>
-		({
-			runPMD: vi.fn(),
-		}) as { runPMD: ReturnType<typeof vi.fn> },
-);
+vi.mock('../../../src/pmd/runPMD.js', () => ({
+	runPMD: vi.fn(),
+}));
+
+import { runPMD } from '../../../src/pmd/runPMD.js';
 
 const mockedReadFileSync = vi.mocked(readFileSync);
+const mockedRunPMD = vi.mocked(runPMD);
 
 // Import modules with proper typing
 interface ExtractXPathModule {
@@ -294,6 +293,97 @@ describe('RuleTester', () => {
 			const examples = tester.getExamples();
 
 			expect(Array.isArray(examples)).toBe(true);
+		});
+
+		describe('findTestCaseLineNumber edge cases', () => {
+			it('should handle case where example boundaries are not found', async () => {
+				const xmlContent = `<?xml version="1.0" encoding="UTF-8"?>
+<rule name="TestRule"
+      language="apex"
+      message="Test message"
+      class="net.sourceforge.pmd.lang.apex.rule.TestRule">
+  <description>Test rule description</description>
+  <priority>3</priority>
+  <example>
+// Violation: Test
+public class TestClass {
+    public void method() {}
+}
+  </example>
+</rule>`;
+
+				mockedReadFileSync.mockReturnValue(xmlContent);
+				const xpathResult: FileOperationResult<string | null> = {
+					data: null,
+					success: true,
+				};
+				mockedExtractXPath.mockReturnValue(xpathResult);
+
+				const tester = new RuleTester('/path/to/test-rule.xml');
+				tester.extractExamples();
+
+				// Mock readFileSync to return content without matching example tags
+				// This simulates the case where example boundaries can't be found
+				// We'll return content that doesn't have the example structure
+				mockedReadFileSync.mockReturnValueOnce(
+					'<rule><example>content</example></rule>',
+				);
+
+				// Mock runPMD to return empty violations
+				mockedRunPMD.mockResolvedValue({
+					data: { violations: [] },
+					success: true,
+				});
+
+				// This will call findTestCaseLineNumber internally
+				// We'll use a file that doesn't have matching example structure
+				const result = await tester.runCoverageTest(false);
+
+				// Should complete without throwing
+				expect(result).toBeDefined();
+			});
+
+			it('should handle file content edge cases', async () => {
+				const xmlContent = `<?xml version="1.0" encoding="UTF-8"?>
+<rule name="TestRule"
+      language="apex"
+      message="Test message"
+      class="net.sourceforge.pmd.lang.apex.rule.TestRule">
+  <description>Test rule description</description>
+  <priority>3</priority>
+  <example>
+// Violation: Test
+public class TestClass {
+    public void method() {}
+}
+  </example>
+</rule>`;
+
+				mockedReadFileSync.mockReturnValue(xmlContent);
+				const xpathResult: FileOperationResult<string | null> = {
+					data: null,
+					success: true,
+				};
+				mockedExtractXPath.mockReturnValue(xpathResult);
+
+				const tester = new RuleTester('/path/to/test-rule.xml');
+				tester.extractExamples();
+
+				// Create a scenario with file content that might have edge cases
+				const sparseContent =
+					'<rule>\n<example>\ncontent\n</example>\n</rule>';
+				mockedReadFileSync.mockReturnValueOnce(sparseContent);
+
+				// Mock runPMD to return empty violations
+				mockedRunPMD.mockResolvedValue({
+					data: { violations: [] },
+					success: true,
+				});
+
+				const result = await tester.runCoverageTest(false);
+
+				expect(result).toBeDefined();
+			});
 		});
 	});
 });

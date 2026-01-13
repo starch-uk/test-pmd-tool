@@ -225,6 +225,20 @@ function checkCoverage(
 
 ## Quality Gates
 
+### Mandatory Quality Check Order
+**CRITICAL: After making any changes, the following commands MUST be run in this exact order:**
+
+1. `pnpm format` - Format code with Prettier
+2. `pnpm typecheck` - Type-check TypeScript without emitting files
+3. `pnpm lint` - Run ESLint on all TypeScript files
+4. `pnpm test:coverage` - Run tests with coverage report (must achieve 100% coverage)
+
+**Important Rules:**
+- ✅ **All commands must pass** before considering changes complete
+- ✅ **If any command fails**, fix the issues and **re-run ALL commands from the beginning** (start with `pnpm format` again)
+- ✅ **Never skip steps** or change the order
+- ✅ **All checks must pass** before committing code
+
 ### Pre-commit Requirements
 **MANDATORY: 100% test coverage is required before any commit**
 

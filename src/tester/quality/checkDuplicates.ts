@@ -85,7 +85,9 @@ export function checkDuplicates(
 				if (!violationPatterns.has(normalized)) {
 					violationPatterns.set(normalized, []);
 				}
-				const patternList = violationPatterns.get(normalized);
+				// get() after set() always returns the array, never undefined
+				// eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- get() after set() always returns the array
+				const patternList = violationPatterns.get(normalized)!;
 				patternList.push(exampleNum);
 			});
 
@@ -95,7 +97,9 @@ export function checkDuplicates(
 				if (!validPatterns.has(normalized)) {
 					validPatterns.set(normalized, []);
 				}
-				const patternList = validPatterns.get(normalized);
+				// get() after set() always returns the array, never undefined
+				// eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- get() after set() always returns the array
+				const patternList = validPatterns.get(normalized)!;
 				patternList.push(exampleNum);
 			});
 		},

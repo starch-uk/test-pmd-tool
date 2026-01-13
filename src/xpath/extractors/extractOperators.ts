@@ -20,8 +20,9 @@ export function extractOperators(xpath: string): string[] {
 	const opMatches = xpath.matchAll(/@Op\s*=\s*['"]([^'"]+)['"]/g);
 
 	for (const match of opMatches) {
-		// Regex capture group ([^'"]+) requires at least one character, so match[1] is always defined and length > 0
-		const operator = match[MATCH_INDEX];
+		// Regex capture group ([^'"]+) requires at least one character, so match[1] is always defined
+		// eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Regex capture group ensures match[1] is defined
+		const operator = match[MATCH_INDEX]!;
 		operators.add(operator);
 	}
 

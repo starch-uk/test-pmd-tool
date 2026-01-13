@@ -102,7 +102,10 @@ export class RuleTester {
 			rulesetsIndex < pathParts.length - categoryIndexOffset
 		) {
 			const categoryIndex = rulesetsIndex + categoryIndexOffset;
-			const category = pathParts[categoryIndex];
+			// The bounds check above ensures categoryIndex < pathParts.length,
+			// and split('/') always returns a dense array, so pathParts[categoryIndex] is always defined
+			// eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Bounds check ensures index is valid, split() returns dense array
+			const category = pathParts[categoryIndex]!;
 			return category;
 		}
 		return 'unknown';
@@ -150,7 +153,11 @@ export class RuleTester {
 
 		const xpathResult = extractXPath(this.ruleFilePath);
 		let xpath: string | null = null;
-		if (xpathResult.success && xpathResult.data !== null) {
+		if (
+			xpathResult.success &&
+			xpathResult.data !== null &&
+			xpathResult.data !== undefined
+		) {
 			xpath = xpathResult.data;
 		}
 
@@ -314,7 +321,9 @@ export class RuleTester {
 		const results: ExampleValidationResult[] = [];
 
 		for (let i = 0; i < this.examples.length; i++) {
-			const example = this.examples[i];
+			// Array access with valid index always returns a value, never undefined
+			// eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Loop condition ensures i < length, array access is always defined
+			const example = this.examples[i]!;
 
 			/**
 			 * 1-based indexing for display.
@@ -506,14 +515,17 @@ export class RuleTester {
 			// Find the target example by counting examples until we reach the target index
 			// Remove unreachable false branch - we always find the example we're searching for
 			for (let i = 0; i < lines.length; i++) {
-				if (lines[i].includes('<example>')) {
+				// split('\n') always returns a dense array, so lines[i] is always defined
+				// eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Loop condition ensures i < length, split() returns dense array
+				const line = lines[i]!;
+				if (line.includes('<example>')) {
 					currentExampleIndex++;
 					// Set exampleStart when we find the target example
 					// Remove unreachable false branch using ternary
 					exampleStart =
 						currentExampleIndex === exampleIndex ? i : exampleStart;
 				} else if (
-					lines[i].includes('</example>') &&
+					line.includes('</example>') &&
 					currentExampleIndex === exampleIndex
 				) {
 					exampleEnd = i;
@@ -540,10 +552,10 @@ export class RuleTester {
 			 */
 			const hasInlineMarkers = (): boolean => {
 				for (let i = exampleStart; i <= exampleEnd; i++) {
-					if (
-						lines[i].includes('// ❌') ||
-						lines[i].includes('// ✅')
-					) {
+					// split('\n') always returns a dense array, so lines[i] is always defined
+					// eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Loop bounds ensure valid index, split() returns dense array
+					const line = lines[i]!;
+					if (line.includes('// ❌') || line.includes('// ✅')) {
 						return true;
 					}
 				}
@@ -554,7 +566,9 @@ export class RuleTester {
 			const LINE_NUMBER_OFFSET = 1;
 			const hasInline = hasInlineMarkers();
 			for (let i = exampleStart; i <= exampleEnd; i++) {
-				const line = lines[i];
+				// split('\n') always returns a dense array, so lines[i] is always defined
+				// eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Loop bounds ensure valid index, split() returns dense array
+				const line = lines[i]!;
 
 				if (hasInline) {
 					// Use inline markers
@@ -577,7 +591,10 @@ export class RuleTester {
 							j <= exampleEnd;
 							j++
 						) {
-							const nextLine = lines[j].trim();
+							// split('\n') always returns a dense array, so lines[j] is always defined
+							// eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Loop bounds ensure valid index, split() returns dense array
+							const nextLineRaw = lines[j]!;
+							const nextLine = nextLineRaw.trim();
 							// Skip empty lines, XML tags, and comments, find the actual code line
 							if (
 								nextLine &&
