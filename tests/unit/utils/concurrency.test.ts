@@ -2,6 +2,7 @@
  * @file
  * Unit tests for limitConcurrency function.
  */
+/* eslint-disable @typescript-eslint/strict-void-return */
 /* eslint-disable @typescript-eslint/explicit-function-return-type */
 /* eslint-disable @typescript-eslint/require-await */
 /* eslint-disable jsdoc/require-returns */

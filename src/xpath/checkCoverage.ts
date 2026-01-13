@@ -642,8 +642,9 @@ export function checkXPathCoverage(
 		const nodeTypeOptions: NodeTypeCoverageOptions | undefined =
 			hasRuleFilePath && hasXpathValue
 				? {
-						lineNumberCollector: (lineNumber: number) =>
-							coveredLineNumbers.add(lineNumber),
+						lineNumberCollector: (lineNumber: number): void => {
+							coveredLineNumbers.add(lineNumber);
+						},
 						ruleFilePath: ruleFilePathValue,
 						xpath: xpathValue,
 					}
@@ -704,8 +705,9 @@ export function checkXPathCoverage(
 		const attributeOptions: AttributeCoverageOptions | undefined =
 			hasRuleFilePath && hasXpathValue
 				? {
-						lineNumberCollector: (lineNumber: number) =>
-							coveredLineNumbers.add(lineNumber),
+						lineNumberCollector: (lineNumber: number): void => {
+							coveredLineNumbers.add(lineNumber);
+						},
 						ruleFilePath: ruleFilePathValue,
 						xpath: xpathValue,
 					}

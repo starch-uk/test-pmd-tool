@@ -2,6 +2,7 @@
  * @file
  * Unit tests for extractXPath function.
  */
+/* eslint-disable @typescript-eslint/strict-void-return */
 import { readFileSync, realpathSync } from 'fs';
 import { resolve } from 'path';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';

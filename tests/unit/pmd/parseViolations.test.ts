@@ -2,6 +2,7 @@
  * @file
  * Unit tests for parseViolations function.
  */
+/* eslint-disable @typescript-eslint/strict-void-return */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { parseViolations } from '../../../src/pmd/parseViolations.js';
 

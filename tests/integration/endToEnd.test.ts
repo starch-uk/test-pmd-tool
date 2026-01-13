@@ -2,6 +2,7 @@
  * @file
  * End-to-end integration tests for RuleTester.
  */
+/* eslint-disable @typescript-eslint/strict-void-return */
 import { existsSync, readFileSync, realpathSync } from 'fs';
 import { resolve } from 'path';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
