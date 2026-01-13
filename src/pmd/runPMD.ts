@@ -2,7 +2,7 @@
  * @file
  * PMD execution module. Runs PMD CLI against Apex files and parses results.
  */
-import { execSync } from 'child_process';
+import { execFileSync } from 'child_process';
 import { resolve } from 'path';
 import type { PMDResult, FileOperationResult } from '../types/index.js';
 import { parseViolations } from './parseViolations.js';
@@ -27,8 +27,21 @@ export async function runPMD(
 		const absoluteRulesetPath = resolve(rulesetPath);
 
 		// Execute PMD with XML output format
-		const result = execSync(
-			`pmd check --no-cache --no-progress -d "${absoluteApexPath}" -R "${absoluteRulesetPath}" -f xml`,
+		// Use execFileSync instead of execSync to prevent command injection
+		// Arguments are passed as an array, avoiding shell interpretation of special characters
+		const result = execFileSync(
+			'pmd',
+			[
+				'check',
+				'--no-cache',
+				'--no-progress',
+				'-d',
+				absoluteApexPath,
+				'-R',
+				absoluteRulesetPath,
+				'-f',
+				'xml',
+			],
 			{
 				cwd: process.cwd(),
 				encoding: 'utf-8',
@@ -38,7 +51,7 @@ export async function runPMD(
 		);
 
 		// Parse the XML output
-		// eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion -- execSync with encoding returns string | Buffer
+		// eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion -- execFileSync with encoding returns string | Buffer
 		const violations = parseViolations(result as string);
 
 		return {
@@ -55,7 +68,7 @@ export async function runPMD(
 			stderr?: Buffer | string;
 			message?: string;
 		}
-		// eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- Error from execSync has known shape
+		// eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- Error from execFileSync has known shape
 		const execError = error as ExecError;
 		if (execError.code === 'ENOENT') {
 			return {

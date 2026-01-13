@@ -3,12 +3,14 @@
 		"test-pmd-rule": "./dist/test-pmd-rule.js"
 	},
 	"dependencies": {
-		"@xmldom/xmldom": "^0.8.11"
+		"@xmldom/xmldom": "^0.8.11",
+		"tmp": "^0.2.5"
 	},
 	"devDependencies": {
 		"@eslint/js": "^9.39.2",
 		"@prettier/plugin-xml": "^3.4.2",
 		"@types/node": "^25.0.6",
+		"@types/tmp": "^0.2.6",
 		"@typescript-eslint/eslint-plugin": "^8.52.0",
 		"@typescript-eslint/parser": "^8.52.0",
 		"@vitest/coverage-v8": "^4.0.16",

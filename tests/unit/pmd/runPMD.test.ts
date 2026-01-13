@@ -2,13 +2,13 @@
  * @file
  * Unit tests for runPMD function.
  */
-import { execSync } from 'child_process';
+import { execFileSync } from 'child_process';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { runPMD } from '../../../src/pmd/runPMD.js';
 
-// Mock execSync
+// Mock execFileSync
 vi.mock('child_process', () => ({
-	execSync: vi.fn(),
+	execFileSync: vi.fn(),
 }));
 
 // Mock resolve function
@@ -16,12 +16,12 @@ vi.mock('path', () => ({
 	resolve: vi.fn((path: string) => path),
 }));
 
-const mockedExecSync = vi.mocked(execSync);
+const mockedExecFileSync = vi.mocked(execFileSync);
 
 /**
- * Interface for execSync error objects in tests.
+ * Interface for execFileSync error objects in tests.
  */
-interface ExecSyncTestError extends Error {
+interface ExecFileSyncTestError extends Error {
 	code?: number | string;
 	stdout?: Buffer | string;
 	stderr?: Buffer | string;
@@ -44,7 +44,7 @@ describe('runPMD', () => {
   </file>
 </pmd>`;
 
-		mockedExecSync.mockReturnValue(mockXmlOutput);
+		mockedExecFileSync.mockReturnValue(mockXmlOutput);
 
 		const result = await runPMD('/test/apex.cls', '/test/rules.xml');
 
@@ -63,8 +63,19 @@ describe('runPMD', () => {
 			success: true,
 		});
 
-		expect(mockedExecSync).toHaveBeenCalledWith(
-			'pmd check --no-cache --no-progress -d "/test/apex.cls" -R "/test/rules.xml" -f xml',
+		expect(mockedExecFileSync).toHaveBeenCalledWith(
+			'pmd',
+			[
+				'check',
+				'--no-cache',
+				'--no-progress',
+				'-d',
+				'/test/apex.cls',
+				'-R',
+				'/test/rules.xml',
+				'-f',
+				'xml',
+			],
 			expect.objectContaining({
 				cwd: process.cwd(),
 				encoding: 'utf-8',
@@ -77,11 +88,11 @@ describe('runPMD', () => {
 	it('should handle PMD execution errors with both stderr and stdout', async () => {
 		const errorWithStderr = new Error(
 			'Command failed',
-		) as ExecSyncTestError;
+		) as ExecFileSyncTestError;
 		errorWithStderr.stdout = 'This is not XML at all, just plain text';
 		errorWithStderr.stderr = 'Some stderr content';
 
-		mockedExecSync.mockImplementation(() => {
+		mockedExecFileSync.mockImplementation(() => {
 			throw errorWithStderr;
 		});
 
@@ -99,11 +110,11 @@ describe('runPMD', () => {
 	it('should handle PMD execution errors without stderr', async () => {
 		const errorWithoutStderr = new Error(
 			'Command failed',
-		) as ExecSyncTestError;
+		) as ExecFileSyncTestError;
 		errorWithoutStderr.stdout = ''; // Empty stdout
 		// stderr is undefined
 
-		mockedExecSync.mockImplementation(() => {
+		mockedExecFileSync.mockImplementation(() => {
 			throw errorWithoutStderr;
 		});
 
@@ -120,7 +131,7 @@ describe('runPMD', () => {
 		const errorMinimal = new Error('Command failed');
 		// Both stderr and stdout are undefined
 
-		mockedExecSync.mockImplementation(() => {
+		mockedExecFileSync.mockImplementation(() => {
 			throw errorMinimal;
 		});
 
@@ -135,11 +146,11 @@ describe('runPMD', () => {
 	it('should include stderr and stdout in error message when parsing fails', async () => {
 		const errorWithDetails = new Error(
 			'Command failed',
-		) as ExecSyncTestError;
+		) as ExecFileSyncTestError;
 		errorWithDetails.stdout = ''; // Empty stdout so parsing fails
 		errorWithDetails.stderr = 'Detailed error information';
 
-		mockedExecSync.mockImplementation(() => {
+		mockedExecFileSync.mockImplementation(() => {
 			throw errorWithDetails;
 		});
 
@@ -155,11 +166,11 @@ describe('runPMD', () => {
 	it('should include stderr and stdout in error message when stdout is whitespace only', async () => {
 		const errorWithWhitespaceStdout = new Error(
 			'Command failed',
-		) as ExecSyncTestError;
+		) as ExecFileSyncTestError;
 		errorWithWhitespaceStdout.stdout = '   \n\t   '; // Whitespace-only stdout
 		errorWithWhitespaceStdout.stderr = 'Detailed error information';
 
-		mockedExecSync.mockImplementation(() => {
+		mockedExecFileSync.mockImplementation(() => {
 			throw errorWithWhitespaceStdout;
 		});
 
@@ -177,7 +188,7 @@ describe('runPMD', () => {
 		const errorMinimal = new Error('Command failed');
 		// Both stderr and stdout are undefined
 
-		mockedExecSync.mockImplementation(() => {
+		mockedExecFileSync.mockImplementation(() => {
 			throw errorMinimal;
 		});
 
@@ -197,10 +208,10 @@ describe('runPMD', () => {
   </file>
 </pmd>`;
 
-		const mockError = new Error('Command failed') as ExecSyncTestError;
+		const mockError = new Error('Command failed') as ExecFileSyncTestError;
 		mockError.code = 1;
 		mockError.stdout = mockXmlOutput;
-		mockedExecSync.mockImplementation(() => {
+		mockedExecFileSync.mockImplementation(() => {
 			throw mockError;
 		});
 
@@ -223,9 +234,9 @@ describe('runPMD', () => {
 	});
 
 	it('should handle PMD not found error', async () => {
-		const mockError = new Error('Command failed') as ExecSyncTestError;
+		const mockError = new Error('Command failed') as ExecFileSyncTestError;
 		mockError.code = 'ENOENT';
-		mockedExecSync.mockImplementation(() => {
+		mockedExecFileSync.mockImplementation(() => {
 			throw mockError;
 		});
 
@@ -240,11 +251,11 @@ describe('runPMD', () => {
 	it('should handle execution errors that produce valid empty XML', async () => {
 		const mockError = new Error(
 			'Command failed with stderr',
-		) as ExecSyncTestError;
+		) as ExecFileSyncTestError;
 		mockError.code = 1;
 		mockError.stderr = 'PMD stderr output';
 		mockError.stdout = '<?xml version="1.0"?><pmd></pmd>'; // Valid but empty XML
-		mockedExecSync.mockImplementation(() => {
+		mockedExecFileSync.mockImplementation(() => {
 			throw mockError;
 		});
 
@@ -260,10 +271,10 @@ describe('runPMD', () => {
 	});
 
 	it('should handle PMD errors with parseable output', async () => {
-		const mockError = new Error('Command failed') as ExecSyncTestError;
+		const mockError = new Error('Command failed') as ExecFileSyncTestError;
 		mockError.code = 1;
 		mockError.stdout = 'not xml at all just plain text';
-		mockedExecSync.mockImplementation(() => {
+		mockedExecFileSync.mockImplementation(() => {
 			throw mockError;
 		});
 
@@ -279,23 +290,35 @@ describe('runPMD', () => {
 	});
 
 	it('should use correct command line arguments', async () => {
-		mockedExecSync.mockReturnValue(`<?xml version="1.0"?><pmd></pmd>`);
+		mockedExecFileSync.mockReturnValue(`<?xml version="1.0"?><pmd></pmd>`);
 
 		await runPMD('apex/file.cls', 'rules/file.xml');
 
-		expect(mockedExecSync).toHaveBeenCalledWith(
-			'pmd check --no-cache --no-progress -d "apex/file.cls" -R "rules/file.xml" -f xml',
+		expect(mockedExecFileSync).toHaveBeenCalledWith(
+			'pmd',
+			[
+				'check',
+				'--no-cache',
+				'--no-progress',
+				'-d',
+				'apex/file.cls',
+				'-R',
+				'rules/file.xml',
+				'-f',
+				'xml',
+			],
 			expect.any(Object),
 		);
 	});
 
 	it('should respect timeout configuration', async () => {
-		mockedExecSync.mockReturnValue(`<?xml version="1.0"?><pmd></pmd>`);
+		mockedExecFileSync.mockReturnValue(`<?xml version="1.0"?><pmd></pmd>`);
 
 		await runPMD('/test/apex.cls', '/test/rules.xml');
 
-		expect(mockedExecSync).toHaveBeenCalledWith(
-			expect.any(String),
+		expect(mockedExecFileSync).toHaveBeenCalledWith(
+			'pmd',
+			expect.any(Array),
 			expect.objectContaining({
 				timeout: 30000,
 			}),
@@ -303,9 +326,9 @@ describe('runPMD', () => {
 	});
 
 	it('should handle Buffer stdout conversion', async () => {
-		const mockError = new Error('Command failed') as ExecSyncTestError;
+		const mockError = new Error('Command failed') as ExecFileSyncTestError;
 		mockError.stdout = Buffer.from('<?xml version="1.0"?><pmd></pmd>');
-		mockedExecSync.mockImplementation(() => {
+		mockedExecFileSync.mockImplementation(() => {
 			throw mockError;
 		});
 
@@ -316,10 +339,10 @@ describe('runPMD', () => {
 	});
 
 	it('should handle Buffer stderr conversion', async () => {
-		const mockError = new Error('Command failed') as ExecSyncTestError;
+		const mockError = new Error('Command failed') as ExecFileSyncTestError;
 		mockError.stdout = '';
 		mockError.stderr = Buffer.from('Error details');
-		mockedExecSync.mockImplementation(() => {
+		mockedExecFileSync.mockImplementation(() => {
 			throw mockError;
 		});
 
@@ -331,10 +354,10 @@ describe('runPMD', () => {
 	});
 
 	it('should handle Buffer stdout in error message', async () => {
-		const mockError = new Error('Command failed') as ExecSyncTestError;
+		const mockError = new Error('Command failed') as ExecFileSyncTestError;
 		mockError.stdout = Buffer.from('   \n\t   ');
 		mockError.stderr = Buffer.from('Error details');
-		mockedExecSync.mockImplementation(() => {
+		mockedExecFileSync.mockImplementation(() => {
 			throw mockError;
 		});
 
@@ -345,10 +368,10 @@ describe('runPMD', () => {
 	});
 
 	it('should handle error without message property', async () => {
-		const mockError: ExecSyncTestError = {
+		const mockError: ExecFileSyncTestError = {
 			stdout: '',
 		};
-		mockedExecSync.mockImplementation(() => {
+		mockedExecFileSync.mockImplementation(() => {
 			throw mockError;
 		});
 
@@ -359,10 +382,10 @@ describe('runPMD', () => {
 	});
 
 	it('should handle stderr with only whitespace', async () => {
-		const mockError = new Error('Command failed') as ExecSyncTestError;
+		const mockError = new Error('Command failed') as ExecFileSyncTestError;
 		mockError.stdout = '';
 		mockError.stderr = '   \n\t   '; // Whitespace-only stderr
-		mockedExecSync.mockImplementation(() => {
+		mockedExecFileSync.mockImplementation(() => {
 			throw mockError;
 		});
 

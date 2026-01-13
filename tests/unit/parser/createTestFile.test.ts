@@ -3,8 +3,7 @@
  * Unit tests for createTestFile function.
  */
 import { writeFileSync } from 'fs';
-import { tmpdir } from 'os';
-import { join } from 'path';
+import tmp from 'tmp';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { createTestFile } from '../../../src/parser/createTestFile.js';
 
@@ -17,17 +16,25 @@ vi.mock('fs', () => ({
 	writeFileSync: vi.fn(),
 }));
 
-vi.mock('os', () => ({
-	tmpdir: vi.fn(() => '/tmp'),
-}));
-
-vi.mock('path', () => ({
-	join: vi.fn((...args: readonly string[]) => args.join('/')),
+// Mock tmp library
+vi.mock('tmp', () => ({
+	default: {
+		fileSync: vi.fn(() => ({
+			fd: 3,
+			name: '/tmp/rule-test-example-1-test.cls',
+			removeCallback: vi.fn(),
+		})),
+	},
 }));
 
 const mockedWriteFileSync = vi.mocked(writeFileSync);
-const mockedTmpdir = vi.mocked(tmpdir);
-const mockedJoin = vi.mocked(join);
+// Type the mocked tmp module properly
+interface TmpModule {
+	fileSync: ReturnType<typeof vi.fn>;
+}
+// eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- tmp is mocked, type assertion needed for test
+const tmpModule = tmp as unknown as TmpModule;
+const mockedTmpFileSync = vi.mocked(tmpModule.fileSync);
 
 let capturedContent = '';
 
@@ -42,9 +49,22 @@ describe('createTestFile', () => {
 				capturedContent = content;
 			},
 		);
-		mockedTmpdir.mockReturnValue('/tmp');
-		mockedJoin.mockImplementation((...args: readonly string[]) =>
-			args.join('/'),
+		// Mock tmp.fileSync to return different file names based on exampleIndex
+		mockedTmpFileSync.mockImplementation(
+			// eslint-disable-next-line @typescript-eslint/prefer-readonly-parameter-types -- Options object for tmp.fileSync
+			(options: {
+				keep?: boolean;
+				postfix?: string;
+				prefix?: string;
+			}) => {
+				const prefix = options.prefix ?? 'tmp-';
+				const postfix = options.postfix ?? '';
+				return {
+					fd: 3,
+					name: `/tmp/${prefix}${String(Date.now())}${postfix}`,
+					removeCallback: vi.fn(),
+				};
+			},
 		);
 	});
 
@@ -190,8 +210,7 @@ public class ValidClass {
 		createTestFile({ exampleContent, exampleIndex: 1 });
 
 		const { calls } = mockedWriteFileSync.mock;
-		// Since we're mocking join and tmpdir, the paths will be the same
-		// But Date.now() should make them different in real usage
+		// tmp.fileSync generates unique file names, so paths will be different
 		expect(calls[0][0]).toContain('rule-test-example-1-');
 		expect(calls[1][0]).toContain('rule-test-example-1-');
 	});

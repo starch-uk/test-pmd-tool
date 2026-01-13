@@ -19,6 +19,17 @@ vi.mock('../../src/pmd/runPMD.js', () => ({
 	runPMD: vi.fn(),
 }));
 
+// Mock tmp library for secure temporary file creation
+vi.mock('tmp', () => ({
+	default: {
+		fileSync: vi.fn(() => ({
+			fd: 3,
+			name: '/tmp/rule-test-example-1-test.cls',
+			removeCallback: vi.fn(),
+		})),
+	},
+}));
+
 import { runPMD } from '../../src/pmd/runPMD.js';
 
 const mockedExistsSync = vi.mocked(existsSync);

@@ -3,8 +3,7 @@
  * Creates temporary Apex test files from example content for PMD rule testing.
  */
 import { writeFileSync } from 'fs';
-import { tmpdir } from 'os';
-import { join } from 'path';
+import tmp from 'tmp';
 import type { TestFileResult } from '../types/index.js';
 import { parseExample } from './parseExample.js';
 
@@ -306,10 +305,15 @@ export function createTestFile({
 	includeViolations = true,
 	includeValids = true,
 }: Readonly<CreateTestFileOptions>): TestFileResult {
-	const tempFile = join(
-		tmpdir(),
-		`rule-test-example-${String(exampleIndex)}-${String(Date.now())}.cls`,
-	);
+	// Use tmp library for secure temporary file creation
+	// keep: true ensures file persists for PMD to read it
+	// File will be cleaned up on process exit by default, or can be manually removed
+	const tmpFile = tmp.fileSync({
+		keep: true,
+		postfix: '.cls',
+		prefix: `rule-test-example-${String(exampleIndex)}-`,
+	});
+	const tempFile = tmpFile.name;
 
 	// Parse the example to get violation and valid code
 	const parsed = parseExample(exampleContent);
