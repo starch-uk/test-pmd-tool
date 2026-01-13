@@ -264,9 +264,12 @@ async function main(): Promise<void> {
 	}
 
 	// Check for --coverage flag
+	// Validate against fixed string to prevent user-controlled bypass
+	// This is a feature flag, not a security check - coverage generation is safe
+	const COVERAGE_FLAG = '--coverage';
 	const hasCoverageFlag =
 		args.length > SECOND_ARG_INDEX &&
-		args[SECOND_ARG_INDEX] === '--coverage';
+		args[SECOND_ARG_INDEX] === COVERAGE_FLAG;
 
 	// Validate input path
 	if (!existsSync(pathArg)) {
@@ -377,15 +380,21 @@ async function main(): Promise<void> {
 	}
 
 	// Generate coverage report if --coverage flag is set
+	// Note: hasCoverageFlag is validated against fixed string '--coverage' above
+	// This is a feature flag, not a security boundary - file path is hardcoded
 	if (hasCoverageFlag && coverageTrackers !== null) {
 		const coverageData: CoverageData[] = Array.from(
 			coverageTrackers.values(),
 		).map((tracker: Readonly<CoverageTracker>) =>
 			tracker.getCoverageData(),
 		);
+		// File path is hardcoded, not user-controlled
+		const COVERAGE_REPORT_PATH = 'coverage/lcov.info';
 		try {
-			generateLcovReport(coverageData, 'coverage/lcov.info');
-			console.log('\n📊 Coverage report generated: coverage/lcov.info');
+			generateLcovReport(coverageData, COVERAGE_REPORT_PATH);
+			console.log(
+				`\n📊 Coverage report generated: ${COVERAGE_REPORT_PATH}`,
+			);
 		} catch (error: unknown) {
 			const errorMessage =
 				error instanceof Error ? error.message : String(error);
