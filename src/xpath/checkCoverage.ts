@@ -21,6 +21,7 @@ const LINE_OFFSET = 1;
 interface NodeTypeCoverageOptions {
 	ruleFilePath?: Readonly<string>;
 	xpath?: Readonly<string>;
+	lineNumberCollector?: (lineNumber: number) => void;
 }
 
 /**
@@ -194,6 +195,7 @@ function checkNodeTypeCoverage(
 	content: Readonly<string>,
 	options?: Readonly<NodeTypeCoverageOptions>,
 ): CoverageEvidence {
+	const lineNumberCollector = options?.lineNumberCollector;
 	const lowerContent = content.toLowerCase();
 	const foundNodeTypes: string[] = [];
 	const missingNodeTypes: string[] = [];
@@ -299,6 +301,10 @@ function checkNodeTypeCoverage(
 								item,
 							);
 							/* eslint-enable @typescript-eslint/no-non-null-assertion */
+							if (lineNumber !== null && lineNumberCollector) {
+								// Record this line as covered for LCOV reporting
+								lineNumberCollector(lineNumber);
+							}
 							return lineNumber !== null
 								? ` - Line ${String(lineNumber)}: ${item}`
 								: ` - ${item}`;
@@ -409,6 +415,7 @@ function checkConditionalCoverage(
 interface AttributeCoverageOptions {
 	ruleFilePath?: Readonly<string>;
 	xpath?: Readonly<string>;
+	lineNumberCollector?: (lineNumber: number) => void;
 }
 
 /**
@@ -423,6 +430,7 @@ function checkAttributeCoverage(
 	content: Readonly<string>,
 	options?: Readonly<AttributeCoverageOptions>,
 ): CoverageEvidence {
+	const lineNumberCollector = options?.lineNumberCollector;
 	const lowerContent = content.toLowerCase();
 	const foundAttributes: string[] = [];
 	const missingAttributes: string[] = [];
@@ -503,6 +511,10 @@ function checkAttributeCoverage(
 								xpathValue,
 								item,
 							);
+							if (lineNumber !== null && lineNumberCollector) {
+								// Record this line as covered for LCOV reporting
+								lineNumberCollector(lineNumber);
+							}
 							return lineNumber !== null
 								? ` - Line ${String(lineNumber)}: ${item}`
 								: ` - ${item}`;
@@ -616,6 +628,7 @@ export function checkXPathCoverage(
 
 	const coverageResults: CoverageResult[] = [];
 	const uncoveredBranches: string[] = [];
+	const coveredLineNumbers = new Set<number>();
 
 	// Check node types coverage
 	if (analysis.nodeTypes.length > MIN_COUNT) {
@@ -628,7 +641,13 @@ export function checkXPathCoverage(
 		const hasXpathValue = xpathValue.length > MIN_COUNT;
 		const nodeTypeOptions: NodeTypeCoverageOptions | undefined =
 			hasRuleFilePath && hasXpathValue
-				? { ruleFilePath: ruleFilePathValue, xpath: xpathValue }
+				? {
+						lineNumberCollector: (lineNumber: number): void => {
+							coveredLineNumbers.add(lineNumber);
+						},
+						ruleFilePath: ruleFilePathValue,
+						xpath: xpathValue,
+					}
 				: undefined;
 		const nodeTypeEvidence = checkNodeTypeCoverage(
 			analysis.nodeTypes,
@@ -685,7 +704,13 @@ export function checkXPathCoverage(
 		const hasXpathValue = xpathValue.length > MIN_COUNT;
 		const attributeOptions: AttributeCoverageOptions | undefined =
 			hasRuleFilePath && hasXpathValue
-				? { ruleFilePath: ruleFilePathValue, xpath: xpathValue }
+				? {
+						lineNumberCollector: (lineNumber: number): void => {
+							coveredLineNumbers.add(lineNumber);
+						},
+						ruleFilePath: ruleFilePathValue,
+						xpath: xpathValue,
+					}
 				: undefined;
 		const attributeEvidence = checkAttributeCoverage(
 			analysis.attributes,
@@ -737,6 +762,7 @@ export function checkXPathCoverage(
 
 	return {
 		coverage: coverageResults,
+		coveredLineNumbers: Array.from(coveredLineNumbers),
 		overallSuccess,
 		uncoveredBranches,
 	};

@@ -105,6 +105,11 @@ export interface XPathCoverageResult {
 	coverage: CoverageResult[];
 	overallSuccess: boolean;
 	uncoveredBranches: string[];
+
+	/**
+	 * Line numbers in the XML file that are covered.
+	 */
+	coveredLineNumbers?: number[];
 }
 
 export interface TestCaseResult {

@@ -2,6 +2,7 @@
  * @file
  * Unit tests for createTestFile function.
  */
+/* eslint-disable @typescript-eslint/strict-void-return */
 import { writeFileSync } from 'fs';
 import tmp from 'tmp';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
