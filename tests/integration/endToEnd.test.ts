@@ -2,7 +2,8 @@
  * @file
  * End-to-end integration tests for RuleTester.
  */
-import { existsSync, readFileSync } from 'fs';
+import { existsSync, readFileSync, realpathSync } from 'fs';
+import { resolve } from 'path';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { RuleTester } from '../../src/tester/RuleTester.js';
 
@@ -10,8 +11,14 @@ import { RuleTester } from '../../src/tester/RuleTester.js';
 vi.mock('fs', () => ({
 	existsSync: vi.fn(),
 	readFileSync: vi.fn(),
+	realpathSync: vi.fn(),
 	unlinkSync: vi.fn(),
 	writeFileSync: vi.fn(),
+}));
+
+// Mock path operations
+vi.mock('path', () => ({
+	resolve: vi.fn(),
 }));
 
 // Mock PMD execution
@@ -34,6 +41,8 @@ import { runPMD } from '../../src/pmd/runPMD.js';
 
 const mockedExistsSync = vi.mocked(existsSync);
 const mockedReadFileSync = vi.mocked(readFileSync);
+const mockedRealpathSync = vi.mocked(realpathSync);
+const mockedResolve = vi.mocked(resolve);
 const mockedRunPMD = vi.mocked(runPMD);
 
 describe('RuleTester Integration', () => {
@@ -45,6 +54,10 @@ describe('RuleTester Integration', () => {
 		console.error = vi.fn();
 		// Reset mocks completely - this clears call history AND resets implementations
 		vi.resetAllMocks();
+
+		// Mock path normalization - default behavior: return input path
+		mockedResolve.mockImplementation((path: Readonly<string>) => path);
+		mockedRealpathSync.mockImplementation((path: Readonly<string>) => path);
 
 		// Mock file existence
 		mockedExistsSync.mockReturnValue(true);

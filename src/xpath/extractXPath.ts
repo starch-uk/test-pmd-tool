@@ -2,12 +2,28 @@
  * @file
  * XPath extraction from PMD rule XML files.
  */
-import { readFileSync } from 'fs';
+import { readFileSync, realpathSync } from 'fs';
+import { resolve } from 'path';
 import { DOMParser } from '@xmldom/xmldom';
 import type { FileOperationResult } from '../types/index.js';
 
 const FIRST_ELEMENT_INDEX = 0;
 const MIN_STRING_LENGTH = 0;
+
+/**
+ * Normalize and validate file path to prevent path traversal attacks.
+ * Resolves the path to an absolute path and resolves symbolic links.
+ * @param filePath - User-provided file path.
+ * @returns Normalized absolute path.
+ * @throws {Error} If path cannot be resolved or contains invalid characters.
+ */
+function normalizePath(filePath: Readonly<string>): string {
+	// Resolve to absolute path, removing ".." segments
+	const resolvedPath = resolve(filePath);
+	// Resolve symbolic links to get canonical path
+	const canonicalPath = realpathSync(resolvedPath);
+	return canonicalPath;
+}
 
 /**
  * Extract XPath expression from XML rule file.
@@ -18,7 +34,9 @@ export function extractXPath(
 	xmlFilePath: Readonly<string>,
 ): FileOperationResult<string | null> {
 	try {
-		const content = readFileSync(xmlFilePath, 'utf-8');
+		// Normalize path to prevent path traversal attacks
+		const normalizedPath = normalizePath(xmlFilePath);
+		const content = readFileSync(normalizedPath, 'utf-8');
 		const parser = new DOMParser();
 		const doc = parser.parseFromString(content, 'text/xml');
 

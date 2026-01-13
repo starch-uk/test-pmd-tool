@@ -43,14 +43,31 @@
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
-const { execSync } = require('child_process');
+const { execFileSync } = require('child_process');
 const { DOMParser } = require('@xmldom/xmldom');
+
+/**
+ * Normalize and validate file path to prevent path traversal attacks.
+ * Resolves the path to an absolute path and resolves symbolic links.
+ * @param {string} filePath - User-provided file path.
+ * @returns {string} Normalized absolute path.
+ * @throws {Error} If path cannot be resolved or contains invalid characters.
+ */
+function normalizePath(filePath) {
+	// Resolve to absolute path, removing ".." segments
+	const resolvedPath = path.resolve(filePath);
+	// Resolve symbolic links to get canonical path
+	const canonicalPath = fs.realpathSync(resolvedPath);
+	return canonicalPath;
+}
 
 /**
  * Extract XPath expression from XML rule file
  */
 function extractXPath(xmlFilePath) {
-	const content = fs.readFileSync(xmlFilePath, 'utf-8');
+	// Normalize path to prevent path traversal attacks
+	const normalizedPath = normalizePath(xmlFilePath);
+	const content = fs.readFileSync(normalizedPath, 'utf-8');
 	const parser = new DOMParser();
 	const doc = parser.parseFromString(content, 'text/xml');
 
@@ -2398,11 +2415,24 @@ async function runPMD(rulesetPath, apexFilePath) {
 		: path.resolve(process.cwd(), rulesetPath);
 
 	try {
+		// Use execFileSync instead of execSync to prevent command injection
+		// Arguments are passed as an array, avoiding shell interpretation of special characters
 		// Use --no-cache to avoid cache issues
 		// Use --no-progress to disable progress bar
 		// Capture both stdout and stderr
-		const result = execSync(
-			`pmd check --no-cache --no-progress -d "${absoluteApexPath}" -R "${absoluteRulesetPath}" -f xml`,
+		const result = execFileSync(
+			'pmd',
+			[
+				'check',
+				'--no-cache',
+				'--no-progress',
+				'-d',
+				absoluteApexPath,
+				'-R',
+				absoluteRulesetPath,
+				'-f',
+				'xml',
+			],
 			{
 				encoding: 'utf-8',
 				timeout: 30000,

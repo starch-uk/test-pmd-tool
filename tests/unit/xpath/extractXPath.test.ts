@@ -2,7 +2,8 @@
  * @file
  * Unit tests for extractXPath function.
  */
-import { readFileSync } from 'fs';
+import { readFileSync, realpathSync } from 'fs';
+import { resolve } from 'path';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { extractXPath } from '../../../src/xpath/extractXPath.js';
 
@@ -25,9 +26,14 @@ function suppressConsoleOutput<T>(fn: () => T): T {
 	}
 }
 
-// Mock file system
+// Mock file system and path
 vi.mock('fs', () => ({
 	readFileSync: vi.fn(),
+	realpathSync: vi.fn(),
+}));
+
+vi.mock('path', () => ({
+	resolve: vi.fn(),
 }));
 
 // Mock DOMParser for null textContent test
@@ -61,10 +67,15 @@ vi.mock('@xmldom/xmldom', async () => {
 });
 
 const mockedReadFileSync = vi.mocked(readFileSync);
+const mockedRealpathSync = vi.mocked(realpathSync);
+const mockedResolve = vi.mocked(resolve);
 
 describe('extractXPath', () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
+		// Default mock behavior: resolve and realpathSync return the input path
+		mockedResolve.mockImplementation((path: Readonly<string>) => path);
+		mockedRealpathSync.mockImplementation((path: Readonly<string>) => path);
 	});
 
 	afterEach(() => {
@@ -208,11 +219,17 @@ describe('extractXPath', () => {
 	});
 
 	it('should handle file read errors', () => {
+		const inputPath = '/path/to/nonexistent.xml';
+		const resolvedPath = '/resolved/path/to/nonexistent.xml';
+		const canonicalPath = '/canonical/path/to/nonexistent.xml';
+
+		mockedResolve.mockReturnValue(resolvedPath);
+		mockedRealpathSync.mockReturnValue(canonicalPath);
 		mockedReadFileSync.mockImplementation(() => {
 			throw new Error('File not found');
 		});
 
-		const result = extractXPath('/path/to/nonexistent.xml');
+		const result = extractXPath(inputPath);
 
 		expect(result.success).toBe(false);
 		expect(result.error).toContain('Error extracting XPath');
@@ -233,7 +250,7 @@ describe('extractXPath', () => {
 		expect(data === null || data === '//test').toBe(true);
 	});
 
-	it('should call readFileSync with correct path and encoding', () => {
+	it('should normalize path before reading file', () => {
 		const mockXml = `<?xml version="1.0"?>
 <rule name="TestRule">
   <properties>
@@ -243,14 +260,19 @@ describe('extractXPath', () => {
   </properties>
 </rule>`;
 
+		const inputPath = '/custom/path/rule.xml';
+		const resolvedPath = '/resolved/path/rule.xml';
+		const canonicalPath = '/canonical/path/rule.xml';
+
+		mockedResolve.mockReturnValue(resolvedPath);
+		mockedRealpathSync.mockReturnValue(canonicalPath);
 		mockedReadFileSync.mockReturnValue(mockXml);
 
-		extractXPath('/custom/path/rule.xml');
+		extractXPath(inputPath);
 
-		expect(mockedReadFileSync).toHaveBeenCalledWith(
-			'/custom/path/rule.xml',
-			'utf-8',
-		);
+		expect(mockedResolve).toHaveBeenCalledWith(inputPath);
+		expect(mockedRealpathSync).toHaveBeenCalledWith(resolvedPath);
+		expect(mockedReadFileSync).toHaveBeenCalledWith(canonicalPath, 'utf-8');
 	});
 
 	it('should handle null textContent in value element', () => {
@@ -273,14 +295,34 @@ describe('extractXPath', () => {
 		expect(result.data).toBe(null);
 	});
 
+	it('should handle path normalization errors', () => {
+		const inputPath = '/path/to/rule.xml';
+		mockedResolve.mockReturnValue('/resolved/path/rule.xml');
+		mockedRealpathSync.mockImplementation(() => {
+			throw new Error('Path resolution failed');
+		});
+
+		const result = extractXPath(inputPath);
+
+		expect(result.success).toBe(false);
+		expect(result.error).toContain('Error extracting XPath');
+		expect(result.error).toContain('Path resolution failed');
+	});
+
 	it('should handle non-Error exceptions', () => {
+		const inputPath = '/path/to/nonexistent.xml';
+		const resolvedPath = '/resolved/path/to/nonexistent.xml';
+		const canonicalPath = '/canonical/path/to/nonexistent.xml';
+
+		mockedResolve.mockReturnValue(resolvedPath);
+		mockedRealpathSync.mockReturnValue(canonicalPath);
 		// Throw a non-Error object to test the String(error) branch
 		mockedReadFileSync.mockImplementation(() => {
 			// eslint-disable-next-line @typescript-eslint/only-throw-error -- Testing non-Error exception handling
 			throw 'String error';
 		});
 
-		const result = extractXPath('/path/to/nonexistent.xml');
+		const result = extractXPath(inputPath);
 
 		expect(result.success).toBe(false);
 		expect(result.error).toContain('Error extracting XPath');
