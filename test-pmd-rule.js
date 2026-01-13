@@ -45,6 +45,7 @@ const path = require('path');
 const os = require('os');
 const { execFileSync } = require('child_process');
 const { DOMParser } = require('@xmldom/xmldom');
+const tmp = require('tmp');
 
 /**
  * Normalize and validate file path to prevent path traversal attacks.
@@ -2538,9 +2539,10 @@ function parseViolations(xmlOutput) {
 
 class RuleTester {
 	constructor(ruleFilePath) {
-		this.ruleFilePath = path.resolve(ruleFilePath);
-		this.ruleName = path.basename(ruleFilePath, '.xml');
-		this.category = path.basename(path.dirname(ruleFilePath));
+		// Normalize path to prevent path traversal attacks
+		this.ruleFilePath = normalizePath(ruleFilePath);
+		this.ruleName = path.basename(this.ruleFilePath, '.xml');
+		this.category = path.basename(path.dirname(this.ruleFilePath));
 		this.tempFiles = [];
 		this.results = {
 			examples: [],
@@ -3482,10 +3484,13 @@ class RuleTester {
 		includeViolations = true,
 		includeValids = true,
 	) {
-		const tempFile = path.join(
-			os.tmpdir(),
-			`rule-test-${this.ruleName}-example-${exampleIndex}-${Date.now()}.cls`,
-		);
+		// Use tmp library for secure temporary file creation
+		const tmpFile = tmp.fileSync({
+			keep: true,
+			postfix: '.cls',
+			prefix: `rule-test-${this.ruleName}-example-${exampleIndex}-`,
+		});
+		const tempFile = tmpFile.name;
 
 		// Parse the example to get violation and valid code
 		const { violations, valids } = this.parseExample(exampleContent);
@@ -4564,7 +4569,8 @@ class RuleTester {
 async function main() {
 	const args = process.argv.slice(2);
 
-	if (args.length !== 1) {
+	// Validate argument count and type to prevent user-controlled bypass
+	if (args.length !== 1 || typeof args[0] !== 'string' || args[0].trim() === '') {
 		console.log('Usage: node test-pmd-rule.js <rule.xml>');
 		console.log(
 			'\nThis script tests a PMD rule using examples embedded in the rule file.',
@@ -4580,17 +4586,19 @@ async function main() {
 
 	const ruleFilePath = args[0];
 
-	if (!fs.existsSync(ruleFilePath)) {
+	// Normalize path to prevent path traversal attacks before checking existence
+	const normalizedPath = normalizePath(ruleFilePath);
+	if (!fs.existsSync(normalizedPath)) {
 		console.error(`❌ Rule file not found: ${ruleFilePath}`);
 		process.exit(1);
 	}
 
-	if (!ruleFilePath.endsWith('.xml')) {
+	if (!normalizedPath.endsWith('.xml')) {
 		console.error('❌ File must be an XML rule file (.xml)');
 		process.exit(1);
 	}
 
-	const tester = new RuleTester(ruleFilePath);
+	const tester = new RuleTester(normalizedPath);
 
 	try {
 		const result = await tester.runCoverageTest();
