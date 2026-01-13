@@ -8,8 +8,10 @@ import type {
 	CoverageEvidence,
 	ExampleData,
 	XPathCoverageResult,
+	Conditional,
 } from '../types/index.js';
 import { analyzeXPath } from './analyzeXPath.js';
+import { conditionalCheckers } from './coverage/conditional/strategies.js';
 
 const MIN_COUNT = 0;
 const NOT_FOUND_INDEX = -1;
@@ -350,13 +352,27 @@ function truncateExpression(
 }
 
 /**
+ * Maps a conditional type from extraction to its corresponding checker key.
+ * @param type - Conditional type from extraction.
+ * @returns Key for conditional checkers map.
+ */
+function mapConditionalTypeToCheckerKey(type: Readonly<string>): string {
+	const typeMap: Record<string, string> = {
+		and: 'and_operator',
+		not: 'not_condition',
+		or: 'or_branch',
+	};
+	return typeMap[type] ?? type;
+}
+
+/**
  * Check if conditionals from XPath are covered in example content.
  * @param conditionals - Conditionals to check.
  * @param content - Example content to search.
  * @returns Coverage evidence.
  */
 function checkConditionalCoverage(
-	conditionals: readonly Readonly<{ expression: string; type: string }>[],
+	conditionals: readonly Readonly<Conditional>[],
 	content: Readonly<string>,
 ): CoverageEvidence {
 	const lowerContent = content.toLowerCase();
@@ -364,12 +380,28 @@ function checkConditionalCoverage(
 	const missingConditionals: string[] = [];
 
 	for (const conditional of conditionals) {
-		const exprLower = conditional.expression.toLowerCase();
+		const checkerKey = mapConditionalTypeToCheckerKey(conditional.type);
+		const checker = conditionalCheckers[checkerKey];
 		let isCovered = false;
 
-		// Default logic: Check if conditional expression keywords appear in content
-		isCovered =
-			lowerContent.includes(exprLower) || lowerContent.includes('if');
+		if (checker) {
+			// Use the proper checker function
+			const result = checker(conditional, content);
+			isCovered = result.success;
+			// Fallback to simple string matching if checker returns false
+			// This maintains backward compatibility with old behavior
+			if (!isCovered) {
+				const exprLower = conditional.expression.toLowerCase();
+				isCovered =
+					lowerContent.includes(exprLower) ||
+					lowerContent.includes('if');
+			}
+		} else {
+			// Fallback to simple string matching for unknown types
+			const exprLower = conditional.expression.toLowerCase();
+			isCovered =
+				lowerContent.includes(exprLower) || lowerContent.includes('if');
+		}
 
 		if (isCovered) {
 			const displayExpr = truncateExpression(

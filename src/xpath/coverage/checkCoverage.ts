@@ -4,8 +4,24 @@
  */
 import type { XPathAnalysis, CoverageResult, Conditional } from '../../types/index.js';
 import { checkNodeTypes } from './checkNodeTypes.js';
+import { conditionalCheckers } from './conditional/strategies.js';
 
 const MIN_ARRAY_LENGTH = 0;
+const MIN_COUNT = 0;
+
+/**
+ * Maps a conditional type from extraction to its corresponding checker key.
+ * @param type - Conditional type from extraction.
+ * @returns Key for conditional checkers map.
+ */
+function mapConditionalTypeToCheckerKey(type: Readonly<string>): string {
+	const typeMap: Record<string, string> = {
+		and: 'and_operator',
+		not: 'not_condition',
+		or: 'or_branch',
+	};
+	return typeMap[type] ?? type;
+}
 
 /**
  * Check coverage for conditional expressions.
@@ -18,31 +34,59 @@ function checkConditionalCoverage(
 	conditionals: readonly Conditional[],
 	content: Readonly<string>,
 ): CoverageResult {
-	// Placeholder implementation - will be expanded with conditional checkers
-	const covered = conditionals.filter((conditional: Readonly<Conditional>) => {
-		// Simple check: see if conditional expression appears in content
-		return content.includes(conditional.expression);
-	});
+	if (conditionals.length === MIN_ARRAY_LENGTH) {
+		return {
+			details: [],
+			evidence: [],
+			message: 'No conditionals to check',
+			success: true,
+		};
+	}
 
-	const success = covered.length === conditionals.length;
-	const coveredCount = covered.length;
+	const results: CoverageResult[] = [];
+	const allEvidence: CoverageResult['evidence'] = [];
+	let allSuccess = true;
+
+	for (const conditional of conditionals) {
+		const checkerKey = mapConditionalTypeToCheckerKey(conditional.type);
+		const checker = conditionalCheckers[checkerKey];
+
+		if (checker) {
+			const result = checker(
+				conditional as Readonly<Conditional>,
+				content,
+			);
+			results.push(result);
+			allEvidence.push(...result.evidence);
+			if (!result.success) {
+				allSuccess = false;
+			}
+		} else {
+			// Unknown conditional type - mark as not covered
+			allSuccess = false;
+			allEvidence.push({
+				count: MIN_COUNT,
+				description: `Unknown conditional type: ${conditional.type}`,
+				required: 1,
+				type: 'valid',
+			});
+		}
+	}
+
+	const coveredCount = results.filter(
+		// eslint-disable-next-line @typescript-eslint/prefer-readonly-parameter-types -- Callback parameter for filter
+		(r) => r.success,
+	).length;
 	const totalCount = conditionals.length;
 	const uncoveredCount = totalCount - coveredCount;
 
 	return {
 		details: [],
-		evidence: [
-			{
-				count: coveredCount,
-				description: 'Conditional expressions covered by content',
-				required: totalCount,
-				type: 'valid',
-			},
-		],
-		message: success
+		evidence: allEvidence,
+		message: allSuccess
 			? `All ${String(totalCount)} conditionals covered`
 			: `${String(uncoveredCount)} of ${String(totalCount)} conditionals not covered`,
-		success,
+		success: allSuccess,
 	};
 }
 

@@ -947,4 +947,83 @@ public class Example {
 		expect(writtenContent).toContain('public class TestClass47 {');
 		expect(writtenContent).not.toContain('public class Example {');
 	});
+
+	it('should handle inner class detection in hasClassLikeStructures (branch at 392)', () => {
+		// This tests the branch at line 392: trimmed.includes('class ') && trimmed.includes('{')
+		// To test this, we need a line that contains "class " and "{" but is NOT detected as top-level
+		// We can use a line that contains the pattern but doesn't start with class keywords
+		// For example: a string literal that contains the pattern
+		const exampleContent = `public void method() {
+  String code = "class Inner { }"; // ❌ contains class and {
+  Integer value = 5; // ❌
+}`;
+
+		createTestFile({
+			exampleContent,
+			exampleIndex: 48,
+			includeValids: false,
+			includeViolations: true,
+		});
+
+		const writtenContent = capturedContent;
+		// Should wrap in a class (hasClassLikeStructures path)
+		// The line with "class " and "{" in string should trigger inner class detection
+		expect(writtenContent).toContain('public class TestClass48 {');
+		expect(writtenContent).toContain('String code = "class Inner { }";');
+		expect(writtenContent).toContain('Integer value = 5;');
+	});
+
+	it('should handle class definition when classBraceDepth is not zero (branch at 439)', () => {
+		// This tests the branch at line 439 when classBraceDepth !== ZERO_BRACE_DEPTH
+		// This happens when we're already inside a class and encounter another class (inner class)
+		const exampleContent = `public class Outer {
+  public void method() {
+    Integer value = 5; // ❌
+  }
+  class Inner { // ❌ inner class - classBraceDepth > 0 when this is encountered
+    public void innerMethod() {
+      Integer innerValue = 10; // ❌
+    }
+  }
+}`;
+
+		createTestFile({
+			exampleContent,
+			exampleIndex: 50,
+			includeValids: false,
+			includeViolations: true,
+		});
+
+		const writtenContent = capturedContent;
+		// Should rename the outer class but keep inner class as-is
+		expect(writtenContent).toContain('public class TestClass50 {');
+		expect(writtenContent).toContain('class Inner {');
+		expect(writtenContent).toContain('Integer value = 5;');
+		expect(writtenContent).toContain('Integer innerValue = 10;');
+	});
+
+	it('should handle class definition when classMatch is falsy (branch at 442)', () => {
+		// This tests the branch at line 442 when classMatch is falsy
+		// This happens when the regex doesn't match - e.g., "public class {" (no class name)
+		// The line passes startsWith('public class ') but regex fails because \w+ requires a name
+		const exampleContent = `public class {
+  public void method() {
+    Integer value = 5; // ❌
+  }
+}`;
+
+		createTestFile({
+			exampleContent,
+			exampleIndex: 49,
+			includeValids: false,
+			includeViolations: true,
+		});
+
+		const writtenContent = capturedContent;
+		// When classMatch is falsy, the code continues without replacing the class name
+		// This is defensive code - the class definition should still be included
+		expect(writtenContent).toBeDefined();
+		// The malformed class line should be included as-is (defensive path)
+		expect(writtenContent).toContain('Integer value = 5;');
+	});
 });
