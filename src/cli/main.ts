@@ -32,10 +32,10 @@ async function main(): Promise<void> {
 	}
 
 	const FIRST_ARG_INDEX = 0;
-	const ruleFilePath: string = args[FIRST_ARG_INDEX] ?? '';
-
-	if (!ruleFilePath) {
-		console.error('❌ No rule file path provided');
+	// After length validation, we know args[FIRST_ARG_INDEX] exists
+	const ruleFilePath = args[FIRST_ARG_INDEX];
+	if (typeof ruleFilePath !== 'string') {
+		console.error('❌ Invalid rule file path');
 		process.exit(EXIT_CODE_ERROR);
 	}
 
