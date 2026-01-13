@@ -197,11 +197,14 @@ public class ValidClass {
 		});
 
 		const writtenContent = capturedContent;
+		// Should use the class as-is (renamed), not wrap in another class
 		expect(writtenContent).toContain('public class TestClass5 {');
 		expect(writtenContent).toContain('private Integer value = 42;');
 		expect(writtenContent).not.toContain(
 			'private static final Integer MAX = 100;',
 		);
+		expect(writtenContent).not.toContain('public class TestClass {');
+		expect(writtenContent).not.toContain('public class ValidClass {');
 	});
 
 	it('should generate unique file names with timestamp', () => {
@@ -589,7 +592,7 @@ UnknownType value = getUnknown(); // ❌ Violation
 		expect(writtenContent).toContain('return true;');
 	});
 
-	it('should extract method body content when class definition is present', () => {
+	it('should use class as-is when class definition is present', () => {
 		const exampleContent = `
 // Violation: Variables that are never reassigned should be declared as final
 public class Example {
@@ -609,24 +612,24 @@ public class Example {
 		});
 
 		const writtenContent = capturedContent;
-		// Should not contain the class definition
+		// Should rename the class but keep the structure
+		expect(writtenContent).toContain('public class TestClass35 {');
 		expect(writtenContent).not.toContain('public class Example {');
-		// Should not contain the method signature
-		expect(writtenContent).not.toContain('public void invalidMethod() {');
+		// Should contain the method signature (needed for PMD to match Method nodes)
+		expect(writtenContent).toContain('public void invalidMethod() {');
 		// Should contain the method body content
 		expect(writtenContent).toContain('Integer value = 5;');
 		expect(writtenContent).toContain("String message = 'Hello';");
 		expect(writtenContent).toContain('System.debug(message);');
-		// Should be wrapped in test class and method
-		expect(writtenContent).toContain('public class TestClass35 {');
-		expect(writtenContent).toContain('public void testMethod35() {');
+		// Should NOT be wrapped in another method
+		expect(writtenContent).not.toContain('public void testMethod35() {');
 	});
 
-	it('should handle empty extracted code when class definition extraction removes everything', () => {
+	it('should handle class with empty method when class definition is present', () => {
 		const exampleContent = `
 // Violation: Test
 public class Example {
-  public void method() {
+  public void emptyMethod() {
   }
 }
 `;
@@ -639,8 +642,309 @@ public class Example {
 		});
 
 		const writtenContent = capturedContent;
-		// Should still create valid class structure even if extracted code is empty
+		// Should use the class as-is (renamed), not wrap in another method
 		expect(writtenContent).toContain('public class TestClass36 {');
-		expect(writtenContent).toContain('public void testMethod36() {');
+		expect(writtenContent).toContain('public void emptyMethod() {');
+		expect(writtenContent).not.toContain('public void testMethod36() {');
+		// Tests else branch at line 527 (no helper methods when helperMethods.length === 0)
+	});
+
+	it('should handle class-like structures without top-level class', () => {
+		const exampleContent = `
+// Violation: Test
+public void method() {
+  Integer value = 5;
+}
+`;
+
+		createTestFile({
+			exampleContent,
+			exampleIndex: 37,
+			includeValids: false,
+			includeViolations: true,
+		});
+
+		const writtenContent = capturedContent;
+		// Should wrap in a class (not in a method)
+		expect(writtenContent).toContain('public class TestClass37 {');
+		expect(writtenContent).toContain('public void method() {');
+		expect(writtenContent).toContain('Integer value = 5;');
+		expect(writtenContent).not.toContain('public void testMethod37() {');
+	});
+
+	it('should handle helper methods insertion when class has top-level class', () => {
+		const exampleContent = `
+// Violation: Test
+public class Example {
+  public void method() {
+    Integer value = getValue();
+  }
+}
+`;
+
+		createTestFile({
+			exampleContent,
+			exampleIndex: 38,
+			includeValids: false,
+			includeViolations: true,
+		});
+
+		const writtenContent = capturedContent;
+		// Should have helper method for getValue()
+		expect(writtenContent).toContain('public Boolean getValue()');
+		expect(writtenContent).toContain('return true;');
+	});
+
+	it('should handle helper methods when class has top-level class and helper methods exist', () => {
+		const exampleContent = `
+// Violation: Test
+public class Example {
+  public void method() {
+    Integer value = getValue();
+    String name = getName();
+  }
+}
+`;
+
+		createTestFile({
+			exampleContent,
+			exampleIndex: 39,
+			includeValids: false,
+			includeViolations: true,
+		});
+
+		const writtenContent = capturedContent;
+		// Should have helper methods inserted before closing brace
+		expect(writtenContent).toContain('public class TestClass39 {');
+		expect(writtenContent).toContain('public Boolean getValue()');
+		expect(writtenContent).toContain('public Boolean getName()');
+		expect(writtenContent).toContain('Integer value = getValue();');
+	});
+
+	it('should add closing brace when missing and insert helper methods', () => {
+		// This tests the branch at line 509 when extractedCode doesn't contain '}'
+		// We need a scenario where:
+		// 1. hasTopLevelClass is true
+		// 2. extractedCode.join('\n') doesn't contain '}' (so lastBraceIndex === -1)
+		// 3. helperMethods.length > 0 (so we enter the if at line 513)
+		// The logic at line 465 includes braces with `trimmed === '}'`, but if the class
+		// is missing its closing brace entirely, and we finish processing while still inside
+		// the class (classBraceDepth > 0), then extractedCode won't have '}'.
+		// We also need the method to be missing its closing brace, otherwise the method's
+		// closing brace will be in extractedCode.
+		const exampleContent = `
+// Violation: Test - both class and method missing closing braces
+public class Example {
+  public void method() {
+    Integer value = getValue();
+    String name = getName();
+`;
+
+		createTestFile({
+			exampleContent,
+			exampleIndex: 41,
+			includeValids: false,
+			includeViolations: true,
+		});
+
+		const writtenContent = capturedContent;
+		// Should still create valid structure and add closing brace
+		expect(writtenContent).toContain('public class TestClass41 {');
+		expect(writtenContent).toContain('public Boolean getValue()');
+		expect(writtenContent).toContain('public Boolean getName()');
+		// The closing brace should be added (branch at line 509), and helper methods
+		// should be inserted before it
+		expect(writtenContent).toContain('}'); // Should have closing brace added
+		// Verify helper methods are before the closing brace
+		const getValueIndex = writtenContent.indexOf(
+			'public Boolean getValue()',
+		);
+		const getNameIndex = writtenContent.indexOf('public Boolean getName()');
+		const lastBraceIndex = writtenContent.lastIndexOf('}');
+		expect(getValueIndex).toBeLessThan(lastBraceIndex);
+		expect(getNameIndex).toBeLessThan(lastBraceIndex);
+	});
+
+	it('should handle class-like structures path (methods without top-level class)', () => {
+		const exampleContent = `
+// Violation: Test method
+public void testMethod() {
+  Integer value = 5;
+}
+`;
+
+		createTestFile({
+			exampleContent,
+			exampleIndex: 40,
+			includeValids: false,
+			includeViolations: true,
+		});
+
+		const writtenContent = capturedContent;
+		// Should wrap in a class (hasClassLikeStructures path)
+		expect(writtenContent).toContain('public class TestClass40 {');
+		expect(writtenContent).toContain('public void testMethod() {');
+		expect(writtenContent).toContain('Integer value = 5;');
+		expect(writtenContent).not.toContain('public void testMethod40() {');
+	});
+
+	it('should handle standalone lines outside class with inline markers', () => {
+		// This tests lines 492-493 and 495-496: standalone lines outside class with markers
+		const exampleContent = `
+// Violation: Test
+public class Example {
+  public void method() {
+    Integer value = 5;
+  }
+}
+Integer standalone = 10; // ❌
+String message = 'test'; // ✅
+`;
+
+		createTestFile({
+			exampleContent,
+			exampleIndex: 42,
+			includeValids: true,
+			includeViolations: true,
+		});
+
+		const writtenContent = capturedContent;
+		// Should include the class
+		expect(writtenContent).toContain('public class TestClass42 {');
+		// Should include standalone lines with markers removed
+		expect(writtenContent).toContain('Integer standalone = 10;');
+		expect(writtenContent).not.toContain('// ❌');
+		expect(writtenContent).toContain("String message = 'test';");
+		expect(writtenContent).not.toContain('// ✅');
+	});
+
+	it('should handle class without access modifier (class keyword only)', () => {
+		// This tests the branch at line 438-443 when class has no access modifier
+		// and classBraceDepth === ZERO_BRACE_DEPTH
+		const exampleContent = `
+// Violation: Test
+class Example {
+  public void method() {
+    Integer value = 5;
+  }
+}
+`;
+
+		createTestFile({
+			exampleContent,
+			exampleIndex: 43,
+			includeValids: false,
+			includeViolations: true,
+		});
+
+		const writtenContent = capturedContent;
+		// Should rename the class (classMatch[1] will be undefined, so classPrefix is '')
+		expect(writtenContent).toContain('class TestClass43 {');
+		expect(writtenContent).not.toContain('public class TestClass43 {');
+		expect(writtenContent).not.toContain('class Example {');
+	});
+
+	it('should handle lines without braces in hasTopLevelClass check', () => {
+		// This tests the ternary branches at lines 360-365 when openBracesMatch or
+		// closeBracesMatch is falsy in the hasTopLevelClass function
+		// We need a line that doesn't contain any braces before the class definition
+		const exampleContent = `
+// Violation: Test
+// This is a comment line without braces
+Integer someVariable = 5;
+public class Example {
+  public void method() {
+    Integer value = 5;
+  }
+}
+`;
+
+		createTestFile({
+			exampleContent,
+			exampleIndex: 44,
+			includeValids: false,
+			includeViolations: true,
+		});
+
+		const writtenContent = capturedContent;
+		// Should still create valid structure
+		expect(writtenContent).toContain('public class TestClass44 {');
+		expect(writtenContent).toContain('Integer value = 5;');
+	});
+
+	it('should handle lines without braces in class extraction', () => {
+		// This tests the ternary branches at lines 456-461 when openBracesMatch or
+		// closeBracesMatch is falsy during class extraction
+		const exampleContent = `
+// Violation: Test
+public class Example {
+  public void method() {
+    Integer value = 5;
+    String message = 'test';
+  }
+}
+`;
+
+		createTestFile({
+			exampleContent,
+			exampleIndex: 45,
+			includeValids: false,
+			includeViolations: true,
+		});
+
+		const writtenContent = capturedContent;
+		// Should still create valid structure
+		expect(writtenContent).toContain('public class TestClass45 {');
+		expect(writtenContent).toContain('Integer value = 5;');
+		expect(writtenContent).toContain("String message = 'test';");
+	});
+
+	it('should handle field declarations in hasClassLikeStructures (branch at 381)', () => {
+		// This tests the branch at line 381 when fieldMatch is truthy
+		// (field declarations without top-level class)
+		const exampleContent = `
+// Violation: Test
+public Integer value = 42;
+private String name = 'test';
+`;
+
+		createTestFile({
+			exampleContent,
+			exampleIndex: 46,
+			includeValids: false,
+			includeViolations: true,
+		});
+
+		const writtenContent = capturedContent;
+		// Should wrap in a class (hasClassLikeStructures path)
+		expect(writtenContent).toContain('public class TestClass46 {');
+		expect(writtenContent).toContain('public Integer value = 42;');
+		expect(writtenContent).toContain("private String name = 'test';");
+	});
+
+	it('should handle class match when classBraceDepth is zero (branch at 438-441)', () => {
+		// This tests the branch at lines 438-441 when classBraceDepth === ZERO_BRACE_DEPTH
+		// and classMatch is truthy - this should be covered by existing tests, but let's
+		// make sure we have a test that explicitly exercises this path
+		const exampleContent = `
+// Violation: Test
+public class Example {
+  public void method() {
+    Integer value = 5;
+  }
+}
+`;
+
+		createTestFile({
+			exampleContent,
+			exampleIndex: 47,
+			includeValids: false,
+			includeViolations: true,
+		});
+
+		const writtenContent = capturedContent;
+		// Should rename the class (classMatch should be truthy)
+		expect(writtenContent).toContain('public class TestClass47 {');
+		expect(writtenContent).not.toContain('public class Example {');
 	});
 });
