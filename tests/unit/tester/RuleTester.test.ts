@@ -101,6 +101,48 @@ describe('RuleTester', () => {
 		vi.restoreAllMocks();
 	});
 
+	it('should return undefined when example line number not found', () => {
+		mockedExtractXPath.mockReturnValue({
+			error: 'xpath extraction failed',
+			success: false,
+		});
+		// Minimal rule file with no <example> tags
+		mockedReadFileSync.mockReturnValue(
+			`<?xml version="1.0" encoding="UTF-8"?>\n<rule name="R" message="m">\n</rule>`,
+		);
+		const tester = new RuleTester('/tmp/rule.xml');
+		interface PrivateExampleLineFinder {
+			findExampleLineNumber: (n: number) => number | undefined;
+		}
+
+		/**
+		 * Safely access RuleTester private method for coverage.
+		 * @param value - Unknown value to inspect.
+		 * @returns Typed accessor or undefined when unavailable.
+		 */
+		function getPrivateExampleLineFinder(
+			value: unknown,
+		): PrivateExampleLineFinder | undefined {
+			if (typeof value !== 'object' || value === null) {
+				return undefined;
+			}
+			if (!('findExampleLineNumber' in value)) {
+				return undefined;
+			}
+			const maybeFn = (value as { findExampleLineNumber?: unknown })
+				.findExampleLineNumber;
+			if (typeof maybeFn !== 'function') {
+				return undefined;
+			}
+			// eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- Guarded by runtime checks above
+			return value as PrivateExampleLineFinder;
+		}
+
+		const finder = getPrivateExampleLineFinder(tester);
+		expect(finder).toBeDefined();
+		expect(finder?.findExampleLineNumber(1)).toBeUndefined();
+	});
+
 	describe('extractRuleMetadata', () => {
 		it('should extract rule metadata with successful xpath extraction', () => {
 			const xmlContent = `<?xml version="1.0" encoding="UTF-8"?>

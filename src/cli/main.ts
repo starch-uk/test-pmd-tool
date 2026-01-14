@@ -16,6 +16,8 @@ import { generateLcovReport } from '../coverage/generateLcov.js';
 
 const EXIT_CODE_SUCCESS = 0;
 const EXIT_CODE_ERROR = 1;
+const PARSE_INT_RADIX = 10;
+const LINE_NUMBER_MATCH_GROUP_INDEX = 1;
 const ARGV_SLICE_INDEX = 2;
 const MIN_ARGS_COUNT = 0;
 const MAX_ARGS_COUNT = 2;
@@ -120,6 +122,51 @@ async function testRuleFile(
 			console.log(
 				`  Rule triggers violations: ${result.ruleTriggersViolations ? '✅ Yes' : '❌ No'}`,
 			);
+		}
+
+		// Quality Checks
+		if (result.qualityChecks) {
+			console.log('\n⭐ Quality Checks:');
+			if (result.qualityChecks.passed) {
+				console.log('  Status: ✅ Passed');
+			} else {
+				console.log('  Status: ⚠️ Incomplete');
+				// Sort issues by line number, then by message
+				const sortedIssues = [...result.qualityChecks.issues].sort(
+					(a: string, b: string) => {
+						// Extract line numbers from "Line X: ..." format
+						const lineMatchA = /^Line\s+(\d+):/.exec(a);
+						const lineMatchB = /^Line\s+(\d+):/.exec(b);
+						const lineNumberA =
+							lineMatchA?.[LINE_NUMBER_MATCH_GROUP_INDEX];
+						const lineNumberB =
+							lineMatchB?.[LINE_NUMBER_MATCH_GROUP_INDEX];
+						const lineNumA = lineMatchA
+							? Number.parseInt(
+									lineNumberA ?? '',
+									PARSE_INT_RADIX,
+								)
+							: Number.MAX_SAFE_INTEGER;
+						const lineNumB = lineMatchB
+							? Number.parseInt(
+									lineNumberB ?? '',
+									PARSE_INT_RADIX,
+								)
+							: Number.MAX_SAFE_INTEGER;
+
+						// Sort by line number first
+						if (lineNumA !== lineNumB) {
+							return lineNumA - lineNumB;
+						}
+
+						// If same line number (or both have no line), sort by message
+						return a.localeCompare(b);
+					},
+				);
+				for (const issue of sortedIssues) {
+					console.log(`  - ${issue}`);
+				}
+			}
 		}
 
 		// XPath Coverage Details

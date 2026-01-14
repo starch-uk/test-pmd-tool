@@ -130,6 +130,7 @@ export interface OverallTestResults {
 	xpathCoverage: XPathCoverageResult;
 	hardcodedValues: HardcodedValueIssue[];
 	detailedTestResults?: TestCaseResult[];
+	qualityChecks?: ValidationResult;
 }
 
 export interface CLIArguments {
