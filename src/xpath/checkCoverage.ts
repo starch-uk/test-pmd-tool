@@ -429,6 +429,7 @@ function findConditionalLineNumber(
 		) {
 			// Find where the actual XPath content starts in the XML file
 			// This is after <value> and potentially after <![CDATA[
+			// eslint-disable-next-line @typescript-eslint/init-declarations -- Variable is assigned in all branches below
 			let actualContentStartLine;
 			// Check if CDATA is used
 			const NEXT_LINE_OFFSET = 1;
