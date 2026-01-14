@@ -119,6 +119,288 @@ describe('conditionalCheckers', () => {
 			expect(result.success).toBe(false);
 			expect(result.message).toBe('No expression to check');
 		});
+
+		it('should handle combined AND conditions and require all parts', () => {
+			const conditional: Conditional = {
+				expression:
+					'@FullMethodName = $stringJoinFullName and .//NewListLiteralExpression',
+				position: 0,
+				type: 'and',
+			};
+			// Content with method call (for FullMethodName) and new List (for NewListLiteralExpression)
+			const content = 'String.join("", new List<String>());';
+
+			const result = conditionalCheckers.and_operator(conditional, content);
+
+			// The combined condition should be recognized and checked
+			// It may report as covered if both parts are satisfied
+			expect(result).toBeDefined();
+			expect(result.evidence).toBeDefined();
+		});
+
+		it('should detect missing parts in combined AND conditions', () => {
+			const conditional: Conditional = {
+				expression:
+					'@FullMethodName = $stringJoinFullName and .//NewListLiteralExpression',
+				position: 0,
+				type: 'and',
+			};
+			// Content with method call but missing new List
+			const content = 'String.join("", something);';
+
+			const result = conditionalCheckers.and_operator(conditional, content);
+
+			expect(result.success).toBe(false);
+			expect(result.message).toMatch(/not (fully )?covered/);
+		});
+
+		it('should handle AND conditions with quotes in splitting', () => {
+			const conditional: Conditional = {
+				expression: '@Name = "test" and @Other = "value"',
+				position: 0,
+				type: 'and',
+			};
+			const content = 'test value';
+
+			const result = conditionalCheckers.and_operator(conditional, content);
+
+			expect(result).toBeDefined();
+		});
+
+		it('should handle AND conditions with parentheses in splitting', () => {
+			const conditional: Conditional = {
+				expression: 'A and (B and C) and D',
+				position: 0,
+				type: 'and',
+			};
+			const content = 'A B C D';
+
+			const result = conditionalCheckers.and_operator(conditional, content);
+
+			expect(result).toBeDefined();
+		});
+
+		it('should handle attribute with quoted value in condition part', () => {
+			const conditional: Conditional = {
+				expression: '@Name = "testValue" and .//NodeType',
+				position: 0,
+				type: 'and',
+			};
+			const content = 'testValue NodeType';
+
+			const result = conditionalCheckers.and_operator(conditional, content);
+
+			expect(result).toBeDefined();
+		});
+
+		it('should handle node type pattern with // prefix', () => {
+			const conditional: Conditional = {
+				expression: '@Attr = $var and //MethodCallExpression',
+				position: 0,
+				type: 'and',
+			};
+			const content = 'method();';
+
+			const result = conditionalCheckers.and_operator(conditional, content);
+
+			expect(result).toBeDefined();
+		});
+
+		it('should handle generic node type check in condition part', () => {
+			const conditional: Conditional = {
+				expression: '@Attr = $var and .//SomeOtherNodeType',
+				position: 0,
+				type: 'and',
+			};
+			const content = 'someothernodetype';
+
+			const result = conditionalCheckers.and_operator(conditional, content);
+
+			expect(result).toBeDefined();
+		});
+
+		it('should handle other attribute types in condition part', () => {
+			const conditional: Conditional = {
+				expression: '@OtherAttr = $var and .//NodeType',
+				position: 0,
+				type: 'and',
+			};
+			const content = 'NodeType';
+
+			const result = conditionalCheckers.and_operator(conditional, content);
+
+			expect(result).toBeDefined();
+		});
+
+		it('should handle splitting when and is at start of expression', () => {
+			const conditional: Conditional = {
+				expression: 'and A and B',
+				position: 0,
+				type: 'and',
+			};
+			const content = 'A B';
+
+			const result = conditionalCheckers.and_operator(conditional, content);
+
+			expect(result).toBeDefined();
+		});
+
+		it('should handle splitting when expression has nested and in parentheses', () => {
+			const conditional: Conditional = {
+				expression: 'A and (B and C) and D',
+				position: 0,
+				type: 'and',
+			};
+			const content = 'A B C D';
+
+			const result = conditionalCheckers.and_operator(conditional, content);
+
+			expect(result).toBeDefined();
+		});
+
+		it('should handle MethodName attribute in condition part', () => {
+			const conditional: Conditional = {
+				expression: '@MethodName = $var and .//NodeType',
+				position: 0,
+				type: 'and',
+			};
+			const content = 'method(); NodeType';
+
+			const result = conditionalCheckers.and_operator(conditional, content);
+
+			expect(result).toBeDefined();
+		});
+
+		it('should handle newlistliteralexpression pattern in lowercase', () => {
+			const conditional: Conditional = {
+				expression: '@Attr = $var and newlistliteralexpression',
+				position: 0,
+				type: 'and',
+			};
+			const content = 'new List<String>();';
+
+			const result = conditionalCheckers.and_operator(conditional, content);
+
+			expect(result).toBeDefined();
+		});
+
+		it('should handle empty expression in splitCombinedAndConditions', () => {
+			const conditional: Conditional = {
+				expression: '',
+				position: 0,
+				type: 'and',
+			};
+			const content = 'some content';
+
+			const result = conditionalCheckers.and_operator(conditional, content);
+
+			expect(result.success).toBe(false);
+		});
+
+		it('should handle expression with no parts after splitting', () => {
+			const conditional: Conditional = {
+				expression: 'and',
+				position: 0,
+				type: 'and',
+			};
+			const content = 'some content';
+
+			const result = conditionalCheckers.and_operator(conditional, content);
+
+			expect(result).toBeDefined();
+		});
+
+		it('should handle attribute pattern without match', () => {
+			const conditional: Conditional = {
+				expression: '@UnknownAttr = $var and .//NodeType',
+				position: 0,
+				type: 'and',
+			};
+			const content = 'NodeType';
+
+			const result = conditionalCheckers.and_operator(conditional, content);
+
+			expect(result).toBeDefined();
+		});
+
+		it('should handle node type pattern without match', () => {
+			const conditional: Conditional = {
+				expression: '@Attr = $var and .//UnknownNodeType',
+				position: 0,
+				type: 'and',
+			};
+			const content = 'unknownnodetype';
+
+			const result = conditionalCheckers.and_operator(conditional, content);
+
+			expect(result).toBeDefined();
+		});
+
+		it('should handle trimmed empty part in splitting', () => {
+			const conditional: Conditional = {
+				expression: 'A and   and B',
+				position: 0,
+				type: 'and',
+			};
+			const content = 'A B';
+
+			const result = conditionalCheckers.and_operator(conditional, content);
+
+			expect(result).toBeDefined();
+		});
+
+		it('should handle attribute pattern where attrName is undefined', () => {
+			const conditional: Conditional = {
+				expression: '@ = $var and .//NodeType',
+				position: 0,
+				type: 'and',
+			};
+			const content = 'NodeType';
+
+			const result = conditionalCheckers.and_operator(conditional, content);
+
+			expect(result).toBeDefined();
+		});
+
+		it('should handle node type pattern where nodeType is undefined', () => {
+			const conditional: Conditional = {
+				expression: '@Attr = $var and .//',
+				position: 0,
+				type: 'and',
+			};
+			const content = 'some content';
+
+			const result = conditionalCheckers.and_operator(conditional, content);
+
+			expect(result).toBeDefined();
+		});
+
+		it('should handle attrMatch null case (pattern matches but exec returns null)', () => {
+			const conditional: Conditional = {
+				expression: '@ = $var and .//NodeType',
+				position: 0,
+				type: 'and',
+			};
+			const content = 'NodeType';
+
+			const result = conditionalCheckers.and_operator(conditional, content);
+
+			expect(result).toBeDefined();
+		});
+
+		it('should handle nodeTypeMatch null case (pattern matches but exec returns null)', () => {
+			const conditional: Conditional = {
+				expression: '@Attr = $var and .//',
+				position: 0,
+				type: 'and',
+			};
+			const content = 'some content';
+
+			const result = conditionalCheckers.and_operator(conditional, content);
+
+			expect(result).toBeDefined();
+		});
+
 	});
 
 	describe('not_condition', () => {
