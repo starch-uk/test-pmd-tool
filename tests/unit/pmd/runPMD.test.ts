@@ -4,7 +4,7 @@
  */
 import { execFileSync } from 'child_process';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { runPMD } from '../../../src/pmd/runPMD.js';
+import { runPMD, runPmdAstDump } from '../../../src/pmd/runPMD.js';
 
 // Mock execFileSync
 vi.mock('child_process', () => ({
@@ -395,5 +395,198 @@ describe('runPMD', () => {
 		expect(result.error).toContain('PMD execution failed: Command failed');
 		// Should not include stderr when it's only whitespace
 		expect(result.error).not.toContain('PMD stderr:');
+	});
+});
+
+describe('runPmdAstDump', () => {
+	beforeEach(() => {
+		vi.clearAllMocks();
+	});
+
+	afterEach(() => {
+		vi.restoreAllMocks();
+	});
+
+	it('should execute PMD AST dump successfully and return raw output', async () => {
+		const mockAstOutput = `CompilationUnit
+  TypeDeclaration
+    ClassDeclaration
+      SimpleName: TestClass
+      MethodDeclaration
+        SimpleName: testMethod`;
+
+		mockedExecFileSync.mockReturnValue(mockAstOutput);
+
+		const result = await runPmdAstDump('/test/apex.cls', '/test/rules.xml');
+
+		expect(result).toEqual({
+			data: mockAstOutput,
+			success: true,
+		});
+
+		expect(mockedExecFileSync).toHaveBeenCalledWith(
+			'pmd',
+			[
+				'ast-dump',
+				'--format',
+				'xml',
+				'--language',
+				'apex',
+				'--file',
+				'/test/apex.cls',
+			],
+			expect.objectContaining({
+				cwd: process.cwd(),
+				encoding: 'utf-8',
+				stdio: ['pipe', 'pipe', 'pipe'],
+				timeout: 30000,
+			}),
+		);
+	});
+
+	it('should handle PMD AST dump execution errors with stdout', async () => {
+		const mockError = new Error('Command failed') as ExecFileSyncTestError;
+		mockError.code = 1;
+		mockError.stdout = 'AST output even on error';
+		mockedExecFileSync.mockImplementation(() => {
+			throw mockError;
+		});
+
+		const result = await runPmdAstDump('/test/apex.cls', '/test/rules.xml');
+
+		// Should return success with stdout even if PMD exited with error
+		expect(result).toEqual({
+			data: 'AST output even on error',
+			success: true,
+		});
+	});
+
+	it('should handle PMD not found error', async () => {
+		const mockError = new Error('Command failed') as ExecFileSyncTestError;
+		mockError.code = 'ENOENT';
+		mockedExecFileSync.mockImplementation(() => {
+			throw mockError;
+		});
+
+		const result = await runPmdAstDump('/test/apex.cls', '/test/rules.xml');
+
+		expect(result).toEqual({
+			error: 'PMD CLI not available. Please install PMD to run tests. Visit: https://pmd.github.io/pmd/pmd_userdocs_installation.html',
+			success: false,
+		});
+	});
+
+	it('should handle PMD execution errors without stdout', async () => {
+		const mockError = new Error('Command failed') as ExecFileSyncTestError;
+		mockError.code = 1;
+		mockError.stdout = '';
+		mockError.stderr = 'Error details';
+		mockedExecFileSync.mockImplementation(() => {
+			throw mockError;
+		});
+
+		const result = await runPmdAstDump('/test/apex.cls', '/test/rules.xml');
+
+		expect(result.success).toBe(false);
+		expect(result.error).toContain('PMD AST dump failed: Command failed');
+		expect(result.error).toContain('PMD stderr:\nError details');
+	});
+
+	it('should include stdout in error message when stdout is whitespace only', async () => {
+		const mockError = new Error('Command failed') as ExecFileSyncTestError;
+		mockError.code = 1;
+		mockError.stdout = '   \n\t   ';
+		mockError.stderr = 'Error details';
+		mockedExecFileSync.mockImplementation(() => {
+			throw mockError;
+		});
+
+		const result = await runPmdAstDump('/test/apex.cls', '/test/rules.xml');
+
+		expect(result.success).toBe(false);
+		expect(result.error).toContain('PMD AST dump failed: Command failed');
+		expect(result.error).toContain('PMD stdout:\n   \n\t   ');
+	});
+
+	it('should handle Buffer stdout conversion in error message path', async () => {
+		const mockError = new Error('Command failed') as ExecFileSyncTestError;
+		mockError.code = 1;
+		mockError.stdout = Buffer.from('   \n\t   ');
+		mockError.stderr = 'Error details';
+		mockedExecFileSync.mockImplementation(() => {
+			throw mockError;
+		});
+
+		const result = await runPmdAstDump('/test/apex.cls', '/test/rules.xml');
+
+		expect(result.success).toBe(false);
+		expect(result.error).toContain('PMD AST dump failed: Command failed');
+		expect(result.error).toContain('PMD stdout:\n   \n\t   ');
+	});
+
+	it('should handle AST dump errors without message and with Buffer stderr', async () => {
+		const mockError: ExecFileSyncTestError = {
+			code: 1,
+			stderr: Buffer.from('Error details'),
+		};
+		mockedExecFileSync.mockImplementation(() => {
+			throw mockError;
+		});
+
+		const result = await runPmdAstDump('/test/apex.cls', '/test/rules.xml');
+
+		expect(result.success).toBe(false);
+		expect(result.error).toContain('PMD AST dump failed: Unknown error');
+		expect(result.error).toContain('PMD stderr:\nError details');
+	});
+
+	it('should omit stderr from error message when stderr is whitespace only', async () => {
+		const mockError = new Error('Command failed') as ExecFileSyncTestError;
+		mockError.code = 1;
+		mockError.stdout = '';
+		mockError.stderr = '   \n\t   ';
+		mockedExecFileSync.mockImplementation(() => {
+			throw mockError;
+		});
+
+		const result = await runPmdAstDump('/test/apex.cls', '/test/rules.xml');
+
+		expect(result.success).toBe(false);
+		expect(result.error).toContain('PMD AST dump failed: Command failed');
+		expect(result.error).not.toContain('PMD stderr:');
+	});
+
+	it('should handle Buffer stdout conversion', async () => {
+		const mockError = new Error('Command failed') as ExecFileSyncTestError;
+		mockError.code = 1;
+		mockError.stdout = Buffer.from('AST output from buffer');
+		mockedExecFileSync.mockImplementation(() => {
+			throw mockError;
+		});
+
+		const result = await runPmdAstDump('/test/apex.cls', '/test/rules.xml');
+
+		expect(result.success).toBe(true);
+		expect(result.data).toBe('AST output from buffer');
+	});
+
+	it('should use correct command line arguments for AST format', async () => {
+		mockedExecFileSync.mockReturnValue('AST output');
+
+		await runPmdAstDump('apex/file.cls', 'rules/file.xml');
+
+		expect(mockedExecFileSync).toHaveBeenCalledWith(
+			'pmd',
+			[
+				'ast-dump',
+				'--format',
+				'xml',
+				'--language',
+				'apex',
+				'--file',
+				'apex/file.cls',
+			],
+			expect.any(Object),
+		);
 	});
 });

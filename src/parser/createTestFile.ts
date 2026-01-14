@@ -682,11 +682,70 @@ export function createTestFile({
 
 	writeFileSync(tempFile, classContent, 'utf-8');
 
+	// Track what was added for AST processing
+	const TEST_METHOD_NAME = `testMethod${String(exampleIndex)}`;
+	const helperMethods = extractHelperMethods(codeToInclude);
+	const FIRST_CAPTURE_GROUP = 1;
+	const EMPTY_NAME_LENGTH = 0;
+	const helperMethodNames = helperMethods
+		.map((method) => {
+			// Extract method name from signature like "public Boolean methodName() {"
+			const methodNameMatch = /public\s+\w+\s+(\w+)\s*\(/.exec(method);
+			return methodNameMatch?.[FIRST_CAPTURE_GROUP] ?? '';
+		})
+		.filter((name) => name.length > EMPTY_NAME_LENGTH);
+
+	// Extract method names that are part of the example code (not helpers)
+	// These are methods declared in the example, not method calls
+	const exampleMethodNames = new Set<string>();
+	if (hasTopLevelClass) {
+		// Extract method declarations from the example
+		const methodDeclRegex =
+			/(?:public|private|protected)\s+\w+\s+(\w+)\s*\(/g;
+		let methodMatch: RegExpExecArray | null = null;
+		while (
+			(methodMatch = methodDeclRegex.exec(fullExampleContent)) !== null
+		) {
+			// The regex always captures the method name in group 1, so methodName is always defined
+			// eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Regex guarantees capture group 1 exists
+			const methodName = methodMatch[FIRST_CAPTURE_GROUP]!;
+			exampleMethodNames.add(methodName);
+		}
+	} else if (hasClassLikeStructures) {
+		// Extract method declarations from class-like structures
+		const methodDeclRegex =
+			/(?:public|private|protected)\s+\w+\s+(\w+)\s*\(/g;
+		let methodMatch: RegExpExecArray | null = null;
+		while (
+			(methodMatch = methodDeclRegex.exec(fullExampleContent)) !== null
+		) {
+			// The regex always captures the method name in group 1, so methodName is always defined
+			// eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Regex guarantees capture group 1 exists
+			const methodName = methodMatch[FIRST_CAPTURE_GROUP]!;
+			exampleMethodNames.add(methodName);
+		}
+	}
+
+	// Filter out example methods from helper methods (they're not helpers)
+	const actualHelperMethodNames = helperMethodNames.filter(
+		(name) => !exampleMethodNames.has(name),
+	);
+
+	const addedWrapperClass = !hasTopLevelClass;
+	const addedWrapperMethod = !hasTopLevelClass && !hasClassLikeStructures;
+
 	return {
 		filePath: tempFile,
 		hasValids: parsed.valids.length > EMPTY_LENGTH,
 		hasViolations: parsed.violations.length > EMPTY_LENGTH,
 		validCount: parsed.valids.length,
 		violationCount: parsed.violations.length,
+		wrapperInfo: {
+			addedWrapperClass,
+			addedWrapperMethod,
+			helperMethodNames: actualHelperMethodNames,
+			wrapperClassName: TEST_CLASS_NAME,
+			wrapperMethodName: TEST_METHOD_NAME,
+		},
 	};
 }

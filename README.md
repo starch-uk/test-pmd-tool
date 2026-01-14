@@ -186,6 +186,26 @@ You can include multiple `<example>` tags in a single rule XML file. Each exampl
 </rule>
 ```
 
+### AST Diagnostics
+
+The `--diag` (or `-d`) flag allows you to inspect the Abstract Syntax Tree (AST) that PMD generates for a specific example. This is useful for:
+
+- **Debugging XPath expressions**: See exactly how PMD parses your example code
+- **Understanding node types**: Identify the AST node types that your XPath should target
+- **Verifying structure**: Confirm that your example code produces the expected AST structure
+
+**Example indices are 1-based** (the first example is index 1, second is index 2, etc.):
+
+```bash
+# Get AST dump for the first example
+test-pmd-rule path/to/rule.xml --diag 1
+
+# Get AST dump for the second example
+test-pmd-rule path/to/rule.xml -d 2
+```
+
+The AST dump is printed to stdout, showing the hierarchical structure of nodes that PMD extracts from your example code.
+
 ## Requirements
 
 - **Node.js**: ≥25.0.0
@@ -217,6 +237,14 @@ test-pmd-rule rulesets/code-style/AvoidMagicNumbers.xml --coverage
 # Test directory with coverage reports
 test-pmd-rule ../sca-extra/rulesets --coverage
 
+# Output AST dump for a specific example (1-based index)
+test-pmd-rule path/to/rule.xml --diag 2
+
+# Short form flags
+test-pmd-rule path/to/rule.xml -c          # --coverage
+test-pmd-rule path/to/rule.xml -d 1        # --diag 1
+test-pmd-rule --help                        # Show help
+
 # Or use npx without installing globally
 npx test-pmd-rule path/to/rule.xml
 ```
@@ -224,7 +252,9 @@ npx test-pmd-rule path/to/rule.xml
 **Arguments:**
 
 - `<rule.xml|directory>`: Path to XML rule file or directory containing XML files (recursive)
-- `--coverage`: Generate LCOV coverage report in `coverage/lcov.info`
+- `--coverage`, `-c`: Generate LCOV coverage report in `coverage/lcov.info`
+- `--diag <number>`, `-d <number>`: Output PMD AST dump for the specified example (1-based index). Requires a single XML rule file, not a directory.
+- `--help`, `-h`: Show help message and exit
 
 The tool will:
 

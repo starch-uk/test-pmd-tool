@@ -4,12 +4,13 @@
 	},
 	"dependencies": {
 		"@xmldom/xmldom": "^0.8.11",
+		"stringify-tree": "^1.1.1",
 		"tmp": "^0.2.5"
 	},
 	"devDependencies": {
 		"@eslint/js": "^9.39.2",
 		"@prettier/plugin-xml": "^3.4.2",
-		"@types/node": "^25.0.7",
+		"@types/node": "^25.0.8",
 		"@types/tmp": "^0.2.6",
 		"@typescript-eslint/eslint-plugin": "^8.53.0",
 		"@typescript-eslint/parser": "^8.53.0",

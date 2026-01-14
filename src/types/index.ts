@@ -79,6 +79,13 @@ export interface TestFileResult {
 	hasValids: boolean;
 	violationCount: number;
 	validCount: number;
+	wrapperInfo?: {
+		addedWrapperClass: boolean;
+		wrapperClassName: string;
+		addedWrapperMethod: boolean;
+		wrapperMethodName: string;
+		helperMethodNames: string[];
+	};
 }
 
 export interface PMDResult {
