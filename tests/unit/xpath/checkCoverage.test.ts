@@ -2011,6 +2011,576 @@ describe('checkXPathCoverage', () => {
 		expect(result.coverage.length).toBeGreaterThan(0);
 	});
 
+	it('should include line numbers for missing operators when xpath and value are on same line', () => {
+		mockedAnalyzeXPath.mockReturnValue({
+			attributes: [],
+			conditionals: [],
+			hasLetExpressions: false,
+			hasUnions: false,
+			nodeTypes: [],
+			operators: ['and'],
+			patterns: [],
+		});
+
+		const mockXmlContent = `<?xml version="1.0" ?>
+<rule name="TestRule">
+  <properties>
+    <property name="xpath" value="//Method[@Flag and @OtherFlag]"></property>
+  </properties>
+</rule>`;
+
+		mockedReadFileSync.mockReturnValue(mockXmlContent);
+
+		const examples: ExampleData[] = [
+			{
+				content: 'if (flag) { }', // no textual "and" so operator is missing
+				exampleIndex: 1,
+				validMarkers: [],
+				valids: [],
+				violationMarkers: [],
+				violations: [],
+			},
+		];
+
+		const result = checkXPathCoverage(
+			'//Method[@Flag and @OtherFlag]',
+			examples,
+			'/path/to/rule.xml',
+		);
+
+		expect(result.coverage).toHaveLength(1);
+		const description = result.coverage[0]?.evidence[0]?.description ?? '';
+		expect(description).toContain('Missing:');
+		expect(description).toContain('and');
+		expect(description).toContain('Line ');
+	});
+
+	it('should include line numbers for missing nested conditional with CDATA and ruleFilePath', () => {
+		mockedAnalyzeXPath.mockReturnValue({
+			attributes: [],
+			conditionals: [
+				{
+					expression:
+						'$isEmptyString(./LiteralExpression)\n\t\t\t\t\t\tor $isEmptyString(./NewListLiteralExpression/following-sibling::LiteralExpression)',
+					position: 0,
+					type: 'and',
+				},
+				{
+					expression:
+						'$isEmptyString(./NewListLiteralExpression/following-sibling::LiteralExpression)',
+					position: 0,
+					type: 'or',
+				},
+			],
+			hasLetExpressions: false,
+			hasUnions: false,
+			nodeTypes: [],
+			operators: [],
+			patterns: [],
+		});
+
+		// Minimal XML that mirrors the real CDATA structure used in sca-extra rules
+		const mockXmlContent = `<?xml version="1.0" ?>
+<ruleset>
+  <rule name="PreferConcatenationOverStringJoinWithEmpty">
+    <properties>
+      <property name="xpath">
+        <value>
+          <![CDATA[
+          let $joinMethod := 'join',
+            $stringJoinFullName := 'String.join',
+            $isEmptyString := function($expr) {
+              $expr/@String = true()
+                and ($expr/@Image = "''" or $expr/@Image = '""' or string-length($expr/@Image) = 0)
+            }
+          return //MethodCallExpression[
+            @MethodName = $joinMethod
+            and @FullMethodName = $stringJoinFullName
+            and .//NewListLiteralExpression
+            and (
+              $isEmptyString(./LiteralExpression)
+              or $isEmptyString(./NewListLiteralExpression/following-sibling::LiteralExpression)
+            )
+          ]
+          ]]>
+        </value>
+      </property>
+    </properties>
+  </rule>
+</ruleset>`;
+
+		mockedReadFileSync.mockReturnValue(mockXmlContent);
+
+		const examples: ExampleData[] = [
+			{
+				content: 'some content without the second conditional',
+				exampleIndex: 1,
+				validMarkers: [],
+				valids: [],
+				violationMarkers: [],
+				violations: [],
+			},
+		];
+
+		const xpath = `
+let $joinMethod := 'join',
+	$stringJoinFullName := 'String.join',
+	$isEmptyString := function($expr) {
+		$expr/@String = true()
+			and ($expr/@Image = "''" or $expr/@Image = '""' or string-length($expr/@Image) = 0)
+	}
+return //MethodCallExpression[
+	@MethodName = $joinMethod
+	and @FullMethodName = $stringJoinFullName
+	and .//NewListLiteralExpression
+	and (
+		$isEmptyString(./LiteralExpression)
+		or $isEmptyString(./NewListLiteralExpression/following-sibling::LiteralExpression)
+	)
+]`;
+
+		const result = checkXPathCoverage(xpath, examples, '/path/to/rule.xml');
+
+		expect(result.coverage).toHaveLength(1);
+		const description = result.coverage[0]?.evidence[0]?.description ?? '';
+		// We should report a line number for the missing "or" conditional, but
+		// tests must not assert the concrete line value.
+		expect(description).toContain('Missing:');
+		expect(description).toContain('or:');
+		expect(description).toContain('Line ');
+	});
+
+	it('should use direct XPath section search for conditional line numbers', () => {
+		mockedAnalyzeXPath.mockReturnValue({
+			attributes: [],
+			conditionals: [
+				{
+					expression: '@Name = "test"',
+					position: 0,
+					type: 'and',
+				},
+			],
+			hasLetExpressions: false,
+			hasUnions: false,
+			nodeTypes: [],
+			operators: [],
+			patterns: [],
+		});
+
+		const mockXmlContent = `<?xml version="1.0"?>
+<rule name="TestRule">
+  <properties>
+    <property name="xpath">
+      <value>//Method[@Flag = true() and @Name = "test"]</value>
+    </property>
+  </properties>
+</rule>`;
+
+		mockedReadFileSync.mockReturnValue(mockXmlContent);
+
+		const examples: ExampleData[] = [
+			{
+				content: 'some unrelated content',
+				exampleIndex: 1,
+				validMarkers: [],
+				valids: [],
+				violationMarkers: [],
+				violations: [],
+			},
+		];
+
+		const result = checkXPathCoverage(
+			'//Method[@Flag = true() and @Name = "test"]',
+			examples,
+			'/path/to/rule.xml',
+		);
+
+		expect(result.coverage).toHaveLength(1);
+		const description = result.coverage[0]?.evidence[0]?.description ?? '';
+		expect(description).toContain('Missing:');
+		expect(description).toContain('@Name = "test"');
+		expect(description).toContain('Line ');
+	});
+
+	it('should use fallback line calculation for conditionals when xpath content is on next line', () => {
+		mockedAnalyzeXPath.mockReturnValue({
+			attributes: [],
+			conditionals: [
+				{
+					expression: '@Name = "test"',
+					position: 5,
+					type: 'and',
+				},
+			],
+			hasLetExpressions: false,
+			hasUnions: false,
+			nodeTypes: [],
+			operators: [],
+			patterns: [],
+		});
+
+		const mockXmlContent = `<?xml version="1.0"?>
+<rule name="TestRule">
+  <properties>
+    <property name="xpath">
+      <value>
+        //Method[@Name = "test"]
+      </value>
+    </property>
+  </properties>
+</rule>`;
+
+		mockedReadFileSync.mockReturnValue(mockXmlContent);
+
+		const examples: ExampleData[] = [
+			{
+				content: 'some unrelated content',
+				exampleIndex: 1,
+				validMarkers: [],
+				valids: [],
+				violationMarkers: [],
+				violations: [],
+			},
+		];
+
+		const result = checkXPathCoverage(
+			'//Method[@Name = "test"]',
+			examples,
+			'/path/to/rule.xml',
+		);
+
+		expect(result.coverage).toHaveLength(1);
+		const description = result.coverage[0]?.evidence[0]?.description ?? '';
+		expect(description).toContain('Missing:');
+		expect(description).toContain('@Name = "test"');
+		expect(description).toContain('Line ');
+	});
+
+	it('should use fallback line calculation when xpath content is on same line as value', () => {
+		mockedAnalyzeXPath.mockReturnValue({
+			attributes: [],
+			conditionals: [
+				{
+					expression: '@Other = "x"',
+					position: 5,
+					type: 'and',
+				},
+			],
+			hasLetExpressions: false,
+			hasUnions: false,
+			nodeTypes: [],
+			operators: [],
+			patterns: [],
+		});
+
+		const mockXmlContent = `<?xml version="1.0"?>
+<rule name="TestRule">
+  <properties>
+    <property name="xpath">
+      <value>//Method[@Other = "x"]</value>
+    </property>
+  </properties>
+</rule>`;
+
+		mockedReadFileSync.mockReturnValue(mockXmlContent);
+
+		const examples: ExampleData[] = [
+			{
+				content: 'some unrelated content',
+				exampleIndex: 1,
+				validMarkers: [],
+				valids: [],
+				violationMarkers: [],
+				violations: [],
+			},
+		];
+
+		const result = checkXPathCoverage(
+			'//Method[@Other = "x"]',
+			examples,
+			'/path/to/rule.xml',
+		);
+
+		expect(result.coverage).toHaveLength(1);
+		const description = result.coverage[0]?.evidence[0]?.description ?? '';
+		expect(description).toContain('Missing:');
+		expect(description).toContain('@Other = "x"');
+		expect(description).toContain('Line ');
+	});
+
+	it('should return null from conditional line finder when no xpath content line is detected', () => {
+		mockedAnalyzeXPath.mockReturnValue({
+			attributes: [],
+			conditionals: [
+				{
+					expression: '@Name = "test"',
+					// Simulate unknown position so fallback condition is skipped
+					position: -1,
+					type: 'and',
+				},
+			],
+			hasLetExpressions: false,
+			hasUnions: false,
+			nodeTypes: [],
+			operators: [],
+			patterns: [],
+		});
+
+		const mockXmlContent = `<?xml version="1.0"?>
+<rule name="TestRule">
+  <properties>
+    <property name="xpath">
+      <!-- no <value> element here -->
+    </property>
+  </properties>
+</rule>`;
+
+		mockedReadFileSync.mockReturnValue(mockXmlContent);
+
+		const examples: ExampleData[] = [
+			{
+				content: 'some unrelated content',
+				exampleIndex: 1,
+				validMarkers: [],
+				valids: [],
+				violationMarkers: [],
+				violations: [],
+			},
+		];
+
+		const result = checkXPathCoverage(
+			'//Method[@Name = "test"]',
+			examples,
+			'/path/to/rule.xml',
+		);
+
+		expect(result.coverage).toHaveLength(1);
+		const description = result.coverage[0]?.evidence[0]?.description ?? '';
+		expect(description).toContain('Missing:');
+		// No line information when finder returns null
+		expect(description).not.toContain('Line ');
+	});
+
+	it('should include line numbers for missing operators when ruleFilePath is provided', () => {
+		mockedAnalyzeXPath.mockReturnValue({
+			attributes: [],
+			conditionals: [],
+			hasLetExpressions: false,
+			hasUnions: false,
+			nodeTypes: [],
+			operators: ['and', 'or'],
+			patterns: [],
+		});
+
+		const mockXmlContent = `<?xml version="1.0" ?>
+<rule name="TestRule">
+  <properties>
+    <property name="xpath">
+      <value>//Method[@Flag and @OtherFlag or @ThirdFlag]</value>
+    </property>
+  </properties>
+</rule>`;
+
+		mockedReadFileSync.mockReturnValue(mockXmlContent);
+
+		const examples: ExampleData[] = [
+			{
+				content: 'if (flag && otherFlag) { }',
+				exampleIndex: 1,
+				validMarkers: [],
+				valids: [],
+				violationMarkers: [],
+				violations: [],
+			},
+		];
+
+		const result = checkXPathCoverage(
+			'//Method[@Flag and @OtherFlag or @ThirdFlag]',
+			examples,
+			'/path/to/rule.xml',
+		);
+
+		expect(result.coverage).toHaveLength(1);
+		const description = result.coverage[0]?.evidence[0]?.description ?? '';
+		// At least one missing operator should carry a line number
+		expect(description).toContain('Missing:');
+		expect(description).toContain('or');
+		expect(description).toContain('Line ');
+	});
+
+	it('should use fallback line calculation for operators when xpath and XML differ', () => {
+		mockedAnalyzeXPath.mockReturnValue({
+			attributes: [],
+			conditionals: [],
+			hasLetExpressions: false,
+			hasUnions: false,
+			nodeTypes: [],
+			operators: ['+'],
+			patterns: [],
+		});
+
+		// XML does not contain '+', so findOperatorLineNumber must use the fallback
+		const mockXmlContent = `<?xml version="1.0"?>
+<rule name="TestRule">
+  <properties>
+    <property name="other">
+      <value>//SomethingWithoutPlus</value>
+    </property>
+  </properties>
+</rule>`;
+
+		mockedReadFileSync.mockReturnValue(mockXmlContent);
+
+		const examples: ExampleData[] = [
+			{
+				content: 'some unrelated content',
+				exampleIndex: 1,
+				validMarkers: [],
+				valids: [],
+				violationMarkers: [],
+				violations: [],
+			},
+		];
+
+		const xpath = '//Method[@Flag + @Other]';
+		const result = checkXPathCoverage(xpath, examples, '/path/to/rule.xml');
+
+		expect(result.coverage).toHaveLength(1);
+		const description = result.coverage[0]?.evidence[0]?.description ?? '';
+		expect(description).toContain('Missing:');
+		expect(description).toContain('+');
+		expect(description).toContain('Line ');
+	});
+
+	it('should return null from operator line finder when operator not in xpath', () => {
+		mockedAnalyzeXPath.mockReturnValue({
+			attributes: [],
+			conditionals: [],
+			hasLetExpressions: false,
+			hasUnions: false,
+			nodeTypes: [],
+			operators: ['+'],
+			patterns: [],
+		});
+
+		const mockXmlContent = `<?xml version="1.0"?>
+<rule name="TestRule">
+  <properties>
+    <property name="xpath">
+      <!-- no <value> element here -->
+    </property>
+  </properties>
+</rule>`;
+
+		mockedReadFileSync.mockReturnValue(mockXmlContent);
+
+		const examples: ExampleData[] = [
+			{
+				content: 'some unrelated content',
+				exampleIndex: 1,
+				validMarkers: [],
+				valids: [],
+				violationMarkers: [],
+				violations: [],
+			},
+		];
+
+		// XPath does not contain the '+' operator, so xpathIndex will be NOT_FOUND_INDEX
+		const xpath = '//Method[@Flag]';
+		const result = checkXPathCoverage(xpath, examples, '/path/to/rule.xml');
+
+		expect(result.coverage).toHaveLength(1);
+		const description = result.coverage[0]?.evidence[0]?.description ?? '';
+		expect(description).toContain('Missing:');
+		expect(description).not.toContain('Line ');
+	});
+
+	it('should handle readFileSync errors gracefully in findConditionalLineNumber', () => {
+		mockedAnalyzeXPath.mockReturnValue({
+			attributes: [],
+			conditionals: [
+				{
+					expression: '@Name = "test"',
+					position: 0,
+					type: 'and',
+				},
+			],
+			hasLetExpressions: false,
+			hasUnions: false,
+			nodeTypes: [],
+			operators: [],
+			patterns: [],
+		});
+
+		// Force readFileSync to throw when conditional line lookup runs
+		mockedReadFileSync.mockImplementationOnce(() => {
+			throw new Error('File read error');
+		});
+
+		const examples: ExampleData[] = [
+			{
+				content: 'some unrelated content',
+				exampleIndex: 1,
+				validMarkers: [],
+				valids: [],
+				violationMarkers: [],
+				violations: [],
+			},
+		];
+
+		const result = checkXPathCoverage(
+			'//Method[@Name = "test"]',
+			examples,
+			'/path/to/rule.xml',
+		);
+
+		expect(result.coverage).toHaveLength(1);
+		const description = result.coverage[0]?.evidence[0]?.description ?? '';
+		expect(description).toContain('Missing:');
+		expect(description).toContain('@Name = "test"');
+		// When readFileSync fails, no line number should be included
+		expect(description).not.toContain('Line ');
+	});
+
+	it('should handle readFileSync errors gracefully in findOperatorLineNumber', () => {
+		mockedAnalyzeXPath.mockReturnValue({
+			attributes: [],
+			conditionals: [],
+			hasLetExpressions: false,
+			hasUnions: false,
+			nodeTypes: [],
+			operators: ['and'],
+			patterns: [],
+		});
+
+		mockedReadFileSync.mockImplementationOnce(() => {
+			throw new Error('File read error');
+		});
+
+		const examples: ExampleData[] = [
+			{
+				content: 'if (flag && otherFlag) { }',
+				exampleIndex: 1,
+				validMarkers: [],
+				valids: [],
+				violationMarkers: [],
+				violations: [],
+			},
+		];
+
+		const result = checkXPathCoverage(
+			'//Method[@Flag and @OtherFlag]',
+			examples,
+			'/path/to/rule.xml',
+		);
+
+		expect(result.coverage).toHaveLength(1);
+		const description = result.coverage[0]?.evidence[0]?.description ?? '';
+		expect(description).toContain('Missing:');
+		expect(description).toContain('and');
+		expect(description).not.toContain('Line ');
+	});
+
 	it('should handle findNodeTypeLineNumber when node type not in single line', () => {
 		const examples = [
 			{
@@ -2410,5 +2980,254 @@ helperMethod();
 		// Should complete without throwing, returning null for line numbers
 		expect(result).toBeDefined();
 		expect(result.coverage).toBeDefined();
+	});
+
+	it('should handle conditional when xpathSectionStart is NOT_FOUND_INDEX', () => {
+		mockedAnalyzeXPath.mockReturnValue({
+			attributes: [],
+			conditionals: [
+				{
+					expression: '@Name = "test"',
+					position: 5,
+					type: 'and',
+				},
+			],
+			hasLetExpressions: false,
+			hasUnions: false,
+			nodeTypes: [],
+			operators: [],
+			patterns: [],
+		});
+
+		// XML without xpath property - triggers xpathSectionStart === NOT_FOUND_INDEX branch
+		const mockXmlContent = `<?xml version="1.0"?>
+<rule name="TestRule">
+  <properties>
+    <property name="other">
+      <value>something</value>
+    </property>
+  </properties>
+</rule>`;
+
+		mockedReadFileSync.mockReturnValue(mockXmlContent);
+
+		const examples: ExampleData[] = [
+			{
+				content: 'some unrelated content',
+				exampleIndex: 1,
+				validMarkers: [],
+				valids: [],
+				violationMarkers: [],
+				violations: [],
+			},
+		];
+
+		const result = checkXPathCoverage(
+			'//Method[@Name = "test"]',
+			examples,
+			'/path/to/rule.xml',
+		);
+
+		expect(result.coverage).toHaveLength(1);
+		const description = result.coverage[0]?.evidence[0]?.description ?? '';
+		expect(description).toContain('Missing:');
+		// Should still try fallback even without xpath section
+		expect(description).not.toContain('Line ');
+	});
+
+	it('should handle conditional when xpathContentStart is last line (hasNextLine false)', () => {
+		mockedAnalyzeXPath.mockReturnValue({
+			attributes: [],
+			conditionals: [
+				{
+					expression: '@Name = "test"',
+					position: 0,
+					type: 'and',
+				},
+			],
+			hasLetExpressions: false,
+			hasUnions: false,
+			nodeTypes: [],
+			operators: [],
+			patterns: [],
+		});
+
+		// XML where <value> is on the last line - triggers hasNextLine = false branch
+		const mockXmlContent = `<?xml version="1.0"?>
+<rule name="TestRule">
+  <properties>
+    <property name="xpath">
+      <value>//Method[@Name = "test"]</value>`;
+
+		mockedReadFileSync.mockReturnValue(mockXmlContent);
+
+		const examples: ExampleData[] = [
+			{
+				content: 'some unrelated content',
+				exampleIndex: 1,
+				validMarkers: [],
+				valids: [],
+				violationMarkers: [],
+				violations: [],
+			},
+		];
+
+		const result = checkXPathCoverage(
+			'//Method[@Name = "test"]',
+			examples,
+			'/path/to/rule.xml',
+		);
+
+		expect(result.coverage).toHaveLength(1);
+		const description = result.coverage[0]?.evidence[0]?.description ?? '';
+		expect(description).toContain('Missing:');
+		expect(description).toContain('Line ');
+	});
+
+	it('should handle conditional when no newlines before position (newlineMatches null)', () => {
+		mockedAnalyzeXPath.mockReturnValue({
+			attributes: [],
+			conditionals: [
+				{
+					expression: '@UniqueAttr = "unique"',
+					position: 0, // Position at start means no newlines before
+					type: 'and',
+				},
+			],
+			hasLetExpressions: false,
+			hasUnions: false,
+			nodeTypes: [],
+			operators: [],
+			patterns: [],
+		});
+
+		// XML that doesn't contain the expression pattern, forcing fallback path
+		// The search pattern would be "and @UniqueAttr = unique" which won't match
+		const mockXmlContent = `<?xml version="1.0"?>
+<rule name="TestRule">
+  <properties>
+    <property name="xpath">
+      <value>//Method[@Name = "test"]</value>
+    </property>
+  </properties>
+</rule>`;
+
+		mockedReadFileSync.mockReturnValue(mockXmlContent);
+
+		const examples: ExampleData[] = [
+			{
+				content: 'some unrelated content',
+				exampleIndex: 1,
+				validMarkers: [],
+				valids: [],
+				violationMarkers: [],
+				violations: [],
+			},
+		];
+
+		// XPath with conditional at position 0 (no newlines before)
+		// This ensures xpathBeforeConditional is empty string, match returns null
+		const xpath = 'and @UniqueAttr = "unique" //Method[@Name = "test"]';
+		const result = checkXPathCoverage(xpath, examples, '/path/to/rule.xml');
+
+		expect(result.coverage).toHaveLength(1);
+		const description = result.coverage[0]?.evidence[0]?.description ?? '';
+		expect(description).toContain('Missing:');
+		expect(description).toContain('Line ');
+	});
+
+	it('should handle conditional type "not" (not "or" or "and")', () => {
+		mockedAnalyzeXPath.mockReturnValue({
+			attributes: [],
+			conditionals: [
+				{
+					expression: '@Name = "test"',
+					position: 0,
+					type: 'not', // Not "or" or "and", so searchPattern is just exprPattern
+				},
+			],
+			hasLetExpressions: false,
+			hasUnions: false,
+			nodeTypes: [],
+			operators: [],
+			patterns: [],
+		});
+
+		// XML that doesn't contain the expression, forcing fallback
+		const mockXmlContent = `<?xml version="1.0"?>
+<rule name="TestRule">
+  <properties>
+    <property name="xpath">
+      <value>//Method[@Other]</value>
+    </property>
+  </properties>
+</rule>`;
+
+		mockedReadFileSync.mockReturnValue(mockXmlContent);
+
+		const examples: ExampleData[] = [
+			{
+				content: 'some unrelated content',
+				exampleIndex: 1,
+				validMarkers: [],
+				valids: [],
+				violationMarkers: [],
+				violations: [],
+			},
+		];
+
+		const xpath = 'not(@Name = "test")';
+		const result = checkXPathCoverage(xpath, examples, '/path/to/rule.xml');
+
+		expect(result.coverage).toHaveLength(1);
+		const description = result.coverage[0]?.evidence[0]?.description ?? '';
+		expect(description).toContain('Missing:');
+		expect(description).toContain('@Name = "test"');
+	});
+
+	it('should handle operator when no newlines before position (newlineMatches null)', () => {
+		mockedAnalyzeXPath.mockReturnValue({
+			attributes: [],
+			conditionals: [],
+			hasLetExpressions: false,
+			hasUnions: false,
+			nodeTypes: [],
+			operators: ['%'],
+			patterns: [],
+		});
+
+		// XML that doesn't contain the operator, forcing fallback path
+		// The search won't find '%' in the XML, so we hit the fallback
+		const mockXmlContent = `<?xml version="1.0"?>
+<rule name="TestRule">
+  <properties>
+    <property name="xpath">
+      <value>//Method[@Name = "test"]</value>
+    </property>
+  </properties>
+</rule>`;
+
+		mockedReadFileSync.mockReturnValue(mockXmlContent);
+
+		const examples: ExampleData[] = [
+			{
+				content: 'some unrelated content',
+				exampleIndex: 1,
+				validMarkers: [],
+				valids: [],
+				violationMarkers: [],
+				violations: [],
+			},
+		];
+
+		// Operator at start of XPath (index 0) means no newlines before
+		// This forces fallback where xpathBeforeOperator is empty string, match returns null
+		const xpath = '% //Method[@Name = "test"]';
+		const result = checkXPathCoverage(xpath, examples, '/path/to/rule.xml');
+
+		expect(result.coverage).toHaveLength(1);
+		const description = result.coverage[0]?.evidence[0]?.description ?? '';
+		expect(description).toContain('Missing:');
+		expect(description).toContain('Line ');
 	});
 });

@@ -352,6 +352,215 @@ function truncateExpression(
 }
 
 /**
+ * Find line number for a conditional expression in the XPath within the XML file.
+ * @param ruleFilePath - Path to the rule XML file.
+ * @param xpath - XPath expression (trimmed).
+ * @param conditional - Conditional to find.
+ * @returns Line number where conditional appears, or null if not found.
+ */
+function findConditionalLineNumber(
+	ruleFilePath: Readonly<string>,
+	xpath: Readonly<string>,
+	conditional: Readonly<Conditional>,
+): number | null {
+	try {
+		const content = readFileSync(ruleFilePath, 'utf-8');
+		const lines = content.split('\n');
+
+		// Build search pattern from conditional expression
+		// Normalize whitespace for matching (replace multiple spaces with single space)
+		const exprPattern = conditional.expression.trim().replace(/\s+/g, ' ');
+		// For 'or' and 'and' conditionals, include the operator in the search to be more specific
+		// This helps distinguish nested conditionals (e.g., 'or' inside 'and')
+		// Build search pattern: operator + expression
+		const searchPattern =
+			conditional.type === 'or' || conditional.type === 'and'
+				? `${conditional.type} ${exprPattern}`
+				: exprPattern;
+		const normalizedSearchPattern = searchPattern.replace(/\s+/g, ' ');
+
+		// Find the XPath section first
+		let xpathSectionStart = NOT_FOUND_INDEX;
+		let inXPathSection = false;
+		let xpathContentStart = NOT_FOUND_INDEX;
+
+		for (let i = 0; i < lines.length; i++) {
+			// split('\n') always returns a dense array, so lines[i] is always defined
+			// eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Loop condition ensures i < length, split() returns dense array
+			const line = lines[i]!;
+			if (line.includes('<property') && line.includes('name="xpath"')) {
+				inXPathSection = true;
+				xpathSectionStart = i;
+			}
+			if (inXPathSection && line.includes('<value>')) {
+				xpathContentStart = i;
+			}
+			if (inXPathSection && line.includes('</property>')) {
+				inXPathSection = false;
+			}
+		}
+
+		// If we found the XPath section, search within it for the expression
+		if (xpathSectionStart !== NOT_FOUND_INDEX) {
+			// Search for the expression pattern in the XPath section
+			// Search from the end backwards to find the most specific match (for nested conditionals)
+			// This helps when 'or' is nested inside 'and' - we want to find the 'or' line, not the 'and' line
+			const LAST_INDEX_OFFSET = 1;
+			const lastLineIndex = lines.length - LAST_INDEX_OFFSET;
+			for (let i = lastLineIndex; i >= xpathSectionStart; i--) {
+				// split('\n') always returns a dense array, so lines[i] is always defined
+				// eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Loop condition ensures i < length, split() returns dense array
+				const line = lines[i]!;
+				// Normalize whitespace in the line for comparison (replace multiple spaces with single space)
+				const normalizedLine = line.replace(/\s+/g, ' ');
+				if (normalizedLine.includes(normalizedSearchPattern)) {
+					return i + LINE_OFFSET;
+				}
+			}
+		}
+
+		// Fallback: find position in trimmed XPath string and estimate line
+		// The xpath parameter is already trimmed, so position is relative to trimmed string
+		// For 'or' and 'and', position points to the operator, so we need to find that in the XML
+		const xpathIndex = conditional.position;
+		if (
+			xpathIndex !== NOT_FOUND_INDEX &&
+			xpathContentStart !== NOT_FOUND_INDEX
+		) {
+			// Find where the actual XPath content starts in the XML file
+			// This is after <value> and potentially after <![CDATA[
+			let actualContentStartLine = xpathContentStart;
+			// Check if CDATA is used
+			const NEXT_LINE_OFFSET = 1;
+			const nextLineIndex = xpathContentStart + NEXT_LINE_OFFSET;
+			const hasNextLine = nextLineIndex < lines.length;
+			const nextLine = hasNextLine ? lines[nextLineIndex] : undefined;
+			const hasCdataStart =
+				hasNextLine && nextLine?.includes('<![CDATA[') === true;
+			if (hasCdataStart) {
+				// CDATA starts on next line, actual content starts after that
+				const CDATA_CONTENT_OFFSET = 1;
+				actualContentStartLine = nextLineIndex + CDATA_CONTENT_OFFSET;
+			} else {
+				// Content might be on the same line as <value> or next line
+				// Check if <value> line contains the start of XPath content
+				const valueLine = lines[xpathContentStart];
+				const hasValueLine = valueLine !== undefined;
+				const valueLineEndsWithTag =
+					hasValueLine && valueLine.trim().endsWith('<value>');
+				if (hasValueLine && !valueLineEndsWithTag) {
+					// Content starts on same line as <value>
+					actualContentStartLine = xpathContentStart;
+				} else {
+					// Content starts on next line
+					actualContentStartLine =
+						xpathContentStart + NEXT_LINE_OFFSET;
+				}
+			}
+
+			// Count newlines in the trimmed XPath up to the conditional position
+			const xpathBeforeConditional = xpath.substring(
+				MIN_COUNT,
+				xpathIndex,
+			);
+			const newlineMatches = xpathBeforeConditional.match(/\n/g);
+			// match() returns null if no match, or array if match found
+			// Use 0 if no matches found (null case)
+			const newlineCount = newlineMatches?.length ?? MIN_COUNT;
+
+			// Calculate the line number
+			// actualContentStartLine is 0-indexed, so we add LINE_OFFSET to convert to 1-indexed
+			// Then add newlineCount to account for newlines in the XPath
+			return actualContentStartLine + LINE_OFFSET + newlineCount;
+		}
+
+		return null;
+	} catch {
+		return null;
+	}
+}
+
+/**
+ * Find line number for an operator in the XPath within the XML file.
+ * @param ruleFilePath - Path to the rule XML file.
+ * @param xpath - XPath expression.
+ * @param operator - Operator to find (e.g., "+", "=", "!=").
+ * @returns Line number where operator appears, or null if not found.
+ */
+function findOperatorLineNumber(
+	ruleFilePath: Readonly<string>,
+	xpath: Readonly<string>,
+	operator: Readonly<string>,
+): number | null {
+	try {
+		const content = readFileSync(ruleFilePath, 'utf-8');
+		const lines = content.split('\n');
+
+		// Escape special regex characters in operator
+		const escapedOperator = operator.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+		const operatorPattern = new RegExp(escapedOperator);
+
+		// Find the line containing the XPath value element
+		for (let i = 0; i < lines.length; i++) {
+			// split('\n') always returns a dense array, so lines[i] is always defined
+			// eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Loop condition ensures i < length, split() returns dense array
+			const line = lines[i]!;
+			// Check if this line contains the XPath and the operator
+			const hasXPath = line.includes('xpath');
+			const hasValue = line.includes('value');
+			const hasOperator = operatorPattern.test(line);
+			if (hasXPath && hasValue && hasOperator) {
+				return i + LINE_OFFSET;
+			}
+		}
+
+		// If not found in a single line, search for the XPath section and then the operator
+		let inXPathSection = false;
+		for (let i = 0; i < lines.length; i++) {
+			// split('\n') always returns a dense array, so lines[i] is always defined
+			// eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Loop condition ensures i < length, split() returns dense array
+			const line = lines[i]!;
+			if (line.includes('<property') && line.includes('name="xpath"')) {
+				inXPathSection = true;
+			}
+			if (inXPathSection && operatorPattern.test(line)) {
+				return i + LINE_OFFSET;
+			}
+			if (inXPathSection && line.includes('</property>')) {
+				inXPathSection = false;
+			}
+		}
+
+		// Fallback: find position in XPath string and estimate line
+		const xpathIndex = xpath.indexOf(operator);
+		if (xpathIndex !== NOT_FOUND_INDEX) {
+			// Find the value element and count lines
+			for (let i = 0; i < lines.length; i++) {
+				// split('\n') always returns a dense array, so lines[i] is always defined
+				// eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Loop condition ensures i < length, split() returns dense array
+				const line = lines[i]!;
+				if (line.includes('<value>')) {
+					// Count newlines in XPath up to the operator position
+					const xpathBeforeOperator = xpath.substring(
+						MIN_COUNT,
+						xpathIndex,
+					);
+					const newlineMatches = xpathBeforeOperator.match(/\n/g);
+					// match() returns null if no match, or array if match found
+					// Use 0 if no matches found (null case)
+					const newlineCount = newlineMatches?.length ?? MIN_COUNT;
+					return i + LINE_OFFSET + newlineCount;
+				}
+			}
+		}
+
+		return null;
+	} catch {
+		return null;
+	}
+}
+
+/**
  * Maps a conditional type from extraction to its corresponding checker key.
  * @param type - Conditional type from extraction.
  * @returns Key for conditional checkers map.
@@ -366,15 +575,27 @@ function mapConditionalTypeToCheckerKey(type: Readonly<string>): string {
 }
 
 /**
+ * Options for conditional coverage checking.
+ */
+interface ConditionalCoverageOptions {
+	ruleFilePath?: Readonly<string>;
+	xpath?: Readonly<string>;
+	lineNumberCollector?: (lineNumber: number) => void;
+}
+
+/**
  * Check if conditionals from XPath are covered in example content.
  * @param conditionals - Conditionals to check.
  * @param content - Example content to search.
+ * @param options - Optional rule file path and XPath for line number tracking.
  * @returns Coverage evidence.
  */
 function checkConditionalCoverage(
 	conditionals: readonly Readonly<Conditional>[],
 	content: Readonly<string>,
+	options?: Readonly<ConditionalCoverageOptions>,
 ): CoverageEvidence {
+	const lineNumberCollector = options?.lineNumberCollector;
 	const lowerContent = content.toLowerCase();
 	const foundConditionals: string[] = [];
 	const missingConditionals: string[] = [];
@@ -414,7 +635,31 @@ function checkConditionalCoverage(
 				conditional.expression,
 				MAX_EXPRESSION_LENGTH,
 			);
-			missingConditionals.push(` - ${conditional.type}: ${displayExpr}`);
+			// Add line number if available
+			const ruleFilePath = options?.ruleFilePath;
+			const xpathValue = options?.xpath;
+			const hasOptions =
+				ruleFilePath !== undefined && xpathValue !== undefined;
+			if (hasOptions) {
+				const lineNumber = findConditionalLineNumber(
+					ruleFilePath,
+					xpathValue,
+					conditional,
+				);
+				if (lineNumber !== null && lineNumberCollector) {
+					// Record this line as covered for LCOV reporting
+					lineNumberCollector(lineNumber);
+				}
+				missingConditionals.push(
+					lineNumber !== null
+						? ` - Line ${String(lineNumber)}: ${conditional.type}: ${displayExpr}`
+						: ` - ${conditional.type}: ${displayExpr}`,
+				);
+			} else {
+				missingConditionals.push(
+					` - ${conditional.type}: ${displayExpr}`,
+				);
+			}
 		}
 	}
 
@@ -573,15 +818,27 @@ function checkAttributeCoverage(
 }
 
 /**
+ * Options for operator coverage checking.
+ */
+interface OperatorCoverageOptions {
+	ruleFilePath?: Readonly<string>;
+	xpath?: Readonly<string>;
+	lineNumberCollector?: (lineNumber: number) => void;
+}
+
+/**
  * Check if operators from XPath are covered in example content.
  * @param operators - Operators to check.
  * @param content - Example content to search.
+ * @param options - Optional rule file path and XPath for line number tracking.
  * @returns Coverage evidence.
  */
 function checkOperatorCoverage(
 	operators: readonly string[],
 	content: Readonly<string>,
+	options?: Readonly<OperatorCoverageOptions>,
 ): CoverageEvidence {
+	const lineNumberCollector = options?.lineNumberCollector;
 	const lowerContent = content.toLowerCase();
 	const foundOperators: string[] = [];
 	const missingOperators: string[] = [];
@@ -599,9 +856,33 @@ function checkOperatorCoverage(
 		foundOperators.length > MIN_COUNT
 			? foundOperators.map((item) => ` - ${item}`).join('\n')
 			: '';
+	// Format missing operators with line numbers if available
 	const missingList =
 		missingOperators.length > MIN_COUNT
-			? missingOperators.map((item) => ` - ${item}`).join('\n')
+			? missingOperators
+					.map((item) => {
+						const ruleFilePath = options?.ruleFilePath;
+						const xpathValue = options?.xpath;
+						const hasOptions =
+							ruleFilePath !== undefined &&
+							xpathValue !== undefined;
+						if (hasOptions) {
+							const lineNumber = findOperatorLineNumber(
+								ruleFilePath,
+								xpathValue,
+								item,
+							);
+							if (lineNumber !== null && lineNumberCollector) {
+								// Record this line as covered for LCOV reporting
+								lineNumberCollector(lineNumber);
+							}
+							return lineNumber !== null
+								? ` - Line ${String(lineNumber)}: ${item}`
+								: ` - ${item}`;
+						}
+						return ` - ${item}`;
+					})
+					.join('\n')
 			: '';
 
 	const foundText = foundList;
@@ -703,9 +984,27 @@ export function checkXPathCoverage(
 
 	// Check conditionals coverage
 	if (analysis.conditionals.length > MIN_COUNT) {
+		const ruleFilePathValue = ruleFilePath;
+		// xpath is guaranteed to be non-null at this point due to earlier check
+		const xpathValue: Readonly<string> = xpath;
+		const hasRuleFilePath =
+			ruleFilePathValue !== undefined &&
+			ruleFilePathValue.length > MIN_COUNT;
+		const hasXpathValue = xpathValue.length > MIN_COUNT;
+		const conditionalOptions: ConditionalCoverageOptions | undefined =
+			hasRuleFilePath && hasXpathValue
+				? {
+						lineNumberCollector: (lineNumber: number): void => {
+							coveredLineNumbers.add(lineNumber);
+						},
+						ruleFilePath: ruleFilePathValue,
+						xpath: xpathValue,
+					}
+				: undefined;
 		const conditionalEvidence = checkConditionalCoverage(
 			analysis.conditionals,
 			allContent,
+			conditionalOptions,
 		);
 		const conditionalSuccess =
 			conditionalEvidence.count >= conditionalEvidence.required;
@@ -766,9 +1065,27 @@ export function checkXPathCoverage(
 
 	// Check operators coverage
 	if (analysis.operators.length > MIN_COUNT) {
+		const ruleFilePathValue = ruleFilePath;
+		// xpath is guaranteed to be non-null at this point due to earlier check
+		const xpathValue: Readonly<string> = xpath;
+		const hasRuleFilePath =
+			ruleFilePathValue !== undefined &&
+			ruleFilePathValue.length > MIN_COUNT;
+		const hasXpathValue = xpathValue.length > MIN_COUNT;
+		const operatorOptions: OperatorCoverageOptions | undefined =
+			hasRuleFilePath && hasXpathValue
+				? {
+						lineNumberCollector: (lineNumber: number): void => {
+							coveredLineNumbers.add(lineNumber);
+						},
+						ruleFilePath: ruleFilePathValue,
+						xpath: xpathValue,
+					}
+				: undefined;
 		const operatorEvidence = checkOperatorCoverage(
 			analysis.operators,
 			allContent,
+			operatorOptions,
 		);
 		const operatorSuccess =
 			operatorEvidence.count >= operatorEvidence.required;
