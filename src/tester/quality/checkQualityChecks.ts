@@ -19,11 +19,12 @@ const NOT_FOUND_INDEX = -1;
 const ZERO_COUNT = 0;
 const SINGLE_OCCURRENCE = 1;
 const VERSION_PATTERN = /^Version:\s*(\d+)\.(\d+)\.(\d+)$/;
-const VARIABLE_DOC_PATTERN = /^(\$[a-zA-Z_][a-zA-Z0-9_]*):\s*.+$/;
+const VARIABLE_DOC_PATTERN = /^(?:[-*]\s+)?(\$[a-zA-Z_][a-zA-Z0-9_]*):\s*.+$/;
 const INLINE_VIOLATION_MARKER = 'Inline violation marker // ❌';
 const INLINE_VALID_MARKER = 'Inline valid marker // ✅';
 const NEXT_LINE_OFFSET = 1;
 const VAR_PREFIX_LENGTH = 1;
+const REGEX_FIRST_CAPTURE_GROUP = 1;
 
 interface XPathValueLocation {
 	startChar: number;
@@ -416,9 +417,9 @@ function checkVariableDocumentation(
 		const trimmed = line.trim();
 		const varMatch = VARIABLE_DOC_PATTERN.exec(trimmed);
 		if (varMatch !== null) {
-			// Extract "$varName" from "$varName: description"
-			const colonIndex = trimmed.indexOf(':');
-			const varName = trimmed.substring(ZERO_COUNT, colonIndex);
+			// Extract "$varName" from captured group (handles both "- $var: desc" and "$var: desc" formats)
+			// eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Regex match ensures group exists
+			const varName = varMatch[REGEX_FIRST_CAPTURE_GROUP]!;
 			documentedVars.add(varName);
 		}
 	}
