@@ -15,11 +15,13 @@ const MIN_ISSUES_COUNT = 0;
 
 /**
  * Main entry point for rule quality validation.
+ * @param ruleFilePath - Path to the rule XML file.
  * @param ruleMetadata - Rule metadata from XML.
  * @param examples - Array of parsed examples.
  * @returns Validation result with issues and warnings.
  */
 export function runQualityChecks(
+	ruleFilePath: Readonly<string>,
 	ruleMetadata: Readonly<RuleMetadata>,
 	// eslint-disable-next-line @typescript-eslint/prefer-readonly-parameter-types -- Array elements are accessed and iterated
 	examples: readonly ExampleData[],
@@ -41,6 +43,9 @@ export function runQualityChecks(
 	const duplicatesResult = checkDuplicates(examples);
 	issues.push(...duplicatesResult.issues);
 	warnings.push(...duplicatesResult.warnings);
+
+	// Note: The new quality checks (⭐ Quality Checks) are run separately
+	// and stored in OverallTestResults.qualityChecks for display in CLI
 
 	return {
 		issues: issues,

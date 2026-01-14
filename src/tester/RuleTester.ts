@@ -16,6 +16,7 @@ import type {
 	TestCaseResult,
 } from '../types/index.js';
 import { runQualityChecks } from './qualityChecks.js';
+import { checkQualityChecks } from './quality/checkQualityChecks.js';
 
 const MIN_EXAMPLES_COUNT = 0;
 const MIN_VIOLATIONS_COUNT = 0;
@@ -251,27 +252,60 @@ export class RuleTester {
 		// Extract examples
 		this.extractExamples();
 
-		// Run quality checks
-		const qualityResult = runQualityChecks(
-			this.ruleMetadata,
-			this.examples,
-		);
-
-		// Actually test each example by running PMD (unless skipped for testing)
+		// Run PMD validation, quality checks, and XPath coverage in parallel
 		const INDEX_OFFSET = 1;
 		const ZERO_VIOLATIONS = 0;
 
-		const exampleResults = skipPMDValidation
-			? // eslint-disable-next-line @typescript-eslint/prefer-readonly-parameter-types -- Callback parameter for map
-				this.examples.map((_example, i: number) => ({
-					actualViolations: ZERO_VIOLATIONS,
-					exampleIndex: i + INDEX_OFFSET,
-					expectedValids: ZERO_VIOLATIONS,
-					expectedViolations: ZERO_VIOLATIONS,
-					passed: true,
-					testCaseResults: [],
-				}))
-			: await this.validateExamplesWithPMD(maxConcurrency);
+		// PMD validation (async)
+		const pmdValidationPromise = skipPMDValidation
+			? Promise.resolve(
+					// eslint-disable-next-line @typescript-eslint/prefer-readonly-parameter-types -- Callback parameter for map
+					this.examples.map((_example, i: number) => ({
+						actualViolations: ZERO_VIOLATIONS,
+						exampleIndex: i + INDEX_OFFSET,
+						expectedValids: ZERO_VIOLATIONS,
+						expectedViolations: ZERO_VIOLATIONS,
+						passed: true,
+						testCaseResults: [],
+					})),
+				)
+			: this.validateExamplesWithPMD(maxConcurrency);
+
+		// Quality checks (synchronous, wrapped in promise for parallel execution)
+		const qualityChecksPromise = Promise.resolve(
+			runQualityChecks(
+				this.ruleFilePath,
+				this.ruleMetadata,
+				this.examples,
+			),
+		);
+
+		// New quality checks (⭐ Quality Checks) (synchronous, wrapped in promise)
+		const newQualityChecksPromise = Promise.resolve(
+			checkQualityChecks(
+				this.ruleFilePath,
+				this.ruleMetadata,
+				this.examples,
+			),
+		);
+
+		// XPath coverage (synchronous, wrapped in promise for parallel execution)
+		const xpathCoveragePromise = Promise.resolve(
+			checkXPathCoverage(
+				this.ruleMetadata.xpath,
+				this.examples,
+				this.ruleFilePath,
+			),
+		);
+
+		// Execute all checks in parallel
+		const [exampleResults, qualityResult, newQualityChecks, xpathCoverage] =
+			await Promise.all([
+				pmdValidationPromise,
+				qualityChecksPromise,
+				newQualityChecksPromise,
+				xpathCoveragePromise,
+			]);
 
 		// Set test results based on actual PMD validation
 		this.results.examplesTested = this.examples.length;
@@ -295,13 +329,11 @@ export class RuleTester {
 			(result) => result.testCaseResults,
 		);
 
-		// Check XPath coverage
-		const xpathCoverage = checkXPathCoverage(
-			this.ruleMetadata.xpath,
-			this.examples,
-			this.ruleFilePath,
-		);
+		// Store XPath coverage results
 		this.results.xpathCoverage = xpathCoverage;
+
+		// Store new quality check results (⭐ Quality Checks)
+		this.results.qualityChecks = newQualityChecks;
 
 		// Determine overall success - pass if all examples pass and quality checks pass
 		this.results.success =

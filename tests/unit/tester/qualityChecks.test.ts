@@ -7,6 +7,7 @@ import { runQualityChecks } from '../../../src/tester/qualityChecks.js';
 
 describe('runQualityChecks', () => {
 	it('should return passed when all checks pass', () => {
+		const ruleFilePath = 'test.xml';
 		const ruleMetadata = {
 			description:
 				'A comprehensive test rule description that is long enough',
@@ -33,7 +34,7 @@ describe('runQualityChecks', () => {
 			},
 		];
 
-		const result = runQualityChecks(ruleMetadata, examples);
+		const result = runQualityChecks(ruleFilePath, ruleMetadata, examples);
 
 		expect(result.passed).toBe(true);
 		expect(result.issues).toHaveLength(0);
@@ -45,6 +46,7 @@ describe('runQualityChecks', () => {
 	});
 
 	it('should return issues for missing rule metadata', () => {
+		const ruleFilePath = 'test.xml';
 		const ruleMetadata = {
 			description: null,
 			message: null,
@@ -63,7 +65,7 @@ describe('runQualityChecks', () => {
 			},
 		];
 
-		const result = runQualityChecks(ruleMetadata, examples);
+		const result = runQualityChecks(ruleFilePath, ruleMetadata, examples);
 
 		expect(result.passed).toBe(false);
 		expect(result.issues).toContain('Rule name is missing');
@@ -73,6 +75,7 @@ describe('runQualityChecks', () => {
 	});
 
 	it('should return warnings for short description', () => {
+		const ruleFilePath = 'test.xml';
 		const ruleMetadata = {
 			description: 'Short',
 			message: 'Test message',
@@ -98,7 +101,7 @@ describe('runQualityChecks', () => {
 			},
 		];
 
-		const result = runQualityChecks(ruleMetadata, examples);
+		const result = runQualityChecks(ruleFilePath, ruleMetadata, examples);
 
 		expect(result.passed).toBe(true);
 		expect(result.warnings).toContain(
@@ -107,6 +110,7 @@ describe('runQualityChecks', () => {
 	});
 
 	it('should return warnings for hardcoded values in XPath', () => {
+		const ruleFilePath = 'test.xml';
 		const ruleMetadata = {
 			description: 'A comprehensive test rule description',
 			message: 'Test message',
@@ -132,7 +136,7 @@ describe('runQualityChecks', () => {
 			},
 		];
 
-		const result = runQualityChecks(ruleMetadata, examples);
+		const result = runQualityChecks(ruleFilePath, ruleMetadata, examples);
 
 		expect(result.passed).toBe(true);
 		expect(result.warnings).toContain(
@@ -141,6 +145,7 @@ describe('runQualityChecks', () => {
 	});
 
 	it('should return issues when no examples provided', () => {
+		const ruleFilePath = 'test.xml';
 		const ruleMetadata = {
 			description: 'A comprehensive test rule description',
 			message: 'Test message',
@@ -148,13 +153,14 @@ describe('runQualityChecks', () => {
 			xpath: '//Method',
 		};
 
-		const result = runQualityChecks(ruleMetadata, []);
+		const result = runQualityChecks(ruleFilePath, ruleMetadata, []);
 
 		expect(result.passed).toBe(false);
 		expect(result.issues).toContain('No examples found in rule');
 	});
 
 	it('should aggregate issues and warnings from all checks', () => {
+		const ruleFilePath = 'test.xml';
 		const ruleMetadata = {
 			description: 'Short',
 			message: 'Test message',
@@ -173,7 +179,7 @@ describe('runQualityChecks', () => {
 			},
 		];
 
-		const result = runQualityChecks(ruleMetadata, examples);
+		const result = runQualityChecks(ruleFilePath, ruleMetadata, examples);
 
 		expect(result.passed).toBe(false);
 		expect(result.issues).toContain('Rule name is missing');
