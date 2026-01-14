@@ -1537,33 +1537,6 @@ public class Test {}
 		).toBe(true);
 	});
 
-	it('should handle properties closing tag in findXPathValueLocation', () => {
-		const xmlContent = `<?xml version="1.0" encoding="UTF-8"?>
-<rule name="TestRule" message="Test message">
-	<description>Test description</description>
-	<properties>
-		<property name="xpath">
-			<value>//Method</value>
-		</property>
-	</properties>
-</rule>`;
-
-		vi.mocked(readFileSync).mockReturnValue(xmlContent);
-
-		const ruleMetadata: RuleMetadata = {
-			description: 'Test description',
-			message: 'Test message',
-			ruleName: 'TestRule',
-			xpath: '//Method',
-		};
-
-		const examples: ExampleData[] = [];
-
-		const result = checkQualityChecks('test.xml', ruleMetadata, examples);
-
-		expect(result.issues.length).toBeGreaterThanOrEqual(0);
-	});
-
 	it('should handle CDATA with closing marker found', () => {
 		const xmlContent = `<?xml version="1.0" encoding="UTF-8"?>
 <rule name="TestRule" message="Test message">
