@@ -3230,4 +3230,58 @@ helperMethod();
 		expect(description).toContain('Missing:');
 		expect(description).toContain('Line ');
 	});
+
+	it('should treat AND conditionals as structurally covered when node types are fully covered and both violation and valid examples exist', () => {
+		mockedAnalyzeXPath.mockReturnValue({
+			attributes: [],
+			conditionals: [
+				{
+					expression:
+						'@FullMethodName = $stringJoinFullName and .//NewListLiteralExpression',
+					position: 0,
+					type: 'and',
+				},
+			],
+			hasLetExpressions: false,
+			hasUnions: false,
+			nodeTypes: ['MethodCallExpression'],
+			operators: [],
+			patterns: [],
+		});
+
+		// Examples with both violation and valid
+		const examples: ExampleData[] = [
+			{
+				content: 'String.join("", new List<String>());',
+				exampleIndex: 1,
+				validMarkers: [],
+				valids: [],
+				violationMarkers: [],
+				violations: ['violation1'], // Has violation
+			},
+			{
+				content: 'String.join(list, "");',
+				exampleIndex: 2,
+				validMarkers: [],
+				valids: ['valid1'], // Has valid
+				violationMarkers: [],
+				violations: [],
+			},
+		];
+
+		const result = checkXPathCoverage(
+			'//MethodCallExpression[@FullMethodName = $stringJoinFullName and .//NewListLiteralExpression]',
+			examples,
+			'/path/to/rule.xml',
+		);
+
+		// Should find conditional coverage result
+		const conditionalResult = result.coverage.find(
+			// eslint-disable-next-line @typescript-eslint/prefer-readonly-parameter-types -- Callback parameter for Array.prototype.find
+			(c) => c.message.includes('Conditionals:'),
+		);
+		expect(conditionalResult).toBeDefined();
+		expect(conditionalResult?.success).toBe(true);
+		expect(conditionalResult?.message).toContain('1/1 covered');
+	});
 });

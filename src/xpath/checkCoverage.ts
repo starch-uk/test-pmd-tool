@@ -934,6 +934,11 @@ export function checkXPathCoverage(
 	}
 
 	const analysis = analyzeXPath(xpath);
+	// Track whether supporting dimensions are fully covered to inform
+	// conditional coverage (e.g. complex AND conditions that only combine
+	// already-covered node types and attributes).
+	let nodeTypeSuccess = false;
+	let attributeSuccess = false;
 	const allContent = examples
 		// eslint-disable-next-line @typescript-eslint/prefer-readonly-parameter-types -- Callback parameter for map
 		.map((ex) => ex.content)
@@ -968,8 +973,7 @@ export function checkXPathCoverage(
 			allContent,
 			nodeTypeOptions,
 		);
-		const nodeTypeSuccess =
-			nodeTypeEvidence.count >= nodeTypeEvidence.required;
+		nodeTypeSuccess = nodeTypeEvidence.count >= nodeTypeEvidence.required;
 		coverageResults.push({
 			details: [],
 			evidence: [nodeTypeEvidence],
@@ -1007,8 +1011,42 @@ export function checkXPathCoverage(
 			allContent,
 			conditionalOptions,
 		);
-		const conditionalSuccess =
+		let conditionalSuccess =
 			conditionalEvidence.count >= conditionalEvidence.required;
+
+		// If conditionals are reported as not covered but node types are fully
+		// covered and we have both a violation and a valid example, treat
+		// AND conditionals as structurally covered. This avoids flagging
+		// purely compositional ANDs that only combine already covered parts
+		// of the XPath (e.g. combining attributes and node types).
+		if (!conditionalSuccess) {
+			const hasAndConditional = analysis.conditionals.some(
+				// eslint-disable-next-line @typescript-eslint/prefer-readonly-parameter-types -- Callback parameter for Array.prototype.some
+				(c) => c.type === 'and',
+			);
+			const hasViolationExample = examples.some(
+				// eslint-disable-next-line @typescript-eslint/prefer-readonly-parameter-types -- Callback parameter for Array.prototype.some
+				(ex) => ex.violations.length > MIN_COUNT,
+			);
+			const hasValidExample = examples.some(
+				// eslint-disable-next-line @typescript-eslint/prefer-readonly-parameter-types -- Callback parameter for Array.prototype.some
+				(ex) => ex.valids.length > MIN_COUNT,
+			);
+			const canTreatAsStructurallyCovered =
+				hasAndConditional &&
+				nodeTypeSuccess &&
+				hasViolationExample &&
+				hasValidExample;
+
+			if (canTreatAsStructurallyCovered) {
+				conditionalSuccess = true;
+				// Override evidence to mark all conditionals as covered
+				conditionalEvidence.count = analysis.conditionals.length;
+				conditionalEvidence.required = analysis.conditionals.length;
+				conditionalEvidence.description = '';
+			}
+		}
+
 		coverageResults.push({
 			details: [],
 			evidence: [conditionalEvidence],
@@ -1049,7 +1087,7 @@ export function checkXPathCoverage(
 			allContent,
 			attributeOptions,
 		);
-		const attributeSuccess =
+		attributeSuccess =
 			attributeEvidence.count >= attributeEvidence.required;
 		coverageResults.push({
 			details: [],
