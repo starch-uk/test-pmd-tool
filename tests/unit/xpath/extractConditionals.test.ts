@@ -134,15 +134,6 @@ return $methods[not(@Static) and @Visibility='public']`;
 		});
 	});
 
-	it('should handle edge cases with empty expressions', () => {
-		// Test cases that might result in empty matches
-		const xpath = "//Method[not() and () or @Name='test']";
-		const result = extractConditionals(xpath);
-
-		// Should still parse what it can
-		expect(result.length).toBeGreaterThanOrEqual(0);
-	});
-
 	it('should handle xpath with multiple complex conditions', () => {
 		const xpath =
 			"//Method[not(@Static) and @Visibility='public' or @Final and contains(@Name, 'test')]";
