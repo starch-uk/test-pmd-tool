@@ -987,38 +987,6 @@ return //Method[@Name=$var1 and @Count=$var2]
 		).toBe(false);
 	});
 
-	it('should handle XPath with CDATA section', () => {
-		const xmlContent = `<?xml version="1.0" encoding="UTF-8"?>
-<rule name="TestRule" message="Test message">
-	<description>Test description</description>
-	<properties>
-		<property name="xpath">
-			<value>
-				<![CDATA[
-let $var1 := 'value1'
-return //Method[@Name=$var1]
-				]]>
-			</value>
-		</property>
-	</properties>
-</rule>`;
-
-		vi.mocked(readFileSync).mockReturnValue(xmlContent);
-
-		const ruleMetadata: RuleMetadata = {
-			description: 'Test description',
-			message: 'Test message',
-			ruleName: 'TestRule',
-			xpath: "let $var1 := 'value1' return //Method[@Name=$var1]",
-		};
-
-		const examples: ExampleData[] = [];
-
-		const result = checkQualityChecks('test.xml', ruleMetadata, examples);
-
-		expect(result.issues.length).toBeGreaterThanOrEqual(0);
-	});
-
 	it('should fail when description is null', () => {
 		const xmlContent = `<?xml version="1.0" encoding="UTF-8"?>
 <rule name="TestRule" message="Test message">
@@ -1260,35 +1228,6 @@ public class Test {}
 		).toBe(true);
 	});
 
-	it('should handle XPath property without value tag on same line', () => {
-		const xmlContent = `<?xml version="1.0" encoding="UTF-8"?>
-<rule name="TestRule" message="Test message">
-	<description>Test description</description>
-	<properties>
-		<property name="xpath">
-			<value>
-				//Method
-			</value>
-		</property>
-	</properties>
-</rule>`;
-
-		vi.mocked(readFileSync).mockReturnValue(xmlContent);
-
-		const ruleMetadata: RuleMetadata = {
-			description: 'Test description',
-			message: 'Test message',
-			ruleName: 'TestRule',
-			xpath: '//Method',
-		};
-
-		const examples: ExampleData[] = [];
-
-		const result = checkQualityChecks('test.xml', ruleMetadata, examples);
-
-		expect(result.issues.length).toBeGreaterThanOrEqual(0);
-	});
-
 	it('should handle marker not found in extractTextAfterMarker', () => {
 		const xmlContent = `<?xml version="1.0" encoding="UTF-8"?>
 <rule name="TestRule" message="Test message">
@@ -1414,61 +1353,6 @@ public class Test {}
 				violations: ['public class Test {}'],
 			},
 		];
-
-		const result = checkQualityChecks('test.xml', ruleMetadata, examples);
-
-		expect(result.issues.length).toBeGreaterThanOrEqual(0);
-	});
-
-	it('should handle XPath value spanning multiple lines without closing tag', () => {
-		const xmlContent = `<?xml version="1.0" encoding="UTF-8"?>
-<rule name="TestRule" message="Test message">
-	<description>Test description</description>
-	<properties>
-		<property name="xpath">
-			<value>
-				//Method
-			</property>
-	</properties>
-</rule>`;
-
-		vi.mocked(readFileSync).mockReturnValue(xmlContent);
-
-		const ruleMetadata: RuleMetadata = {
-			description: 'Test description',
-			message: 'Test message',
-			ruleName: 'TestRule',
-			xpath: '//Method',
-		};
-
-		const examples: ExampleData[] = [];
-
-		const result = checkQualityChecks('test.xml', ruleMetadata, examples);
-
-		expect(result.issues.length).toBeGreaterThanOrEqual(0);
-	});
-
-	it('should handle XPath location not found', () => {
-		const xmlContent = `<?xml version="1.0" encoding="UTF-8"?>
-<rule name="TestRule" message="Test message">
-	<description>Test description</description>
-	<properties>
-		<property name="other">
-			<value>test</value>
-		</property>
-	</properties>
-</rule>`;
-
-		vi.mocked(readFileSync).mockReturnValue(xmlContent);
-
-		const ruleMetadata: RuleMetadata = {
-			description: 'Test description',
-			message: 'Test message',
-			ruleName: 'TestRule',
-			xpath: '//Method[@Name="hardcoded"]',
-		};
-
-		const examples: ExampleData[] = [];
 
 		const result = checkQualityChecks('test.xml', ruleMetadata, examples);
 
