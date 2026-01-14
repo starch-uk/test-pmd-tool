@@ -429,7 +429,7 @@ function findConditionalLineNumber(
 		) {
 			// Find where the actual XPath content starts in the XML file
 			// This is after <value> and potentially after <![CDATA[
-			let actualContentStartLine = xpathContentStart;
+			let actualContentStartLine;
 			// Check if CDATA is used
 			const NEXT_LINE_OFFSET = 1;
 			const nextLineIndex = xpathContentStart + NEXT_LINE_OFFSET;
