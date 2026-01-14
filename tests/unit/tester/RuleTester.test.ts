@@ -123,7 +123,7 @@ describe('RuleTester', () => {
 		function getPrivateExampleLineFinder(
 			value: unknown,
 		): PrivateExampleLineFinder | undefined {
-			if (typeof value !== 'object' || value === null) {
+			if (value == null || typeof value !== 'object') {
 				return undefined;
 			}
 			if (!('findExampleLineNumber' in value)) {
