@@ -856,7 +856,45 @@ function determineNodeColor(
 	const hasViolationSection = violationMatchCount > EMPTY_MARKERS_LENGTH;
 	const hasValidSection = validMatchCount > EMPTY_MARKERS_LENGTH;
 
-	// Check if this node is actually matched by the XPath expression
+	// First, check if the node type matches the XPath (regardless of PMD results)
+	// This determines if the node is relevant to the rule
+	let nodeTypeMatchesXPath = false;
+	if (xpath !== null && xpath.length > EMPTY_STRING_LENGTH) {
+		const xpathNodeTypes = extractNodeTypes(xpath);
+		nodeTypeMatchesXPath = xpathNodeTypes.includes(nodeType);
+
+		// For MethodCallExpression, also check FullMethodName constraints
+		if (
+			nodeTypeMatchesXPath &&
+			nodeType === 'MethodCallExpression' &&
+			options.fullMethodName !== undefined
+		) {
+			const fullMethodNameMatches = xpath.matchAll(
+				/@FullMethodName\s*=\s*['"]([^'"]+)['"]/g,
+			);
+			const expectedMethodNames = new Set<string>();
+			const FIRST_CAPTURE_GROUP = 1;
+			for (const match of fullMethodNameMatches) {
+				const methodName = match[FIRST_CAPTURE_GROUP];
+				if (methodName !== undefined) {
+					expectedMethodNames.add(methodName);
+				}
+			}
+			// If XPath has FullMethodName constraints, node must match
+			if (expectedMethodNames.size > EMPTY_MARKERS_LENGTH) {
+				nodeTypeMatchesXPath = expectedMethodNames.has(
+					options.fullMethodName,
+				);
+			}
+		}
+	}
+
+	// If node type doesn't match XPath, don't color it (not relevant to the rule)
+	if (!nodeTypeMatchesXPath) {
+		return undefined;
+	}
+
+	// Check if this node is actually matched by the XPath expression (PMD's violation detection)
 	// Use PMD's actual XPath evaluation results (xpathMatchLines) if available
 	// When xpathMatchLines is defined (even if empty), we use it as the authoritative source
 	// Only fall back to node type checking if xpathMatchLines is undefined
@@ -928,8 +966,9 @@ function determineNodeColor(
 					}
 				}
 			} else {
-				// xpathMatchLines is defined but empty (no violations) - don't color anything
-				return undefined;
+				// xpathMatchLines is defined but empty (no violations found)
+				// Don't return early - let the coloring logic below handle it
+				nodeMatchesXPath = false;
 			}
 
 			// If node is on a violation line, also verify it matches XPath conditions
@@ -964,21 +1003,14 @@ function determineNodeColor(
 				}
 				// If no FullMethodName constraints in XPath, any MethodCallExpression on violation line matches
 			}
-
-			// If xpathMatchLines is empty (no violations) or node doesn't match, don't color
-			// This ensures we only color nodes that PMD actually found violations on
-			if (!nodeMatchesXPath) {
-				return undefined;
-			}
+			// Don't return early here - let the coloring logic below handle it based on nodeMatchesXPath and section
 		} else {
 			// Fallback: xpathMatchLines is undefined - use node type checking
 			// This happens when XPath is null/empty or PMD execution failed
+			// Set nodeMatchesXPath based on node type, but don't return early
+			// The coloring logic below will handle it
 			const xpathNodeTypes = extractNodeTypes(xpath);
 			nodeMatchesXPath = xpathNodeTypes.includes(nodeType);
-			if (!nodeMatchesXPath) {
-				// Node type is not matched by XPath, so it shouldn't be tested
-				return undefined;
-			}
 		}
 	}
 
@@ -1283,26 +1315,38 @@ function determineNodeColor(
 	}
 
 	// Color based on XPath match results (PMD's actual violation detection)
-	// If we have XPath match results, only color nodes that match the XPath
-	// When PMD finds a violation, the node is colored red regardless of section type
-	// (PMD's actual results take precedence over section markers)
-	if (
-		xpathMatchLines !== undefined &&
-		xpathMatchLines.size > EMPTY_MARKERS_LENGTH
-	) {
-		// We have XPath match results - only color nodes that actually match
-		if (!nodeMatchesXPath) {
-			// Node doesn't match XPath - don't color it
+	// If we have XPath match results, use PMD's actual results to determine color
+	if (xpathMatchLines !== undefined) {
+		if (xpathMatchLines.size > EMPTY_MARKERS_LENGTH) {
+			// PMD found violations - check if this node is involved
+			if (nodeMatchesXPath) {
+				// PMD found a violation on this node - color it red
+				// (regardless of section type, because PMD's actual results take precedence)
+				return alreadyCovered ? 'dark-red' : 'red';
+			}
+			// PMD found violations but not on this node
+			// If node is in violation section, it should have triggered but didn't → green (actually valid)
+			if (hasViolationSection) {
+				return alreadyCovered ? 'dark-green' : 'green';
+			}
+			// Node is in valid section and PMD didn't find violation → green (correctly didn't trigger)
+			if (hasValidSection) {
+				return alreadyCovered ? 'dark-green' : 'green';
+			}
+			// No clear section - don't color
 			return undefined;
 		}
-
-		// Node matches XPath - PMD found a violation on this node
-		// Color it red regardless of section type, because PMD's actual results take precedence
-		// If it's in a valid section but PMD found a violation, that indicates the rule incorrectly triggers
-		// but we still show it in red because PMD found a violation
-		// If node matches XPath, color it even if there are no explicit markers
-		// (PMD found a violation, so we should show it)
-		return alreadyCovered ? 'dark-red' : 'red';
+		// xpathMatchLines is defined but empty (no violations found)
+		// If node is in violation section, it should have triggered but didn't → green (actually valid)
+		if (hasViolationSection) {
+			return alreadyCovered ? 'dark-green' : 'green';
+		}
+		// Node is in valid section and PMD didn't find violation → green (correctly didn't trigger)
+		if (hasValidSection) {
+			return alreadyCovered ? 'dark-green' : 'green';
+		}
+		// No clear section - don't color
+		return undefined;
 	}
 
 	// Fallback: no XPath match results - use section-based coloring
