@@ -252,6 +252,9 @@ function extractHelperMethods(codeLines: readonly string[]): string[] {
 	const fullCode = codeLines.join('\n');
 
 	// Extract method calls using regex - match word characters before parentheses
+	// We need to distinguish between:
+	// 1. Standalone method calls: methodName() - these might need helper methods
+	// 2. Method calls on objects/types: object.methodName() or Type.methodName() - these are built-in and don't need helpers
 	const methodCallRegex = /\b([a-zA-Z_]\w*)\s*\(/g;
 	let match: RegExpExecArray | null = null;
 	const foundMethods = new Set<string>();
@@ -299,8 +302,13 @@ function extractHelperMethods(codeLines: readonly string[]): string[] {
 		'Datetime',
 	];
 
+	const MIN_INDEX = 0;
+	const CHAR_BEFORE_OFFSET = 1;
 	while ((match = methodCallRegex.exec(fullCode)) !== null) {
 		const [, methodName] = match;
+		// For successful regex matches, index is always defined
+		// TypeScript types it as number | undefined, but it's always a number for successful matches
+		const matchIndex = match.index;
 
 		// Skip Apex keywords and built-in types
 		// The false branch (methodName === undefined) is unreachable
@@ -309,6 +317,19 @@ function extractHelperMethods(codeLines: readonly string[]): string[] {
 			continue;
 		}
 
+		// Check if this method call is on an object/type (preceded by a dot)
+		// If it is, skip it - these are built-in methods that don't need helper methods
+		// Examples: Pattern.compile(), input.split(), String.valueOf()
+		// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- match.index can be undefined in TypeScript types
+		if (matchIndex !== undefined && matchIndex > MIN_INDEX) {
+			const charBeforeMatch = fullCode[matchIndex - CHAR_BEFORE_OFFSET];
+			// If preceded by a dot, it's a method call on an object/type - skip it
+			if (charBeforeMatch === '.') {
+				continue;
+			}
+		}
+
+		// This is a standalone method call - add it (will be filtered later if already defined)
 		// Remove unreachable false branch - methodName is always defined from regex match
 		// Use non-null assertion to eliminate unreachable branch
 		// eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- methodName is always defined from regex match
@@ -470,6 +491,63 @@ export function createTestFile({
 	})();
 
 	let classContent = '';
+
+	// Extract helper methods and filter them BEFORE adding to file
+	// This ensures we don't create helper methods for methods already defined in the example
+	// Do this once for all branches to avoid duplication
+	const allHelperMethods = extractHelperMethods(codeToInclude);
+	const FIRST_CAPTURE_GROUP = 1;
+	const EMPTY_NAME_LENGTH = 0;
+
+	// Extract method names that are part of the example code (not helpers)
+	// These are methods declared in the example, not method calls
+	// Match method declarations with any combination of modifiers
+	const exampleMethodNames = new Set<string>();
+	// Match method declarations: [modifiers]* returnType methodName(
+	// Handles: public void method(), private String getPattern(), static final Pattern compile(), etc.
+	// Pattern: (modifiers with spaces) returnType methodName(
+	// Modifiers can be: public, private, protected, static, final (in any order)
+	// Return type is a word (void, String, Pattern, etc.)
+	// Method name is captured in group 1
+	const methodDeclRegex =
+		/\b(?:public|private|protected|static|final)(?:\s+(?:public|private|protected|static|final))*\s+\w+\s+(\w+)\s*\(/g;
+	let methodDeclMatch: RegExpExecArray | null = null;
+	while (
+		(methodDeclMatch = methodDeclRegex.exec(fullExampleContent)) !== null
+	) {
+		// The regex always captures the method name in group 1, so methodName is always defined
+		// eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Regex guarantees capture group 1 exists
+		const methodName = methodDeclMatch[FIRST_CAPTURE_GROUP]!;
+		exampleMethodNames.add(methodName);
+	}
+
+	// Filter out example methods from helper methods (they're not helpers)
+	// Create a map of method name to method signature for efficient filtering
+	const helperMethodMap = new Map<string, string>();
+	for (const method of allHelperMethods) {
+		// Extract method name from signature like "public Boolean methodName() {"
+		const methodNameMatch = /public\s+\w+\s+(\w+)\s*\(/.exec(method);
+		const methodName = methodNameMatch?.[FIRST_CAPTURE_GROUP];
+		if (
+			methodName !== undefined &&
+			methodName.length > EMPTY_NAME_LENGTH &&
+			!exampleMethodNames.has(methodName)
+		) {
+			helperMethodMap.set(methodName, method);
+		}
+	}
+
+	// Filter to only include methods not already defined in the example
+	const filteredHelperMethods = Array.from(helperMethodMap.entries())
+		.filter(
+			([methodName]: readonly [string, string]) =>
+				!exampleMethodNames.has(methodName),
+		)
+		.map(
+			([, methodSignature]: readonly [string, string]) => methodSignature,
+		);
+
+	const actualHelperMethodNames = Array.from(helperMethodMap.keys());
 
 	if (hasTopLevelClass) {
 		// Case 1: Has top-level class - extract from original content and rename the class
@@ -692,9 +770,7 @@ export function createTestFile({
 			// Add missing class closing brace
 			extractedCode.push('}');
 		}
-
 		// Add helper methods before the final closing brace
-		const helperMethods = extractHelperMethods(codeToInclude);
 		const classContentStr = extractedCode.join('\n');
 		// Find the last closing brace (should be the class closing brace)
 		// After line 662, if hasTopLevelClass is true, extractedCode always has at least one '}'
@@ -703,7 +779,7 @@ export function createTestFile({
 		// After line 662, if hasTopLevelClass is true, extractedCode always has at least one '}'
 		// So lastBraceIndex is always >= 0 when hasTopLevelClass is true
 		// We're in the hasTopLevelClass branch, so lastBraceIndex >= 0 is guaranteed
-		if (helperMethods.length > EMPTY_LENGTH) {
+		if (filteredHelperMethods.length > EMPTY_LENGTH) {
 			// Split class content at the last closing brace to insert helper methods
 			// lastBraceIndex is always > 0 because we have at least the class declaration line before the closing brace
 			const beforeLastBrace = classContentStr.substring(
@@ -712,7 +788,7 @@ export function createTestFile({
 			);
 			const afterLastBrace = classContentStr.substring(lastBraceIndex);
 			classContent = beforeLastBrace + '\n';
-			for (const method of helperMethods) {
+			for (const method of filteredHelperMethods) {
 				classContent += `    ${method}\n`;
 			}
 			classContent += afterLastBrace + '\n';
@@ -727,9 +803,8 @@ export function createTestFile({
 			classContent += `    ${line}\n`;
 		});
 
-		// Add helper methods
-		const helperMethods = extractHelperMethods(codeToInclude);
-		for (const method of helperMethods) {
+		// Add filtered helper methods
+		for (const method of filteredHelperMethods) {
 			classContent += `    ${method}\n`;
 		}
 
@@ -746,9 +821,8 @@ export function createTestFile({
 			classContent += `    }\n`;
 		}
 
-		// Add helper methods
-		const helperMethods = extractHelperMethods(codeToInclude);
-		for (const method of helperMethods) {
+		// Add filtered helper methods
+		for (const method of filteredHelperMethods) {
 			classContent += `    ${method}\n`;
 		}
 
@@ -759,52 +833,6 @@ export function createTestFile({
 
 	// Track what was added for AST processing
 	const TEST_METHOD_NAME = `testMethod${String(exampleIndex)}`;
-	const helperMethods = extractHelperMethods(codeToInclude);
-	const FIRST_CAPTURE_GROUP = 1;
-	const EMPTY_NAME_LENGTH = 0;
-	const helperMethodNames = helperMethods
-		.map((method) => {
-			// Extract method name from signature like "public Boolean methodName() {"
-			const methodNameMatch = /public\s+\w+\s+(\w+)\s*\(/.exec(method);
-			return methodNameMatch?.[FIRST_CAPTURE_GROUP] ?? '';
-		})
-		.filter((name) => name.length > EMPTY_NAME_LENGTH);
-
-	// Extract method names that are part of the example code (not helpers)
-	// These are methods declared in the example, not method calls
-	const exampleMethodNames = new Set<string>();
-	if (hasTopLevelClass) {
-		// Extract method declarations from the example
-		const methodDeclRegex =
-			/(?:public|private|protected)\s+\w+\s+(\w+)\s*\(/g;
-		let methodMatch: RegExpExecArray | null = null;
-		while (
-			(methodMatch = methodDeclRegex.exec(fullExampleContent)) !== null
-		) {
-			// The regex always captures the method name in group 1, so methodName is always defined
-			// eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Regex guarantees capture group 1 exists
-			const methodName = methodMatch[FIRST_CAPTURE_GROUP]!;
-			exampleMethodNames.add(methodName);
-		}
-	} else if (hasClassLikeStructures) {
-		// Extract method declarations from class-like structures
-		const methodDeclRegex =
-			/(?:public|private|protected)\s+\w+\s+(\w+)\s*\(/g;
-		let methodMatch: RegExpExecArray | null = null;
-		while (
-			(methodMatch = methodDeclRegex.exec(fullExampleContent)) !== null
-		) {
-			// The regex always captures the method name in group 1, so methodName is always defined
-			// eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Regex guarantees capture group 1 exists
-			const methodName = methodMatch[FIRST_CAPTURE_GROUP]!;
-			exampleMethodNames.add(methodName);
-		}
-	}
-
-	// Filter out example methods from helper methods (they're not helpers)
-	const actualHelperMethodNames = helperMethodNames.filter(
-		(name) => !exampleMethodNames.has(name),
-	);
 
 	const addedWrapperClass = !hasTopLevelClass;
 	const addedWrapperMethod = !hasTopLevelClass && !hasClassLikeStructures;
@@ -818,7 +846,7 @@ export function createTestFile({
 		wrapperInfo: {
 			addedWrapperClass,
 			addedWrapperMethod,
-			helperMethodNames: actualHelperMethodNames,
+			helperMethodNames: [...actualHelperMethodNames],
 			wrapperClassName: TEST_CLASS_NAME,
 			wrapperMethodName: TEST_METHOD_NAME,
 		},
