@@ -2,11 +2,11 @@
  * @file
  * CLI entry point for PMD Rule Tester. Tests PMD rules using examples embedded in XML rule files.
  */
-import { existsSync, readdirSync, statSync } from 'fs';
+import { existsSync, readdirSync, realpathSync, statSync } from 'fs';
 import { extname, resolve } from 'path';
 import { argv } from 'process';
 import { cpus } from 'os';
-import { pathToFileURL } from 'url';
+import { fileURLToPath } from 'url';
 import { DOMParser } from '@xmldom/xmldom';
 import { stringifyTree } from 'stringify-tree';
 import { RuleTester } from '../tester/RuleTester.js';
@@ -43,7 +43,19 @@ function isCliInvocation(): boolean {
 	if (entryPath === undefined) {
 		return false;
 	}
-	return import.meta.url === pathToFileURL(entryPath).href;
+	try {
+		// Convert import.meta.url to absolute file path
+		const currentModulePath = fileURLToPath(import.meta.url);
+		// Resolve entryPath to absolute path to handle relative paths from npm/node_modules
+		const resolvedEntryPath = resolve(process.cwd(), entryPath);
+		// Resolve symlinks to handle npm/pnpm bin symlinks
+		const absoluteEntryPath = realpathSync(resolvedEntryPath);
+		// Compare resolved absolute paths
+		return currentModulePath === absoluteEntryPath;
+	} catch {
+		// If path resolution fails (e.g., file doesn't exist), assume not CLI invocation
+		return false;
+	}
 }
 
 /**
