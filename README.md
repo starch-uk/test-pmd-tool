@@ -186,6 +186,49 @@ You can include multiple `<example>` tags in a single rule XML file. Each exampl
 </rule>
 ```
 
+### AST Diagnostics
+
+The `--diag` (or `-d`) flag allows you to inspect the Abstract Syntax Tree (AST) that PMD generates for a specific example. This is useful for:
+
+- **Debugging XPath expressions**: See exactly how PMD parses your example code
+- **Understanding node types**: Identify the AST node types that your XPath should target
+- **Verifying structure**: Confirm that your example code produces the expected AST structure
+- **Troubleshooting test failures**: Examine the AST when examples don't behave as expected
+
+**Example indices are 1-based** (the first example is index 1, second is index 2, etc.):
+
+```bash
+# Get AST dump for the first example
+test-pmd-rule path/to/rule.xml --diag 1
+
+# Get AST dump for the second example
+test-pmd-rule path/to/rule.xml -d 2
+```
+
+**Color Coding:**
+
+The AST nodes are color-coded to indicate which parts of your example code are being tested:
+
+- **Red (bright)**: Node is tested by **violation** examples in the current example
+- **Dark Red (dim)**: Node is tested by **violation** examples but was already covered in previous examples
+- **Green (bright)**: Node is tested by **valid** examples in the current example
+- **Dark Green (dim)**: Node is tested by **valid** examples but was already covered in previous examples
+- **No color**: Node is not tested or couldn't be matched to example code
+
+This color coding helps you understand:
+
+- Which AST nodes correspond to your violation/valid markers
+- Whether nodes are being tested by the current example or were already covered
+- Which parts of the AST structure your XPath expression should target
+
+**Notes:**
+
+- The AST dump is printed to stdout, showing the hierarchical structure of nodes that PMD extracts from your example code
+- The diagnostic mode cannot be used with directories or combined with `--coverage`
+- If the generated test file has syntax errors, the tool will display the generated file content to help debug issues
+- The AST output includes all node attributes and can be quite verbose - use it when you need detailed insight into PMD's parsing
+- Colors use ANSI escape codes and will automatically be disabled if your terminal doesn't support them
+
 ## Requirements
 
 - **Node.js**: ≥25.0.0
@@ -197,6 +240,9 @@ You can include multiple `<example>` tags in a single rule XML file. Each exampl
 ```bash
 # Install from npm
 npm install -g test-pmd-rule
+
+# Or install using pnpm (recommended)
+pnpm install -g test-pmd-rule
 
 # Or use npx to run without installing globally
 npx test-pmd-rule path/to/rule.xml
@@ -217,27 +263,64 @@ test-pmd-rule rulesets/code-style/AvoidMagicNumbers.xml --coverage
 # Test directory with coverage reports
 test-pmd-rule ../sca-extra/rulesets --coverage
 
+# Output AST dump for a specific example (1-based index)
+test-pmd-rule path/to/rule.xml --diag 2
+
+# Short form flags
+test-pmd-rule path/to/rule.xml -c          # --coverage
+test-pmd-rule path/to/rule.xml -d 1        # --diag 1
+test-pmd-rule --help                        # Show help
+test-pmd-rule -h                            # Show help (short form)
+
 # Or use npx without installing globally
 npx test-pmd-rule path/to/rule.xml
 ```
 
 **Arguments:**
 
-- `<rule.xml|directory>`: Path to XML rule file or directory containing XML files (recursive)
-- `--coverage`: Generate LCOV coverage report in `coverage/lcov.info`
+- `<rule.xml|directory>`: Path to XML rule file or directory containing XML files (recursive). Required unless using `--help` or `-h`.
+
+**Options:**
+
+- `--coverage`, `-c`: Generate LCOV coverage report in `coverage/lcov.info`. Can be used with single files or directories. Cannot be combined with `--diag`.
+- `--diag <number>`, `-d <number>`: Output PMD AST dump for the specified example (1-based index). Requires a single XML rule file, not a directory. Useful for debugging XPath expressions and understanding how PMD parses your example code. Cannot be combined with `--coverage`.
+- `--help`, `-h`: Show help message and exit.
+
+**Output Features:**
+
+- **Emoji-enhanced output**: Visual indicators for different output sections and status:
+    - 🧪 Testing status
+    - 📋 Test details
+    - 📊 Test summary
+    - 🔍 XPath coverage analysis
+    - ✅ Pass/Success indicators
+    - ⚠️ Warning/Incomplete indicators
+    - ❌ Error/Failure indicators
+    - ⭐ Quality checks
+    - 🎯 Overall results
+    - 📄 Diagnostic file content
+- **Color output**: Terminal colors (ANSI escape codes) are used where supported for improved readability:
+    - Green for success/pass indicators
+    - Yellow for warnings/incomplete status
+    - Red for errors/failures
+    - Colors are automatically disabled if the terminal doesn't support them
+- **Structured output**: Clear sections for test results, coverage analysis, and quality checks with proper indentation and hierarchical display
 
 The tool will:
 
-1. **Directory Discovery**: If given a directory, recursively find all `**/*.xml` files
-2. **Parallel Processing**: Test multiple files concurrently using CPU-core-based thread pools
-3. **Extract Examples**: Parse examples from `<example>` tags in PMD rule XML files
-4. **Parse Markers**: Identify violation (`// ❌` or `// Violation:`) and valid (`// ✅` or `// Valid:`) code sections
-5. **Test File Creation**: Generate temporary Apex test files with example code
-6. **Parallel PMD Execution**: Run PMD against test files with concurrent workers
-7. **Validation**: Verify violations occur for violation examples and don't occur for valid examples
-8. **XPath Coverage Analysis**: Analyze XPath expressions and show coverage with line numbers
-9. **Coverage Reports**: Generate LCOV format reports when `--coverage` flag is used
-10. **Comprehensive Results**: Report detailed test results with parallel processing stats
+1. **Argument Parsing**: Parse command-line arguments including flags (`--coverage`, `--diag`, `--help`) and their short forms (`-c`, `-d`, `-h`)
+2. **Directory Discovery**: If given a directory, recursively find all `**/*.xml` files
+3. **Parallel Processing**: Test multiple files concurrently using CPU-core-based thread pools
+4. **Extract Examples**: Parse examples from `<example>` tags in PMD rule XML files
+5. **Parse Markers**: Identify violation (`// ❌` or `// Violation:`) and valid (`// ✅` or `// Valid:`) code sections
+6. **Test File Creation**: Generate temporary Apex test files with example code
+7. **Parallel PMD Execution**: Run PMD against test files with concurrent workers
+8. **Validation**: Verify violations occur for violation examples and don't occur for valid examples
+9. **XPath Coverage Analysis**: Analyze XPath expressions and show coverage with line numbers
+10. **Coverage Reports**: Generate LCOV format reports when `--coverage` flag is used
+11. **AST Diagnostics**: Output PMD AST dumps when `--diag` flag is used (single file mode only)
+12. **Comprehensive Results**: Report detailed test results with emoji-enhanced output, color coding, and parallel processing stats
+13. **Error Handling**: Provide clear error messages for invalid arguments, missing files, and execution errors
 
 ## Coverage Reporting
 
@@ -320,40 +403,50 @@ pnpm test:coverage
 ```
 src/
 ├── cli/                    # Command-line interface
-│   └── main.ts             # CLI entry point
+│   ├── main.ts             # CLI entry point
+│   └── args.ts             # Argument parsing
 ├── coverage/               # Coverage reporting
-│   ├── generateLcov.ts    # LCOV report generation
-│   └── trackCoverage.ts   # Coverage data collection
+│   ├── generateLcov.ts     # LCOV report generation
+│   └── trackCoverage.ts    # Coverage data collection
 ├── pmd/                    # PMD execution utilities
 │   ├── runPMD.ts           # PMD CLI execution
 │   └── parseViolations.ts  # XML violation parsing
 ├── parser/                 # Example parsing and processing
 │   ├── parseExample.ts     # Example code parsing
-│   ├── extractMarkers.ts  # Violation/valid marker extraction
-│   └── createTestFile.ts  # Test file generation
+│   ├── extractMarkers.ts   # Violation/valid marker extraction
+│   └── createTestFile.ts   # Test file generation
 ├── utils/                  # Utility functions
 │   └── concurrency.ts      # Parallel execution utilities
 ├── xpath/                  # XPath analysis and validation
-│   ├── extractXPath.ts    # XPath extraction from XML
-│   ├── analyzeXPath.ts    # XPath analysis orchestration
-│   ├── checkCoverage.ts   # Coverage checking
-│   └── extractors/        # XPath component extractors
-│       ├── extractNodeTypes.ts
-│       ├── extractOperators.ts
-│       ├── extractAttributes.ts
-│       └── extractConditionals.ts
+│   ├── extractXPath.ts     # XPath extraction from XML
+│   ├── analyzeXPath.ts     # XPath analysis orchestration
+│   ├── checkCoverage.ts    # Coverage checking
+│   ├── extractors/         # XPath component extractors
+│   │   ├── extractNodeTypes.ts
+│   │   ├── extractOperators.ts
+│   │   ├── extractAttributes.ts
+│   │   ├── extractConditionals.ts
+│   │   ├── extractHardcodedValues.ts
+│   │   └── extractLetVariables.ts
+│   └── coverage/           # Coverage checking modules
+│       ├── checkCoverage.ts
+│       ├── checkNodeTypes.ts
+│       └── conditional/    # Conditional coverage strategies
+│           ├── checkComparison.ts
+│           └── strategies.ts
 ├── tester/                 # Main testing logic
-│   ├── RuleTester.ts      # Main tester class
-│   ├── qualityChecks.ts   # Quality validation
-│   └── quality/           # Quality check modules
+│   ├── RuleTester.ts       # Main tester class
+│   ├── qualityChecks.ts    # Quality validation entry point
+│   └── quality/            # Quality check modules
 │       ├── checkRuleMetadata.ts
 │       ├── checkExamples.ts
-│       └── checkDuplicates.ts
+│       ├── checkDuplicates.ts
+│       └── checkQualityChecks.ts
 └── types/                  # TypeScript type definitions
     └── index.ts
 
 tests/                      # Unit and integration tests
-├── unit/                   # Unit tests
+├── unit/                   # Unit tests (mirror src/ structure)
 └── integration/            # End-to-end tests
 
 docs/                       # Documentation (symlinked from agent-docs)
@@ -367,6 +460,8 @@ Comprehensive documentation is available in the [`docs/`](docs/) directory (syml
 - Code Analyzer Configuration
 - XPath 3.1 Reference
 - PMD Apex AST Reference
+- Testing Framework Documentation (Vitest)
+- Code Quality Guidelines (ESLint, Prettier)
 
 ## Contributing
 

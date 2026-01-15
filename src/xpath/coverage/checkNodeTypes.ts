@@ -6,6 +6,7 @@ import type { CoverageResult } from '../../types/index.js';
 
 const MIN_ARRAY_LENGTH = 0;
 const MIN_COUNT = 0;
+const BRACE_DEPTH_ONE = 1;
 
 /**
  * Get keywords associated with a node type for coverage checking.
@@ -27,10 +28,50 @@ function getNodeTypeKeywords(nodeType: Readonly<string>): string[] {
 		SwitchStatement: ['switch'],
 		TernaryExpression: ['?', ':'], // Ternary operator uses ? and :
 		TryCatchFinallyBlockStatement: ['try', 'catch'],
+		UserClass: ['class'], // UserClass nodes are inner/nested classes
 		WhileLoopStatement: ['while'],
 	};
 
 	return keywordMap[nodeType] ?? [nodeType.toLowerCase()];
+}
+
+/**
+ * Check if content contains nested classes (inner classes).
+ * UserClass nodes are classes declared inside other classes.
+ * @param content - Content to check.
+ * @returns True if nested classes are detected.
+ */
+function hasNestedClasses(content: Readonly<string>): boolean {
+	const lines = content.split('\n');
+	let braceDepth = 0;
+	let insideClass = false;
+	const CLASS_PATTERN = /\bclass\s+\w+/;
+
+	for (const line of lines) {
+		const trimmed = line.trim();
+		// Count braces to track nesting depth
+		for (const char of line) {
+			if (char === '{') {
+				braceDepth++;
+			} else if (char === '}') {
+				braceDepth--;
+				if (braceDepth === BRACE_DEPTH_ONE) {
+					insideClass = false;
+				}
+			}
+		}
+
+		// Check if this line declares a class
+		if (CLASS_PATTERN.test(trimmed)) {
+			if (insideClass && braceDepth > BRACE_DEPTH_ONE) {
+				// We found a class declaration inside another class
+				return true;
+			}
+			insideClass = true;
+		}
+	}
+
+	return false;
 }
 
 /**
@@ -39,7 +80,7 @@ function getNodeTypeKeywords(nodeType: Readonly<string>): string[] {
  * @param content - Example content to check against.
  * @returns Coverage result with evidence.
  */
-export function checkNodeTypes(
+function checkNodeTypes(
 	nodeTypes: readonly string[],
 	content: Readonly<string>,
 ): CoverageResult {
@@ -88,11 +129,19 @@ export function checkNodeTypes(
 	const missingTypes: string[] = [];
 
 	for (const nodeType of checkableNodeTypes) {
-		const keywords = getNodeTypeKeywords(nodeType);
-		const contentLower = trimmedContent.toLowerCase();
-		const isCovered = keywords.some((keyword) =>
-			contentLower.includes(keyword.toLowerCase()),
-		);
+		let isCovered = false;
+
+		// Special handling for UserClass - must detect nested classes
+		const isUserClass = nodeType === 'UserClass';
+		if (isUserClass) {
+			isCovered = hasNestedClasses(trimmedContent);
+		} else {
+			const keywords = getNodeTypeKeywords(nodeType);
+			const contentLower = trimmedContent.toLowerCase();
+			isCovered = keywords.some((keyword) =>
+				contentLower.includes(keyword.toLowerCase()),
+			);
+		}
 
 		if (isCovered) {
 			coveredTypes.push(nodeType);
@@ -122,3 +171,5 @@ export function checkNodeTypes(
 		success,
 	};
 }
+
+export { checkNodeTypes, hasNestedClasses };

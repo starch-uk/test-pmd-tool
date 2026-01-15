@@ -41,7 +41,7 @@ describe('checkDuplicates', () => {
 		expect(result.warnings).toHaveLength(0);
 	});
 
-	it('should detect duplicate violation patterns', () => {
+	it('should detect duplicate violation markers', () => {
 		const examples: ExampleData[] = [
 			{
 				content: 'public class Test1 {}',
@@ -50,7 +50,8 @@ describe('checkDuplicates', () => {
 				valids: [],
 				violationMarkers: [
 					{
-						description: 'Test',
+						description:
+							'This is a test violation marker description',
 						index: 0,
 						isViolation: true,
 						lineNumber: 1,
@@ -65,7 +66,8 @@ describe('checkDuplicates', () => {
 				valids: [],
 				violationMarkers: [
 					{
-						description: 'Test',
+						description:
+							'This is a test violation marker description',
 						index: 0,
 						isViolation: true,
 						lineNumber: 1,
@@ -80,18 +82,18 @@ describe('checkDuplicates', () => {
 		expect(result.passed).toBe(true);
 		expect(result.issues).toHaveLength(0);
 		expect(result.warnings).toHaveLength(1);
-		expect(result.warnings[0]).toContain('Duplicate violation pattern');
+		expect(result.warnings[0]).toContain('Duplicate marker description');
 		expect(result.warnings[0]).toContain('found in examples: 1, 2');
 	});
 
-	it('should detect duplicate valid patterns', () => {
+	it('should detect duplicate valid markers', () => {
 		const examples: ExampleData[] = [
 			{
 				content: 'public class Test1 {}',
 				exampleIndex: 1,
 				validMarkers: [
 					{
-						description: 'Valid',
+						description: 'This is a test valid marker description',
 						index: 0,
 						isViolation: false,
 						lineNumber: 1,
@@ -106,7 +108,7 @@ describe('checkDuplicates', () => {
 				exampleIndex: 2,
 				validMarkers: [
 					{
-						description: 'Valid',
+						description: 'This is a test valid marker description',
 						index: 0,
 						isViolation: false,
 						lineNumber: 1,
@@ -123,7 +125,7 @@ describe('checkDuplicates', () => {
 		expect(result.passed).toBe(true);
 		expect(result.issues).toHaveLength(0);
 		expect(result.warnings).toHaveLength(1);
-		expect(result.warnings[0]).toContain('Duplicate valid pattern');
+		expect(result.warnings[0]).toContain('Duplicate marker description');
 		expect(result.warnings[0]).toContain('found in examples: 1, 2');
 	});
 
@@ -177,13 +179,15 @@ describe('checkDuplicates', () => {
 				valids: [],
 				violationMarkers: [
 					{
-						description: 'Test1',
+						description:
+							'This is the first test marker description',
 						index: 0,
 						isViolation: true,
 						lineNumber: 1,
 					},
 					{
-						description: 'Test2',
+						description:
+							'This is the second test marker description',
 						index: 1,
 						isViolation: true,
 						lineNumber: 2,
@@ -201,13 +205,15 @@ describe('checkDuplicates', () => {
 				valids: [],
 				violationMarkers: [
 					{
-						description: 'Test1',
+						description:
+							'This is the first test marker description',
 						index: 0,
 						isViolation: true,
 						lineNumber: 1,
 					},
 					{
-						description: 'Test2',
+						description:
+							'This is the second test marker description',
 						index: 1,
 						isViolation: true,
 						lineNumber: 2,
@@ -225,7 +231,8 @@ describe('checkDuplicates', () => {
 				valids: [],
 				violationMarkers: [
 					{
-						description: 'Test1',
+						description:
+							'This is the first test marker description',
 						index: 0,
 						isViolation: true,
 						lineNumber: 1,
@@ -239,10 +246,10 @@ describe('checkDuplicates', () => {
 
 		expect(result.passed).toBe(true);
 		expect(result.issues).toHaveLength(0);
-		expect(result.warnings).toHaveLength(2); // Two patterns duplicated
+		expect(result.warnings).toHaveLength(2); // Two marker descriptions duplicated
 	});
 
-	it('should normalize whitespace when comparing patterns', () => {
+	it('should normalize whitespace when comparing marker descriptions', () => {
 		const examples: ExampleData[] = [
 			{
 				content: 'public class Test1 {}',
@@ -251,13 +258,14 @@ describe('checkDuplicates', () => {
 				valids: [],
 				violationMarkers: [
 					{
-						description: 'Test',
+						description:
+							'This   is   a   test   marker   description',
 						index: 0,
 						isViolation: true,
 						lineNumber: 1,
 					},
 				],
-				violations: ['public    class   MyClass   {}'],
+				violations: ['public class MyClass {}'],
 			},
 			{
 				content: 'public class Test2 {}',
@@ -266,7 +274,7 @@ describe('checkDuplicates', () => {
 				valids: [],
 				violationMarkers: [
 					{
-						description: 'Test',
+						description: 'This is a test marker description',
 						index: 0,
 						isViolation: true,
 						lineNumber: 1,
@@ -281,11 +289,11 @@ describe('checkDuplicates', () => {
 		expect(result.passed).toBe(true);
 		expect(result.issues).toHaveLength(0);
 		expect(result.warnings).toHaveLength(1);
-		expect(result.warnings[0]).toContain('Duplicate violation pattern');
+		expect(result.warnings[0]).toContain('Duplicate marker description');
 	});
 
-	it('should handle edge case where patternList get returns undefined', () => {
-		// This test covers the defensive check for undefined patternList
+	it('should handle edge case where descriptionList get returns undefined', () => {
+		// This test covers the defensive check for undefined descriptionList
 		// In practice, get() after set() should never return undefined,
 		// but TypeScript requires the check
 		const examples: ExampleData[] = [
@@ -296,7 +304,7 @@ describe('checkDuplicates', () => {
 				valids: [],
 				violationMarkers: [
 					{
-						description: 'Test',
+						description: 'This is a test marker description',
 						index: 0,
 						isViolation: true,
 						lineNumber: 1,
@@ -311,7 +319,7 @@ describe('checkDuplicates', () => {
 				valids: [],
 				violationMarkers: [
 					{
-						description: 'Test',
+						description: 'This is a test marker description',
 						index: 0,
 						isViolation: true,
 						lineNumber: 1,

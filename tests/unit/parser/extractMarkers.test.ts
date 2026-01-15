@@ -20,7 +20,7 @@ public class TestClass {
 
 		expect(violationMarkers).toHaveLength(1);
 		expect(violationMarkers[0]).toEqual({
-			description: 'Inline violation marker // ❌',
+			description: 'Inline violation marker: Invalid field access',
 			index: 0,
 			isViolation: true,
 			lineNumber: 3,
@@ -28,7 +28,7 @@ public class TestClass {
 
 		expect(validMarkers).toHaveLength(1);
 		expect(validMarkers[0]).toEqual({
-			description: 'Inline valid marker // ✅',
+			description: 'Inline valid marker: Valid debug statement',
 			index: 0,
 			isViolation: false,
 			lineNumber: 5,
@@ -79,7 +79,8 @@ public class TestClass {
 
 		expect(violationMarkers).toHaveLength(1);
 		expect(violationMarkers[0]).toEqual({
-			description: 'Inline violation marker // ❌',
+			description:
+				'Inline violation marker: Inline violation overrides section',
 			index: 0,
 			isViolation: true,
 			lineNumber: 4,
@@ -101,11 +102,23 @@ public class TestClass {
 
 		expect(violationMarkers).toHaveLength(2);
 		expect(violationMarkers[0].lineNumber).toBe(3);
+		expect(violationMarkers[0].description).toBe(
+			'Inline violation marker: First violation',
+		);
 		expect(violationMarkers[1].lineNumber).toBe(4);
+		expect(violationMarkers[1].description).toBe(
+			'Inline violation marker: Second violation',
+		);
 
 		expect(validMarkers).toHaveLength(2);
 		expect(validMarkers[0].lineNumber).toBe(5);
+		expect(validMarkers[0].description).toBe(
+			'Inline valid marker: First valid',
+		);
 		expect(validMarkers[1].lineNumber).toBe(6);
+		expect(validMarkers[1].description).toBe(
+			'Inline valid marker: Second valid',
+		);
 	});
 
 	it('should handle empty content', () => {
@@ -159,5 +172,90 @@ fourth // ✅
 		expect(violationMarkers[1].index).toBe(1);
 		expect(validMarkers[0].index).toBe(0);
 		expect(validMarkers[1].index).toBe(1);
+	});
+
+	it('should handle inline markers without descriptive text', () => {
+		const content = `
+public class TestClass {
+    private String field; // ❌
+    public void method() {
+        System.debug('test'); // ✅
+    }
+}
+`;
+
+		const { violationMarkers, validMarkers } = extractMarkers(content);
+
+		expect(violationMarkers).toHaveLength(1);
+		expect(violationMarkers[0]).toEqual({
+			description: 'Inline violation marker // ❌',
+			index: 0,
+			isViolation: true,
+			lineNumber: 3,
+		});
+
+		expect(validMarkers).toHaveLength(1);
+		expect(validMarkers[0]).toEqual({
+			description: 'Inline valid marker // ✅',
+			index: 0,
+			isViolation: false,
+			lineNumber: 5,
+		});
+	});
+
+	it('should handle markers with only whitespace after emoji', () => {
+		const content = `
+public class TestClass {
+    private String field; // ❌   
+    public void method() {
+        System.debug('test'); // ✅    
+    }
+}
+`;
+
+		const { violationMarkers, validMarkers } = extractMarkers(content);
+
+		expect(violationMarkers).toHaveLength(1);
+		expect(violationMarkers[0].description).toBe(
+			'Inline violation marker // ❌',
+		);
+
+		expect(validMarkers).toHaveLength(1);
+		expect(validMarkers[0].description).toBe('Inline valid marker // ✅');
+	});
+
+	it('should handle markers with only whitespace after emoji', () => {
+		// Tests when firstMatch exists but trim() results in empty string
+		// This covers the optional chaining branches (lines 39, 55)
+		const content = `
+public class TestClass {
+    private String field; // ❌   
+    public void method() {
+        System.debug('test'); // ✅    
+    }
+}
+`;
+
+		const { violationMarkers, validMarkers } = extractMarkers(content);
+
+		expect(violationMarkers).toHaveLength(1);
+		// When firstMatch.trim() is empty, descriptionText.length is 0, so uses default
+		expect(violationMarkers[0]?.description).toBe(
+			'Inline violation marker // ❌',
+		);
+
+		expect(validMarkers).toHaveLength(1);
+		expect(validMarkers[0]?.description).toBe('Inline valid marker // ✅');
+	});
+
+	it('should handle edge case where marker pattern might not match expected format', () => {
+		// This tests the optional chaining branches more thoroughly
+		// by ensuring we cover both paths of markerMatch?.[FIRST_MATCH_GROUP_INDEX]
+		const content = 'code // ❌\ncode2 // ✅';
+		const { violationMarkers, validMarkers } = extractMarkers(content);
+
+		expect(violationMarkers).toHaveLength(1);
+		expect(validMarkers).toHaveLength(1);
+		// Both branches of optional chaining should be covered
 	});
 });

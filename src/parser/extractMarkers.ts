@@ -5,6 +5,10 @@
 import type { ViolationMarker } from '../types/index.js';
 
 const LINE_NUMBER_OFFSET = 1;
+const FIRST_MATCH_GROUP_INDEX = 1;
+const MIN_DESCRIPTION_LENGTH = 0;
+const REGEX_MARKER_PATTERN = /\/\/\s*❌\s*(.*)/;
+const REGEX_VALID_PATTERN = /\/\/\s*✅\s*(.*)/;
 
 /**
  * Extract violation and valid markers from example content.
@@ -28,15 +32,41 @@ export function extractMarkers(exampleContent: string): {
 
 		// Check for inline violation/valid markers
 		if (trimmed.includes('// ❌')) {
+			// Extract text after // ❌ marker, if any
+			// Since we checked trimmed.includes('// ❌'), the regex will always match
+			const regex = new RegExp(REGEX_MARKER_PATTERN);
+			const markerMatch = regex.exec(trimmed);
+			// markerMatch is never null because the pattern matches when includes() is true
+			// firstMatch is always a string (possibly empty) because group 1 (.*) always matches
+			// eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- regex always matches when includes() is true
+			const firstMatch = markerMatch![FIRST_MATCH_GROUP_INDEX]!;
+			const descriptionText = firstMatch.trim();
+			const description =
+				descriptionText.length > MIN_DESCRIPTION_LENGTH
+					? `Inline violation marker: ${descriptionText}`
+					: 'Inline violation marker // ❌';
 			violationMarkers.push({
-				description: 'Inline violation marker // ❌',
+				description,
 				index: violationMarkers.length,
 				isViolation: true,
 				lineNumber,
 			});
 		} else if (trimmed.includes('// ✅')) {
+			// Extract text after // ✅ marker, if any
+			// Since we checked trimmed.includes('// ✅'), the regex will always match
+			const regex = new RegExp(REGEX_VALID_PATTERN);
+			const markerMatch = regex.exec(trimmed);
+			// markerMatch is never null because the pattern matches when includes() is true
+			// firstMatch is always a string (possibly empty) because group 1 (.*) always matches
+			// eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- regex always matches when includes() is true
+			const firstMatch = markerMatch![FIRST_MATCH_GROUP_INDEX]!;
+			const descriptionText = firstMatch.trim();
+			const description =
+				descriptionText.length > MIN_DESCRIPTION_LENGTH
+					? `Inline valid marker: ${descriptionText}`
+					: 'Inline valid marker // ✅';
 			validMarkers.push({
-				description: 'Inline valid marker // ✅',
+				description,
 				index: validMarkers.length,
 				isViolation: false,
 				lineNumber,

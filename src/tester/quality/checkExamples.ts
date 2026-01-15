@@ -63,6 +63,14 @@ export function checkExamples(
 		(example: Readonly<ExampleData>, index: Readonly<number>) => {
 			const exampleNum = index + INDEX_OFFSET;
 
+			// Check for forbidden method name 'testMethod'
+			if (example.content.includes('testMethod(')) {
+				const exampleNumStr = String(exampleNum);
+				errors.push(
+					`Example ${exampleNumStr}: You can't call a method testMethod in examples`,
+				);
+			}
+
 			// Check for violation markers
 			if (example.violationMarkers.length === MIN_VIOLATION_MARKERS) {
 				const exampleNumStr = String(exampleNum);

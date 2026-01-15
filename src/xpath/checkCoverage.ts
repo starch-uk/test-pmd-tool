@@ -12,6 +12,7 @@ import type {
 } from '../types/index.js';
 import { analyzeXPath } from './analyzeXPath.js';
 import { conditionalCheckers } from './coverage/conditional/strategies.js';
+import { hasNestedClasses } from './coverage/checkNodeTypes.js';
 
 const MIN_COUNT = 0;
 const NOT_FOUND_INDEX = -1;
@@ -267,6 +268,11 @@ function checkNodeTypeCoverage(
 			case 'StandardCondition':
 				// Skip StandardCondition - it's an internal AST node not directly represented in code
 				isCovered = true;
+				break;
+			case 'UserClass':
+				// UserClass nodes are inner/nested classes (classes declared inside other classes)
+				// Check if there are nested classes in the content
+				isCovered = hasNestedClasses(content);
 				break;
 			default:
 				// Fallback to simple string matching for unknown node types
@@ -731,11 +737,20 @@ function checkAttributeCoverage(
 				isCovered = /\b\d+(\.\d+)?\b/.test(content);
 				break;
 			case 'Image':
-				// Look for literal values (numbers, strings, booleans, null)
+				// @Image can be literal values, class names, method names, etc.
+				// Check for literal values (numbers, strings, booleans, null)
+				// or class/method declarations with identifiers
 				isCovered =
 					/\b\d+(\.\d+)?\b|'(?:[^'\\]|\\.)*'|"[^"]*"|\bnull\b|\btrue\b|\bfalse\b/.test(
 						lowerContent,
-					);
+					) ||
+					/\bclass\s+\w+/.test(content) ||
+					/\b\w+\s*\(/.test(content);
+				break;
+			case 'Nested':
+				// @Nested='true' for inner/nested classes
+				// Check if there are nested classes in the content
+				isCovered = hasNestedClasses(content);
 				break;
 			case 'Static':
 				// Look for static modifier
@@ -853,11 +868,8 @@ function checkOperatorCoverage(
 		}
 	}
 
-	const foundList =
-		foundOperators.length > MIN_COUNT
-			? foundOperators.map((item) => ` - ${item}`).join('\n')
-			: '';
 	// Format missing operators with line numbers if available
+	// Only show uncovered operators, not covered ones
 	const missingList =
 		missingOperators.length > MIN_COUNT
 			? missingOperators
@@ -886,20 +898,11 @@ function checkOperatorCoverage(
 					.join('\n')
 			: '';
 
-	const foundText = foundList;
 	const missingText =
 		missingOperators.length > MIN_COUNT ? `Missing:\n${missingList}` : '';
 
-	// Only include description if there are items to show
-	const hasFound = foundText.length > MIN_COUNT;
-	const hasMissing = missingText.length > MIN_COUNT;
-	let description = '';
-	if (hasFound) {
-		description = hasMissing ? `${foundText}\n${missingText}` : foundText;
-	}
-	if (!hasFound && hasMissing) {
-		description = missingText;
-	}
+	// Only include description for missing (uncovered) operators
+	const description = missingText;
 	// Note: If both are empty, description remains empty string (unreachable in practice)
 
 	return {

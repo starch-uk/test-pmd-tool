@@ -25,29 +25,27 @@ function normalizeCode(code: string): string {
 }
 
 /**
- * Check for duplicate patterns and add warnings.
- * @param patterns - Map of patterns to example numbers.
- * @param type - Type of pattern (violation or valid).
+ * Check for duplicate marker descriptions across all examples.
+ * @param markerDescriptions - Map of normalized descriptions to example numbers.
  * @param warnings - Array to append warnings to.
  */
-function checkPatternDuplicates(
-	patterns: Readonly<Map<string, readonly number[]>>,
-	type: Readonly<string>,
+function checkMarkerDuplicates(
+	markerDescriptions: Readonly<Map<string, readonly number[]>>,
 	// eslint-disable-next-line @typescript-eslint/prefer-readonly-parameter-types -- Array is mutated via push()
 	warnings: string[],
 ): void {
-	for (const [pattern, exampleNumbers] of patterns.entries()) {
+	for (const [description, exampleNumbers] of markerDescriptions.entries()) {
 		if (
 			exampleNumbers.length > MIN_DUPLICATE_COUNT &&
-			pattern.length > MIN_PATTERN_LENGTH
+			description.length > MIN_PATTERN_LENGTH
 		) {
 			// Only warn for substantial duplicates
-			const patternPreview = pattern.substring(
+			const descriptionPreview = description.substring(
 				MIN_COUNT,
 				PATTERN_DISPLAY_LENGTH,
 			);
 			warnings.push(
-				`Duplicate ${type} pattern "${patternPreview}..." ` +
+				`Duplicate marker description "${descriptionPreview}..." ` +
 					`found in examples: ${exampleNumbers.join(', ')}`,
 			);
 		}
@@ -56,6 +54,7 @@ function checkPatternDuplicates(
 
 /**
  * Check for duplicate messages, branches, or patterns across examples.
+ * Checks all markers (violation and valid) across all examples.
  * @param examples - Array of parsed examples to check.
  * @returns Validation result with errors and warnings.
  */
@@ -70,44 +69,49 @@ export function checkDuplicates(
 		return { issues: errors, passed: true, warnings };
 	}
 
-	// Check for duplicate violation patterns
-	const violationPatterns = new Map<string, number[]>();
-	const validPatterns = new Map<string, number[]>();
+	// Check for duplicate marker descriptions across all examples
+	// Collect all markers (both violation and valid) from all examples
+	const markerDescriptions = new Map<string, number[]>();
 
 	examples.forEach(
 		// eslint-disable-next-line @typescript-eslint/prefer-readonly-parameter-types -- Callback parameters for forEach
 		(example: Readonly<ExampleData>, index: Readonly<number>) => {
 			const exampleNum = index + INDEX_OFFSET;
 
-			// Check violation patterns
-			example.violations.forEach((code: Readonly<string>) => {
-				const normalized = normalizeCode(code);
-				if (!violationPatterns.has(normalized)) {
-					violationPatterns.set(normalized, []);
-				}
-				// get() after set() always returns the array, never undefined
-				// eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- get() after set() always returns the array
-				const patternList = violationPatterns.get(normalized)!;
-				patternList.push(exampleNum);
-			});
+			// Check all violation markers
+			example.violationMarkers.forEach(
+				// eslint-disable-next-line @typescript-eslint/prefer-readonly-parameter-types -- Callback parameter
+				(marker) => {
+					const normalized = normalizeCode(marker.description);
+					if (!markerDescriptions.has(normalized)) {
+						markerDescriptions.set(normalized, []);
+					}
+					// get() after set() always returns the array, never undefined
+					// eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- get() after set() always returns the array
+					const descriptionList = markerDescriptions.get(normalized)!;
+					descriptionList.push(exampleNum);
+				},
+			);
 
-			// Check valid patterns
-			example.valids.forEach((code: Readonly<string>) => {
-				const normalized = normalizeCode(code);
-				if (!validPatterns.has(normalized)) {
-					validPatterns.set(normalized, []);
-				}
-				// get() after set() always returns the array, never undefined
-				// eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- get() after set() always returns the array
-				const patternList = validPatterns.get(normalized)!;
-				patternList.push(exampleNum);
-			});
+			// Check all valid markers
+			example.validMarkers.forEach(
+				// eslint-disable-next-line @typescript-eslint/prefer-readonly-parameter-types -- Callback parameter
+				(marker) => {
+					const normalized = normalizeCode(marker.description);
+					if (!markerDescriptions.has(normalized)) {
+						markerDescriptions.set(normalized, []);
+					}
+					// get() after set() always returns the array, never undefined
+					// eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- get() after set() always returns the array
+					const descriptionList = markerDescriptions.get(normalized)!;
+					descriptionList.push(exampleNum);
+				},
+			);
 		},
 	);
 
-	// Report duplicates
-	checkPatternDuplicates(violationPatterns, 'violation', warnings);
-	checkPatternDuplicates(validPatterns, 'valid', warnings);
+	// Report duplicate markers
+	checkMarkerDuplicates(markerDescriptions, warnings);
 
 	const noErrors = errors.length === ZERO_ERRORS;
 	return {

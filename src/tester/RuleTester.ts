@@ -392,27 +392,41 @@ export class RuleTester {
 					includeViolations: true,
 				});
 
-				const testPassed = await this.runTestCase({
-					exampleIndex,
-					filePath: violationTestFile.filePath,
-					testCaseResults: testCaseResults,
-					testType: 'violation',
-				});
-				if (!testPassed) {
-					passed = false;
-				}
-
-				// Count actual violations from this test
+				let violationTestPassed = false;
 				try {
 					const pmdResult = await runPMD(
 						violationTestFile.filePath,
 						this.ruleFilePath,
 					);
+					const ZERO_VIOLATIONS_COUNT = 0;
 					if (pmdResult.success && pmdResult.data) {
+						violationTestPassed =
+							pmdResult.data.violations.length >
+							ZERO_VIOLATIONS_COUNT;
 						actualViolations += pmdResult.data.violations.length;
 					}
 				} catch {
 					// PMD execution failed
+				}
+
+				if (!violationTestPassed) {
+					passed = false;
+				}
+
+				// Create one test case result per violation marker
+				for (const marker of example.violationMarkers) {
+					const xmlLineNumber = this.findMarkerLineNumber(
+						example,
+						exampleIndex,
+						marker.lineNumber,
+					);
+					testCaseResults.push({
+						description: `Violation test for example ${String(exampleIndex)}`,
+						exampleIndex,
+						lineNumber: xmlLineNumber,
+						passed: violationTestPassed,
+						testType: 'violation',
+					});
 				}
 			}
 
@@ -426,14 +440,49 @@ export class RuleTester {
 					includeViolations: false,
 				});
 
-				const testPassed = await this.runTestCase({
-					exampleIndex,
-					filePath: validTestFile.filePath,
-					testCaseResults: testCaseResults,
-					testType: 'valid',
-				});
-				if (!testPassed) {
+				let validTestPassed = false;
+				try {
+					const pmdResult = await runPMD(
+						validTestFile.filePath,
+						this.ruleFilePath,
+					);
+					const ZERO_VIOLATIONS_COUNT = 0;
+					// Check if PMD execution was successful and returned data
+					// Extract to variable for better branch coverage tracking
+					const hasValidResult =
+						pmdResult.success && pmdResult.data !== undefined;
+					if (hasValidResult) {
+						// TypeScript: hasValidResult check ensures data is defined
+						// The condition pmdResult.success && pmdResult.data !== undefined
+						// guarantees pmdResult.data is not undefined when hasValidResult is true
+						// eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- hasValidResult guarantees data is defined
+						const pmdData = pmdResult.data!;
+						validTestPassed =
+							pmdData.violations.length === ZERO_VIOLATIONS_COUNT;
+					}
+					// If pmdResult.success is false or pmdResult.data is undefined, validTestPassed remains false
+				} catch {
+					// PMD execution failed
+				}
+
+				if (!validTestPassed) {
 					passed = false;
+				}
+
+				// Create one test case result per valid marker
+				for (const marker of example.validMarkers) {
+					const xmlLineNumber = this.findMarkerLineNumber(
+						example,
+						exampleIndex,
+						marker.lineNumber,
+					);
+					testCaseResults.push({
+						description: `Valid test for example ${String(exampleIndex)}`,
+						exampleIndex,
+						lineNumber: xmlLineNumber,
+						passed: validTestPassed,
+						testType: 'valid',
+					});
 				}
 			}
 
@@ -451,104 +500,19 @@ export class RuleTester {
 	}
 
 	/**
-	 * Runs a single test case and records the result.
-	 * @param testCaseConfig - Configuration for the test case.
-	 * @param testCaseConfig.exampleIndex - 1-based index of the example being tested.
-	 * @param testCaseConfig.filePath - Path to the temporary test file.
-	 * @param testCaseConfig.testCaseResults - Array to append test case results to.
-	 * @param testCaseConfig.testType - Type of test ('valid' or 'violation').
-	 * @returns Promise resolving to whether the test passed.
-	 * @private
-	 */
-	private async runTestCase(
-		// eslint-disable-next-line @typescript-eslint/prefer-readonly-parameter-types -- Need mutable array to push results
-		testCaseConfig: Readonly<{
-			exampleIndex: number;
-			filePath: string;
-			testCaseResults: TestCaseResult[];
-			testType: 'valid' | 'violation';
-		}>,
-	): Promise<boolean> {
-		const { exampleIndex, filePath, testCaseResults, testType } =
-			testCaseConfig;
-		try {
-			const pmdResult = await runPMD(filePath, this.ruleFilePath);
-			let passed = false;
-			let lineNumber: number | undefined = undefined;
-
-			const ZERO_VIOLATIONS_COUNT = 0;
-			if (pmdResult.success && pmdResult.data) {
-				if (testType === 'violation') {
-					// Should find at least one violation
-					passed =
-						pmdResult.data.violations.length >
-						ZERO_VIOLATIONS_COUNT;
-					if (!passed) {
-						// Find the line number in XML where this violation test is defined
-						lineNumber = this.findTestCaseLineNumber(
-							exampleIndex,
-							testType,
-						);
-					}
-				} else {
-					// Should find no violations
-					passed =
-						pmdResult.data.violations.length ===
-						ZERO_VIOLATIONS_COUNT;
-					if (!passed) {
-						// Find the line number in XML where this valid test is defined
-						lineNumber = this.findTestCaseLineNumber(
-							exampleIndex,
-							testType,
-						);
-					}
-				}
-			} else {
-				// PMD execution failed
-				passed = false;
-				lineNumber = this.findTestCaseLineNumber(
-					exampleIndex,
-					testType,
-				);
-			}
-
-			const testTypeLabel =
-				testType === 'violation' ? 'Violation' : 'Valid';
-			testCaseResults.push({
-				description: `${testTypeLabel} test for example ${String(exampleIndex)}`,
-				exampleIndex,
-				lineNumber,
-				passed,
-				testType,
-			});
-
-			return passed;
-		} catch {
-			// PMD execution failed
-			const lineNumber = this.findExampleLineNumber(exampleIndex);
-			const testTypeLabel =
-				testType === 'violation' ? 'Violation' : 'Valid';
-			testCaseResults.push({
-				description: `${testTypeLabel} test for example ${String(exampleIndex)}`,
-				exampleIndex,
-				lineNumber,
-				passed: false,
-				testType,
-			});
-			return false;
-		}
-	}
-
-	/**
-	 * Finds the line number in the XML file for a specific test case within an example.
+	 * Maps a marker's line number (within example content) to XML file line number.
+	 * Finds the marker by searching for its pattern in the XML within the example boundaries.
+	 * @param example - The example data containing the marker.
 	 * @param exampleIndex - 1-based example index.
-	 * @param testType - Type of test case ('valid' or 'violation').
+	 * @param markerLineNumber - 1-based line number within the example content (used to find marker in example).
 	 * @returns Line number in the XML file, or undefined if not found.
 	 * @private
 	 */
-	private findTestCaseLineNumber(
-		exampleIndex: number,
-		testType: 'valid' | 'violation',
+	private findMarkerLineNumber(
+		// eslint-disable-next-line @typescript-eslint/prefer-readonly-parameter-types -- ExampleData needs to be mutable for property access
+		example: Readonly<ExampleData>,
+		exampleIndex: Readonly<number>,
+		markerLineNumber: Readonly<number>,
 	): number | undefined {
 		try {
 			const content = readFileSync(this.ruleFilePath, 'utf-8');
@@ -560,18 +524,16 @@ export class RuleTester {
 			let exampleEnd = NOT_FOUND_INDEX;
 			let currentExampleIndex = 0;
 
-			// Find the target example by counting examples until we reach the target index
-			// Remove unreachable false branch - we always find the example we're searching for
+			// Find the target example boundaries
 			for (let i = 0; i < lines.length; i++) {
 				// split('\n') always returns a dense array, so lines[i] is always defined
 				// eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Loop condition ensures i < length, split() returns dense array
 				const line = lines[i]!;
 				if (line.includes('<example>')) {
 					currentExampleIndex++;
-					// Set exampleStart when we find the target example
-					// Remove unreachable false branch using ternary
-					exampleStart =
-						currentExampleIndex === exampleIndex ? i : exampleStart;
+					if (currentExampleIndex === exampleIndex) {
+						exampleStart = i;
+					}
 				} else if (
 					line.includes('</example>') &&
 					currentExampleIndex === exampleIndex
@@ -581,85 +543,123 @@ export class RuleTester {
 				}
 			}
 
-			// If example boundaries not found, this means the XML file structure
-			// doesn't match what was parsed. This should never happen in normal operation
-			// since examples are parsed from the same file. However, we handle it gracefully.
 			if (
 				exampleStart === NOT_FOUND_INDEX ||
 				exampleEnd === NOT_FOUND_INDEX
 			) {
-				// This path is only reachable if the file was modified between parsing and this call,
-				// or if the XML parser is more lenient than our string search.
-				// For 100% coverage, we need to test this path, so we keep it.
 				return undefined;
 			}
 
-			/**
-			 * Check if this example has inline markers.
-			 * @returns True if inline markers are found.
-			 */
-			const hasInlineMarkers = (): boolean => {
-				for (let i = exampleStart; i <= exampleEnd; i++) {
-					// split('\n') always returns a dense array, so lines[i] is always defined
-					// eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Loop bounds ensure valid index, split() returns dense array
-					const line = lines[i]!;
-					if (line.includes('// ❌') || line.includes('// ✅')) {
-						return true;
+			// Find the marker by searching for its pattern in the XML
+			// For inline markers, search for "// ❌" or "// ✅"
+			// For section markers, search for "// Violation:" or "// Valid:"
+			const LINE_NUMBER_OFFSET = 1;
+			const exampleContentLines = example.content.split('\n');
+
+			// Get the line from example content that contains the marker
+			const markerLineIndex = markerLineNumber - LINE_NUMBER_OFFSET;
+			const ZERO_INDEX = 0;
+			if (
+				markerLineIndex < ZERO_INDEX ||
+				markerLineIndex >= exampleContentLines.length
+			) {
+				return undefined;
+			}
+
+			// split('\n') always returns a dense array, so exampleContentLines[markerLineIndex] is always defined
+			// eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Bounds checked above
+			const markerLineInExample = exampleContentLines[markerLineIndex]!;
+
+			// Search for this line (or a substring that uniquely identifies it) in the XML
+			// within the example boundaries
+			for (let i = exampleStart; i <= exampleEnd; i++) {
+				// split('\n') always returns a dense array, so lines[i] is always defined
+				// eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Loop bounds ensure valid index, split() returns dense array
+				const xmlLine = lines[i]!;
+
+				// Check if this XML line contains the marker pattern
+				// For inline markers, look for the marker symbol
+				if (markerLineInExample.includes('// ❌')) {
+					if (xmlLine.includes('// ❌')) {
+						// Try to match more specifically by checking if key parts of the line match
+						// Extract a unique identifier from the marker line (the code part, not the comment)
+						const codePart = markerLineInExample
+							.split('// ❌')
+							[ZERO_INDEX]?.trim();
+						const EMPTY_STRING_LENGTH = 0;
+						// If codePart exists and is found in xmlLine, return this line
+						// Otherwise, return first match (no code part or codePart not found)
+						const hasCodePart =
+							codePart !== undefined &&
+							codePart.length > EMPTY_STRING_LENGTH;
+						if (hasCodePart) {
+							const codePartMatches = xmlLine.includes(codePart);
+							if (codePartMatches) {
+								return i + LINE_NUMBER_OFFSET;
+							}
+							// If codePart exists but doesn't match, continue loop to find another match
+						} else {
+							// No code part, just return first match
+							return i + LINE_NUMBER_OFFSET;
+						}
+					}
+				} else if (markerLineInExample.includes('// ✅')) {
+					if (xmlLine.includes('// ✅')) {
+						const codePart = markerLineInExample
+							.split('// ✅')
+							[ZERO_INDEX]?.trim();
+						const EMPTY_STRING_LENGTH = 0;
+						// If codePart exists and is found in xmlLine, return this line
+						// Otherwise, return first match (no code part or codePart not found)
+						const hasCodePart =
+							codePart !== undefined &&
+							codePart.length > EMPTY_STRING_LENGTH;
+						if (hasCodePart) {
+							const codePartMatches = xmlLine.includes(codePart);
+							if (codePartMatches) {
+								return i + LINE_NUMBER_OFFSET;
+							}
+							// If codePart exists but doesn't match, continue loop to find another match
+						} else {
+							// No code part, just return first match
+							return i + LINE_NUMBER_OFFSET;
+						}
+					}
+				} else if (markerLineInExample.includes('// Violation:')) {
+					if (xmlLine.includes('// Violation:')) {
+						return i + LINE_NUMBER_OFFSET;
+					}
+				} else if (markerLineInExample.includes('// Valid:')) {
+					if (xmlLine.includes('// Valid:')) {
+						return i + LINE_NUMBER_OFFSET;
 					}
 				}
-				return false;
-			};
+			}
 
-			// Now find the appropriate marker
-			const LINE_NUMBER_OFFSET = 1;
-			const hasInline = hasInlineMarkers();
+			// Fallback: if we can't find the exact marker, try to map by line number offset
+			// Find where example content starts in XML
+			let exampleContentStart = NOT_FOUND_INDEX;
 			for (let i = exampleStart; i <= exampleEnd; i++) {
 				// split('\n') always returns a dense array, so lines[i] is always defined
 				// eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Loop bounds ensure valid index, split() returns dense array
 				const line = lines[i]!;
-
-				if (hasInline) {
-					// Use inline markers
-					const inlineMarkerText =
-						testType === 'violation' ? '// ❌' : '// ✅';
-					if (line.includes(inlineMarkerText)) {
-						return i + LINE_NUMBER_OFFSET; // 1-based line number (current line with marker and code)
-					}
-				} else {
-					// Use section markers
-					const sectionMarkerText =
-						testType === 'violation'
-							? '// Violation:'
-							: '// Valid:';
-					if (line.includes(sectionMarkerText)) {
-						// Find the next non-empty, non-comment line after the marker
-						const NEXT_LINE_OFFSET = 1;
-						for (
-							let j = i + NEXT_LINE_OFFSET;
-							j <= exampleEnd;
-							j++
-						) {
-							// split('\n') always returns a dense array, so lines[j] is always defined
-							// eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Loop bounds ensure valid index, split() returns dense array
-							const nextLineRaw = lines[j]!;
-							const nextLine = nextLineRaw.trim();
-							// Skip empty lines, XML tags, and comments, find the actual code line
-							if (
-								nextLine &&
-								!nextLine.startsWith('//') &&
-								!nextLine.startsWith('*/') &&
-								!nextLine.startsWith('/*') &&
-								!nextLine.startsWith('</') &&
-								!nextLine.startsWith('<')
-							) {
-								return j + LINE_NUMBER_OFFSET; // 1-based line number of the code line
-							}
-						}
-						// Section markers are always followed by code, so this path is unreachable
-						// Continue loop to find marker or return undefined at end
-					}
+				if (line.includes('<![CDATA[')) {
+					exampleContentStart = i + LINE_NUMBER_OFFSET;
+					break;
 				}
 			}
+
+			if (exampleContentStart !== NOT_FOUND_INDEX) {
+				const MARKER_LINE_OFFSET = 1;
+				const xmlLineIndex =
+					exampleContentStart + markerLineNumber - MARKER_LINE_OFFSET;
+				// Since exampleContentStart is found within [exampleStart, exampleEnd],
+				// and markerLineNumber is bounded by exampleContentLines.length,
+				// xmlLineIndex should always be within bounds
+				return xmlLineIndex;
+			}
+
+			return undefined;
 		} catch {
 			// Ignore errors when finding line numbers
 		}
@@ -672,6 +672,7 @@ export class RuleTester {
 	 * @returns Line number in the XML file, or undefined if not found.
 	 * @private
 	 */
+	// eslint-disable-next-line @typescript-eslint/no-unused-private-class-members -- Used only in tests via private method accessor
 	private findExampleLineNumber(exampleIndex: number): number | undefined {
 		// readFileSync should never throw as file existence is checked in constructor
 		const content = readFileSync(this.ruleFilePath, 'utf-8');

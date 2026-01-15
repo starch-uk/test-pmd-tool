@@ -14,6 +14,7 @@ const TAB_CHAR = '\t';
 const SPACE_CHAR = ' ';
 const DEFAULT_INDENT = '    ';
 const FIRST_ELEMENT_INDEX = 0;
+const LAST_ELEMENT_OFFSET = 1;
 
 /**
  * Removes inline markers from a code line while preserving leading indentation.
@@ -520,17 +521,38 @@ export function createTestFile({
 				classBraceDepth += openBraces - closeBraces;
 
 				// Detect method declarations (lines with opening brace that increase depth from 1 to 2)
+				// Exclude property blocks (Pattern FIELD_PATTERN { get { ... } }) - these are not methods
+				const isPropertyBlock =
+					trimmed.includes('{') &&
+					!trimmed.includes('(') &&
+					!trimmed.includes('void') &&
+					prevClassBraceDepth === INITIAL_BRACE_DEPTH;
 				const methodRegex = /\w+\s*\(/;
 				const methodMatch = methodRegex.exec(trimmed);
 				const hasMethodPattern = methodMatch !== null;
-				const isMethodDeclaration =
-					prevClassBraceDepth === INITIAL_BRACE_DEPTH &&
-					classBraceDepth > INITIAL_BRACE_DEPTH &&
-					!trimmed.startsWith('{') &&
-					trimmed.includes('{') &&
-					(trimmed.includes('void') ||
-						trimmed.includes('(') ||
-						hasMethodPattern);
+				// Check if this is a method declaration (not a property block)
+				// Property blocks are excluded - they have { but no ( and no void
+				// If it's a property block, it's not a method declaration
+				let isMethodDeclaration = false;
+				if (!isPropertyBlock) {
+					// Not a property block - check if it's a method declaration
+					// Check depth conditions first
+					const hasCorrectDepth =
+						prevClassBraceDepth === INITIAL_BRACE_DEPTH &&
+						classBraceDepth > INITIAL_BRACE_DEPTH;
+					// Check structure conditions
+					const hasMethodStructure =
+						!trimmed.startsWith('{') && trimmed.includes('{');
+					// Check method indicators (void, parentheses, or method pattern)
+					const hasVoid = trimmed.includes('void');
+					const hasParentheses = trimmed.includes('(');
+					const hasMethodIndicator =
+						hasVoid || hasParentheses || hasMethodPattern;
+					isMethodDeclaration =
+						hasCorrectDepth &&
+						hasMethodStructure &&
+						hasMethodIndicator;
+				}
 
 				if (isMethodDeclaration) {
 					insideMethod = true;
@@ -553,7 +575,9 @@ export function createTestFile({
 				}
 
 				// Include line if it matches our criteria or is structural (braces, etc.)
-				if (shouldInclude || trimmed === '{' || trimmed === '}') {
+				// Always include braces to maintain structure - this ensures property getters/setters, methods, and class are properly structured
+				const shouldIncludeBrace = trimmed === '{' || trimmed === '}';
+				if (shouldInclude || shouldIncludeBrace) {
 					// Check if this is the method declaration line itself (with or without marker)
 					const hasMethodDeclaration =
 						methodDeclaration !== null &&
@@ -612,6 +636,9 @@ export function createTestFile({
 				}
 
 				if (classBraceDepth <= ZERO_BRACE_DEPTH) {
+					// Class ended - reset state
+					// Note: We don't add closing brace here because line 662 handles it after the loop
+					// This ensures consistent behavior regardless of when the class ends
 					insideClass = false;
 					classBraceDepth = ZERO_BRACE_DEPTH;
 					insideMethod = false;
@@ -625,13 +652,32 @@ export function createTestFile({
 			}
 		}
 
+		// Ensure class closing brace is present if we started a class
+		// When hasTopLevelClass is true, we always push the class declaration (line 502),
+		// so extractedCode.length > EMPTY_LENGTH is always true
+		// We're already in the hasTopLevelClass branch, so this check is always true
+		const lastLineIndex = extractedCode.length - LAST_ELEMENT_OFFSET;
+		// lastLineIndex is always valid because we always have at least the class declaration
+		// eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+		const lastLine = extractedCode[lastLineIndex]!;
+		if (!lastLine.trim().endsWith('}')) {
+			// Add missing class closing brace
+			extractedCode.push('}');
+		}
+
 		// Add helper methods before the final closing brace
 		const helperMethods = extractHelperMethods(codeToInclude);
 		const classContentStr = extractedCode.join('\n');
-		// The logic at line 465 always includes braces, so classContentStr will always have '}'
+		// Find the last closing brace (should be the class closing brace)
+		// After line 662, if hasTopLevelClass is true, extractedCode always has at least one '}'
+		// So lastBraceIndex is never NOT_FOUND_INDEX when hasTopLevelClass is true
 		const lastBraceIndex = classContentStr.lastIndexOf('}');
-
+		// After line 662, if hasTopLevelClass is true, extractedCode always has at least one '}'
+		// So lastBraceIndex is always >= 0 when hasTopLevelClass is true
+		// We're in the hasTopLevelClass branch, so lastBraceIndex >= 0 is guaranteed
 		if (helperMethods.length > EMPTY_LENGTH) {
+			// Split class content at the last closing brace to insert helper methods
+			// lastBraceIndex is always > 0 because we have at least the class declaration line before the closing brace
 			const beforeLastBrace = classContentStr.substring(
 				ZERO_BRACE_DEPTH,
 				lastBraceIndex,
@@ -643,6 +689,7 @@ export function createTestFile({
 			}
 			classContent += afterLastBrace + '\n';
 		} else {
+			// No helper methods - classContentStr already has closing brace from line 662
 			classContent = classContentStr + '\n';
 		}
 	} else if (hasClassLikeStructures) {
@@ -682,11 +729,70 @@ export function createTestFile({
 
 	writeFileSync(tempFile, classContent, 'utf-8');
 
+	// Track what was added for AST processing
+	const TEST_METHOD_NAME = `testMethod${String(exampleIndex)}`;
+	const helperMethods = extractHelperMethods(codeToInclude);
+	const FIRST_CAPTURE_GROUP = 1;
+	const EMPTY_NAME_LENGTH = 0;
+	const helperMethodNames = helperMethods
+		.map((method) => {
+			// Extract method name from signature like "public Boolean methodName() {"
+			const methodNameMatch = /public\s+\w+\s+(\w+)\s*\(/.exec(method);
+			return methodNameMatch?.[FIRST_CAPTURE_GROUP] ?? '';
+		})
+		.filter((name) => name.length > EMPTY_NAME_LENGTH);
+
+	// Extract method names that are part of the example code (not helpers)
+	// These are methods declared in the example, not method calls
+	const exampleMethodNames = new Set<string>();
+	if (hasTopLevelClass) {
+		// Extract method declarations from the example
+		const methodDeclRegex =
+			/(?:public|private|protected)\s+\w+\s+(\w+)\s*\(/g;
+		let methodMatch: RegExpExecArray | null = null;
+		while (
+			(methodMatch = methodDeclRegex.exec(fullExampleContent)) !== null
+		) {
+			// The regex always captures the method name in group 1, so methodName is always defined
+			// eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Regex guarantees capture group 1 exists
+			const methodName = methodMatch[FIRST_CAPTURE_GROUP]!;
+			exampleMethodNames.add(methodName);
+		}
+	} else if (hasClassLikeStructures) {
+		// Extract method declarations from class-like structures
+		const methodDeclRegex =
+			/(?:public|private|protected)\s+\w+\s+(\w+)\s*\(/g;
+		let methodMatch: RegExpExecArray | null = null;
+		while (
+			(methodMatch = methodDeclRegex.exec(fullExampleContent)) !== null
+		) {
+			// The regex always captures the method name in group 1, so methodName is always defined
+			// eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Regex guarantees capture group 1 exists
+			const methodName = methodMatch[FIRST_CAPTURE_GROUP]!;
+			exampleMethodNames.add(methodName);
+		}
+	}
+
+	// Filter out example methods from helper methods (they're not helpers)
+	const actualHelperMethodNames = helperMethodNames.filter(
+		(name) => !exampleMethodNames.has(name),
+	);
+
+	const addedWrapperClass = !hasTopLevelClass;
+	const addedWrapperMethod = !hasTopLevelClass && !hasClassLikeStructures;
+
 	return {
 		filePath: tempFile,
 		hasValids: parsed.valids.length > EMPTY_LENGTH,
 		hasViolations: parsed.violations.length > EMPTY_LENGTH,
 		validCount: parsed.valids.length,
 		violationCount: parsed.violations.length,
+		wrapperInfo: {
+			addedWrapperClass,
+			addedWrapperMethod,
+			helperMethodNames: actualHelperMethodNames,
+			wrapperClassName: TEST_CLASS_NAME,
+			wrapperMethodName: TEST_METHOD_NAME,
+		},
 	};
 }
