@@ -425,9 +425,8 @@ export class RuleTester {
 							(v: Readonly<{ line: number }>) =>
 								v.line === testFileLineNumber,
 						);
-					if (!markerPassed) {
-						passed = false;
-					}
+					// If any marker fails, the test fails
+					passed = passed && markerPassed;
 					testCaseResults.push({
 						description: `Violation test for example ${String(exampleIndex)}`,
 						exampleIndex,
@@ -716,7 +715,7 @@ export class RuleTester {
 			const markerLineInExample = exampleContentLines[markerLineIndex]!;
 
 			// Extract the code part (without the comment marker)
-			let codeToFind: string;
+			let codeToFind = '';
 			if (markerLineInExample.includes('// ❌')) {
 				const splitResult = markerLineInExample.split('// ❌');
 				// split() always returns at least one element, so [0] is always defined

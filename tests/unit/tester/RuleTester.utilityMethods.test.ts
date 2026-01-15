@@ -458,4 +458,273 @@ Line one
 		// Should find a line via fallback
 		expect(fallbackResult).toBeDefined();
 	});
+
+	it('should handle findMarkerLineInTestFile with out-of-bounds markerLineNumber', () => {
+		mockedExtractXPath.mockReturnValue({
+			error: 'xpath extraction failed',
+			success: false,
+		});
+
+		mockedReadFileSync.mockReturnValue(
+			`<?xml version="1.0" encoding="UTF-8"?>\n<rule name="R" message="m">\n</rule>`,
+		);
+
+		const tester = new RuleTester('/tmp/rule.xml');
+
+		interface PrivateMarkerLineInTestFileFinder {
+			findMarkerLineInTestFile: (
+				example: Readonly<ExampleData>,
+				markerLineNumber: number,
+				testFilePath: string,
+			) => number | undefined;
+		}
+
+		/**
+		 * Safely access RuleTester private method for coverage.
+		 * @param value - Unknown value to inspect.
+		 * @returns Typed accessor or undefined when unavailable.
+		 */
+		function getPrivateMarkerLineInTestFileFinder(
+			value: unknown,
+		): PrivateMarkerLineInTestFileFinder | undefined {
+			if (value == null || typeof value !== 'object') {
+				return undefined;
+			}
+			if (!('findMarkerLineInTestFile' in value)) {
+				return undefined;
+			}
+			const maybeFn = (value as { findMarkerLineInTestFile?: unknown })
+				.findMarkerLineInTestFile;
+			if (typeof maybeFn !== 'function') {
+				return undefined;
+			}
+			// eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- Guarded by runtime checks above
+			return value as PrivateMarkerLineInTestFileFinder;
+		}
+
+		const finder = getPrivateMarkerLineInTestFileFinder(tester);
+		expect(finder).toBeDefined();
+
+		const example: ExampleData = {
+			content: 'Line one\nLine two',
+			exampleIndex: 1,
+			validMarkers: [],
+			valids: [],
+			violationMarkers: [],
+			violations: [],
+		};
+
+		// Test out-of-bounds markerLineNumber (negative)
+		mockedReadFileSync.mockReturnValue('Test file content');
+		const negativeResult = finder?.findMarkerLineInTestFile(
+			example,
+			-1, // Out of bounds (negative)
+			'/tmp/test.cls',
+		);
+		expect(negativeResult).toBeUndefined();
+
+		// Test out-of-bounds markerLineNumber (too large)
+		const tooLargeResult = finder?.findMarkerLineInTestFile(
+			example,
+			100, // Out of bounds (example only has 2 lines)
+			'/tmp/test.cls',
+		);
+		expect(tooLargeResult).toBeUndefined();
+	});
+
+	it('should handle findMarkerLineInTestFile with valid marker and empty codeToFind', () => {
+		mockedExtractXPath.mockReturnValue({
+			error: 'xpath extraction failed',
+			success: false,
+		});
+
+		mockedReadFileSync.mockReturnValue(
+			`<?xml version="1.0" encoding="UTF-8"?>\n<rule name="R" message="m">\n</rule>`,
+		);
+
+		const tester = new RuleTester('/tmp/rule.xml');
+
+		interface PrivateMarkerLineInTestFileFinder {
+			findMarkerLineInTestFile: (
+				example: Readonly<ExampleData>,
+				markerLineNumber: number,
+				testFilePath: string,
+			) => number | undefined;
+		}
+
+		/**
+		 * Safely access RuleTester private method for coverage.
+		 * @param value - Unknown value to inspect.
+		 * @returns Typed accessor or undefined when unavailable.
+		 */
+		function getPrivateMarkerLineInTestFileFinder(
+			value: unknown,
+		): PrivateMarkerLineInTestFileFinder | undefined {
+			if (value == null || typeof value !== 'object') {
+				return undefined;
+			}
+			if (!('findMarkerLineInTestFile' in value)) {
+				return undefined;
+			}
+			const maybeFn = (value as { findMarkerLineInTestFile?: unknown })
+				.findMarkerLineInTestFile;
+			if (typeof maybeFn !== 'function') {
+				return undefined;
+			}
+			// eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- Guarded by runtime checks above
+			return value as PrivateMarkerLineInTestFileFinder;
+		}
+
+		const finder = getPrivateMarkerLineInTestFileFinder(tester);
+		expect(finder).toBeDefined();
+
+		// Test with empty codeToFind (line with only marker, no code)
+		const exampleWithEmptyCode: ExampleData = {
+			content: '// ❌\n// ✅',
+			exampleIndex: 1,
+			validMarkers: [],
+			valids: [],
+			violationMarkers: [],
+			violations: [],
+		};
+
+		mockedReadFileSync.mockReturnValue('Test file content');
+		const emptyCodeResult = finder?.findMarkerLineInTestFile(
+			exampleWithEmptyCode,
+			1, // First line is "// ❌" which will result in empty codeToFind
+			'/tmp/test.cls',
+		);
+		expect(emptyCodeResult).toBeUndefined();
+	});
+
+	it('should handle findMarkerLineInTestFile with valid marker', () => {
+		mockedExtractXPath.mockReturnValue({
+			error: 'xpath extraction failed',
+			success: false,
+		});
+
+		mockedReadFileSync.mockReturnValue(
+			`<?xml version="1.0" encoding="UTF-8"?>\n<rule name="R" message="m">\n</rule>`,
+		);
+
+		const tester = new RuleTester('/tmp/rule.xml');
+
+		interface PrivateMarkerLineInTestFileFinder {
+			findMarkerLineInTestFile: (
+				example: Readonly<ExampleData>,
+				markerLineNumber: number,
+				testFilePath: string,
+			) => number | undefined;
+		}
+
+		/**
+		 * Safely access RuleTester private method for coverage.
+		 * @param value - Unknown value to inspect.
+		 * @returns Typed accessor or undefined when unavailable.
+		 */
+		function getPrivateMarkerLineInTestFileFinder(
+			value: unknown,
+		): PrivateMarkerLineInTestFileFinder | undefined {
+			if (value == null || typeof value !== 'object') {
+				return undefined;
+			}
+			if (!('findMarkerLineInTestFile' in value)) {
+				return undefined;
+			}
+			const maybeFn = (value as { findMarkerLineInTestFile?: unknown })
+				.findMarkerLineInTestFile;
+			if (typeof maybeFn !== 'function') {
+				return undefined;
+			}
+			// eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- Guarded by runtime checks above
+			return value as PrivateMarkerLineInTestFileFinder;
+		}
+
+		const finder = getPrivateMarkerLineInTestFileFinder(tester);
+		expect(finder).toBeDefined();
+
+		// Test with valid marker (// ✅)
+		const exampleWithValidMarker: ExampleData = {
+			content: 'SomeCode(); // ✅',
+			exampleIndex: 1,
+			validMarkers: [],
+			valids: [],
+			violationMarkers: [],
+			violations: [],
+		};
+
+		mockedReadFileSync.mockReturnValue('    SomeCode(); // ✅');
+		const validMarkerResult = finder?.findMarkerLineInTestFile(
+			exampleWithValidMarker,
+			1, // Line with "// ✅" marker
+			'/tmp/test.cls',
+		);
+		expect(validMarkerResult).toBeDefined();
+	});
+
+	it('should return undefined when test file does not exist', () => {
+		mockedExtractXPath.mockReturnValue({
+			error: 'xpath extraction failed',
+			success: false,
+		});
+
+		mockedReadFileSync.mockReturnValue(
+			`<?xml version="1.0" encoding="UTF-8"?>\n<rule name="R" message="m">\n</rule>`,
+		);
+
+		const tester = new RuleTester('/tmp/rule.xml');
+
+		interface PrivateMarkerLineInTestFileFinder {
+			findMarkerLineInTestFile: (
+				example: Readonly<ExampleData>,
+				markerLineNumber: number,
+				testFilePath: string,
+			) => number | undefined;
+		}
+
+		/**
+		 * Safely access RuleTester private method for coverage.
+		 * @param value - Unknown value to inspect.
+		 * @returns Typed accessor or undefined when unavailable.
+		 */
+		function getPrivateMarkerLineInTestFileFinder(
+			value: unknown,
+		): PrivateMarkerLineInTestFileFinder | undefined {
+			if (value == null || typeof value !== 'object') {
+				return undefined;
+			}
+			if (!('findMarkerLineInTestFile' in value)) {
+				return undefined;
+			}
+			const maybeFn = (value as { findMarkerLineInTestFile?: unknown })
+				.findMarkerLineInTestFile;
+			if (typeof maybeFn !== 'function') {
+				return undefined;
+			}
+			// eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- Guarded by runtime checks above
+			return value as PrivateMarkerLineInTestFileFinder;
+		}
+
+		const finder = getPrivateMarkerLineInTestFileFinder(tester);
+		expect(finder).toBeDefined();
+
+		// Mock existsSync to return false (file doesn't exist)
+		mockedExistsSync.mockReturnValue(false);
+
+		const example: ExampleData = {
+			content: 'SomeCode(); // ❌',
+			exampleIndex: 1,
+			validMarkers: [],
+			valids: [],
+			violationMarkers: [],
+			violations: [],
+		};
+
+		const result = finder?.findMarkerLineInTestFile(
+			example,
+			1,
+			'/tmp/nonexistent.cls',
+		);
+		expect(result).toBeUndefined();
+	});
 });

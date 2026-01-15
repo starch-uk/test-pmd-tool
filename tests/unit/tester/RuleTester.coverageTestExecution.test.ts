@@ -578,5 +578,75 @@ public class TestClass {
 			expect(result).toBeDefined();
 			expect(result.examplesTested).toBe(1);
 		});
+
+		it('should handle violation marker that does not match PMD violation line', async () => {
+			const xmlContent = `<?xml version="1.0" encoding="UTF-8"?>
+<rule name="TestRule"
+      language="apex"
+      message="Test message"
+      class="net.sourceforge.pmd.lang.apex.rule.TestRule">
+  <description>Test rule description</description>
+  <priority>3</priority>
+  <example>
+// Violation: Test violation
+public class TestClass {
+    public void method1() {} // ❌ Violation marker on line 3
+    public void method2() {} // This line has actual violation
+}
+  </example>
+</rule>`;
+
+			mockedReadFileSync.mockReturnValue(xmlContent);
+			const xpathResult: FileOperationResult<string | null> = {
+				data: null,
+				success: true,
+			};
+			mockedExtractXPath.mockReturnValue(xpathResult);
+
+			const tester = new RuleTester('/path/to/test-rule.xml');
+			tester.extractExamples();
+
+			// Mock the test file content so findMarkerLineInTestFile can find the marker line
+			// The test file will have the marker on line 4 (after class declaration and opening brace)
+			// This needs to be set up before runCoverageTest calls findMarkerLineInTestFile
+			// findMarkerLineInTestFile reads the test file, so we need to mock it
+			// The test file path will be something like /tmp/test-1.cls
+			mockedReadFileSync.mockImplementation((filePath: string) => {
+				if (filePath.includes('test-') && filePath.endsWith('.cls')) {
+					return 'public class TestClass1 {\n    public void method1() {} // ❌\n    public void method2() {}\n}';
+				}
+				return xmlContent;
+			});
+
+			// Mock runPMD to return violation on line 5 (method2), not line 4 (method1 with marker)
+			// This covers the !markerPassed branch at line 428
+			// First call is for violation test, second is for violation counting
+			mockedRunPMD
+				.mockResolvedValueOnce({
+					data: {
+						violations: [
+							{ line: 5, message: 'Test', rule: 'TestRule' },
+						],
+					},
+					success: true,
+				})
+				.mockResolvedValueOnce({
+					data: {
+						violations: [
+							{ line: 5, message: 'Test', rule: 'TestRule' },
+						],
+					},
+					success: true,
+				});
+
+			// findMarkerLineInTestFile will find line 4 (method1 with marker)
+			// But PMD violation is on line 5 (method2), so markerPassed will be false
+			// This covers the !markerPassed branch at line 428
+			const result = await tester.runCoverageTest(false);
+
+			expect(result).toBeDefined();
+			expect(result.examplesTested).toBe(1);
+			// The test should complete - the !markerPassed branch is covered by the internal logic
+		});
 	});
 });
