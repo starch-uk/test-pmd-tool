@@ -166,6 +166,7 @@ public class TestClass {
     - If an example contains multiple top-level classes, they're wrapped as inner classes within a test class
     - If an example contains only methods/fields without a class, they're wrapped in a test class
     - If an example contains only standalone code, it's wrapped in a test method within a test class
+    - **Helper method generation**: The tool automatically generates helper methods for method calls that aren't defined in the example. Return types are inferred from usage context (e.g., `List<String>` from for-each loops, `Set<String>` from Set assignments, `Map<String, Integer>` from Map assignments)
 4. **PMD Execution**: PMD is run against the test files to check if violations occur as expected
 5. **Validation**: The tool verifies that:
     - Violation examples actually trigger the rule
@@ -211,21 +212,33 @@ test-pmd-rule path/to/rule.xml -d 2
 
 **Color Coding:**
 
-The AST nodes are color-coded to indicate which parts of your example code are being tested:
+The AST nodes are color-coded to indicate which parts of your example code are being tested. The tool uses PMD's actual violation results to determine which nodes match your XPath expression:
 
-- **Red (bright)**: Node is tested by **violation** examples in the current example
-- **Dark Red (dim)**: Node is tested by **violation** examples but was already covered in previous examples
-- **Green (bright)**: Node is tested by **valid** examples in the current example
-- **Dark Green (dim)**: Node is tested by **valid** examples but was already covered in previous examples
+- **Red (bright)**: Node matches the XPath and is tested by **violation** examples in the current example
+- **Dark Red (dim)**: Node matches the XPath and is tested by **violation** examples but was already covered in previous examples
+- **Green (bright)**: Node matches the XPath and is tested by **valid** examples in the current example
+- **Dark Green (dim)**: Node matches the XPath and is tested by **valid** examples but was already covered in previous examples
 - **Orange**: Node matches both **violation** and **valid** sections (indicates ambiguity - the same code appears in both sections)
-- **No color**: Node is not tested or couldn't be matched to example code
+- **No color**: Node doesn't match the XPath or couldn't be matched to example code
 
 This color coding helps you understand:
 
+- Which AST nodes actually match your XPath expression (based on PMD's violation detection)
 - Which AST nodes correspond to your violation/valid markers
 - Whether nodes are being tested by the current example or were already covered
 - Which parts of the AST structure your XPath expression should target
 - When the same code appears in both violation and valid sections (orange indicates this ambiguity)
+
+**XPath-Based Coloring:**
+
+The tool runs PMD on your example code to determine which lines actually trigger violations. Nodes are colored based on:
+
+1. Whether the node's line number matches a violation line from PMD
+2. Whether the node type matches the XPath expression
+3. For `MethodCallExpression` nodes, whether the `FullMethodName` matches XPath constraints (if any)
+4. Whether the node appears in violation or valid sections of your example
+
+This ensures that only nodes that actually match your XPath expression are colored, making it easier to verify that your XPath is working correctly.
 
 **Notes:**
 
@@ -235,6 +248,8 @@ This color coding helps you understand:
 - The AST output includes all node attributes and can be quite verbose - use it when you need detailed insight into PMD's parsing
 - Colors use ANSI escape codes and will automatically be disabled if your terminal doesn't support them
 - **Wrapper class cleanup**: The tool automatically strips wrapper class prefixes from `DefiningType` attributes (e.g., `DefiningType='TestClass1.MyClassViolation'` becomes `DefiningType='MyClassViolation'`) to make the output cleaner and more readable
+- **XPath-based coloring**: Nodes are colored based on actual PMD violation results, not just example markers. This means nodes will be colored even if you don't have explicit violation markers, as long as PMD finds violations on those lines
+- **Fallback matching**: If a node doesn't have line numbers, the tool will still color it if it matches the XPath node type and conditions (e.g., `FullMethodName` for `MethodCallExpression` nodes)
 
 ## Requirements
 
