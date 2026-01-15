@@ -16,7 +16,7 @@ import {
 	type CoverageData,
 } from '../coverage/trackCoverage.js';
 import { generateLcovReport } from '../coverage/generateLcov.js';
-import { runPmdAstDump } from '../pmd/runPMD.js';
+import { runPMD, runPmdAstDump } from '../pmd/runPMD.js';
 import { createTestFile } from '../parser/createTestFile.js';
 import { extractNodeTypes } from '../xpath/extractors/extractNodeTypes.js';
 import { parseCliArgs, printUsage } from './args.js';
@@ -556,6 +556,16 @@ interface NodeColorOptions {
 				helperMethodNames: readonly string[];
 		  }>
 		| undefined;
+
+	/**
+	 * Set of line numbers in the test file that match the XPath (from PMD violations).
+	 */
+	xpathMatchLines?: ReadonlySet<number>;
+
+	/**
+	 * FullMethodName attribute for MethodCallExpression nodes (e.g., 'Pattern.compile', 'input.replaceFirst').
+	 */
+	fullMethodName?: string;
 }
 
 /**
@@ -582,6 +592,11 @@ interface ParseXmlAstOptions {
 		violationMarkers: readonly { lineNumber: number }[];
 		exampleContent: string;
 	}[];
+
+	/**
+	 * Set of line numbers in the test file that match the XPath (from PMD violations).
+	 */
+	xpathMatchLines?: ReadonlySet<number>;
 }
 
 /**
@@ -781,6 +796,8 @@ function determineNodeColor(
 		validMarkers,
 		violationMarkers,
 		previousExamplesCoverage,
+		beginLine,
+		xpathMatchLines,
 	} = options;
 
 	// Map each line in example to its section (violation/valid)
@@ -839,14 +856,129 @@ function determineNodeColor(
 	const hasViolationSection = violationMatchCount > EMPTY_MARKERS_LENGTH;
 	const hasValidSection = validMatchCount > EMPTY_MARKERS_LENGTH;
 
-	// Only color nodes if their type is actually matched by the XPath expression
-	// If the XPath doesn't match this node type, don't show it as needing coverage
+	// Check if this node is actually matched by the XPath expression
+	// Use PMD's actual XPath evaluation results (xpathMatchLines) if available
+	// When xpathMatchLines is defined (even if empty), we use it as the authoritative source
+	// Only fall back to node type checking if xpathMatchLines is undefined
+	let nodeMatchesXPath = false;
 	if (xpath !== null && xpath.length > EMPTY_STRING_LENGTH) {
-		const xpathNodeTypes = extractNodeTypes(xpath);
-		const nodeTypeInXPath = xpathNodeTypes.includes(nodeType);
-		if (!nodeTypeInXPath) {
-			// Node type is not matched by XPath, so it shouldn't be tested
-			return undefined;
+		// If we have XPath match results (defined, even if empty), use those exclusively
+		if (xpathMatchLines !== undefined) {
+			// We have XPath match results - check if this node is involved in a match
+			// A node matches if any violation line falls within the node's line range
+			if (xpathMatchLines.size > EMPTY_MARKERS_LENGTH) {
+				// We have violations - check if this node is on a violation line
+				// Violation lines are from the test file (which includes wrapper),
+				// and AST node line numbers are also from the test file, so they should match directly
+				if (beginLine !== null) {
+					const { endLine } = options;
+					const nodeStartLine = beginLine;
+					const nodeEndLine = endLine ?? nodeStartLine;
+
+					// Check if any violation line falls within this node's range
+					for (const violationLine of xpathMatchLines) {
+						if (
+							violationLine >= nodeStartLine &&
+							violationLine <= nodeEndLine
+						) {
+							nodeMatchesXPath = true;
+							break;
+						}
+					}
+				} else {
+					// Node has no line number after traversing up the tree
+					// Fallback: if node type matches XPath and we have violations,
+					// and for MethodCallExpression, the FullMethodName matches XPath constraints,
+					// then consider it a match (nodes without line numbers but matching XPath conditions)
+					const xpathNodeTypes = extractNodeTypes(xpath);
+					if (xpathNodeTypes.includes(nodeType)) {
+						// Node type matches XPath - for MethodCallExpression, also verify FullMethodName
+						if (nodeType === 'MethodCallExpression') {
+							const fullMethodNameMatches = xpath.matchAll(
+								/@FullMethodName\s*=\s*['"]([^'"]+)['"]/g,
+							);
+							const expectedMethodNames = new Set<string>();
+							const FIRST_CAPTURE_GROUP = 1;
+							for (const match of fullMethodNameMatches) {
+								const methodName = match[FIRST_CAPTURE_GROUP];
+								if (methodName !== undefined) {
+									expectedMethodNames.add(methodName);
+								}
+							}
+							// If XPath has FullMethodName constraints, node must match
+							if (
+								expectedMethodNames.size > EMPTY_MARKERS_LENGTH
+							) {
+								const nodeFullMethodName =
+									options.fullMethodName;
+								if (
+									nodeFullMethodName !== undefined &&
+									expectedMethodNames.has(nodeFullMethodName)
+								) {
+									nodeMatchesXPath = true;
+								}
+							} else {
+								// No FullMethodName constraints - any MethodCallExpression matches
+								nodeMatchesXPath = true;
+							}
+						} else {
+							// Non-MethodCallExpression node type matches XPath
+							nodeMatchesXPath = true;
+						}
+					}
+				}
+			} else {
+				// xpathMatchLines is defined but empty (no violations) - don't color anything
+				return undefined;
+			}
+
+			// If node is on a violation line, also verify it matches XPath conditions
+			// For MethodCallExpression, check if the FullMethodName matches what XPath expects
+			if (nodeMatchesXPath && nodeType === 'MethodCallExpression') {
+				// Extract FullMethodName values from XPath (e.g., 'Pattern.compile', 'Pattern.matches')
+				const fullMethodNameMatches = xpath.matchAll(
+					/@FullMethodName\s*=\s*['"]([^'"]+)['"]/g,
+				);
+				const expectedMethodNames = new Set<string>();
+				const FIRST_CAPTURE_GROUP = 1;
+				for (const match of fullMethodNameMatches) {
+					const methodName = match[FIRST_CAPTURE_GROUP];
+					if (methodName !== undefined) {
+						expectedMethodNames.add(methodName);
+					}
+				}
+
+				// Check if this node's FullMethodName matches any expected method name
+				if (expectedMethodNames.size > EMPTY_MARKERS_LENGTH) {
+					// We have FullMethodName constraints in XPath - check if node's FullMethodName matches
+					const nodeFullMethodName = options.fullMethodName;
+					// Only reject if we have a FullMethodName and it doesn't match
+					// If FullMethodName is undefined, we can't verify, so allow it (might be a child node)
+					if (
+						nodeFullMethodName !== undefined &&
+						!expectedMethodNames.has(nodeFullMethodName)
+					) {
+						// Node's FullMethodName doesn't match any expected method name
+						nodeMatchesXPath = false;
+					}
+				}
+				// If no FullMethodName constraints in XPath, any MethodCallExpression on violation line matches
+			}
+
+			// If xpathMatchLines is empty (no violations) or node doesn't match, don't color
+			// This ensures we only color nodes that PMD actually found violations on
+			if (!nodeMatchesXPath) {
+				return undefined;
+			}
+		} else {
+			// Fallback: xpathMatchLines is undefined - use node type checking
+			// This happens when XPath is null/empty or PMD execution failed
+			const xpathNodeTypes = extractNodeTypes(xpath);
+			nodeMatchesXPath = xpathNodeTypes.includes(nodeType);
+			if (!nodeMatchesXPath) {
+				// Node type is not matched by XPath, so it shouldn't be tested
+				return undefined;
+			}
 		}
 	}
 
@@ -1151,6 +1283,36 @@ function determineNodeColor(
 	}
 
 	// Color based on section type
+	// If we have XPath match results, only color nodes that match the XPath
+	// The color is determined by which section the node is in (violation = red, valid = green)
+	if (
+		xpathMatchLines !== undefined &&
+		xpathMatchLines.size > EMPTY_MARKERS_LENGTH
+	) {
+		// We have XPath match results - only color nodes that actually match
+		if (!nodeMatchesXPath) {
+			// Node doesn't match XPath - don't color it
+			return undefined;
+		}
+
+		// Node matches XPath - color based on section type
+		// If in violation section, it should trigger (red)
+		// If in valid section, it shouldn't trigger (green) - but if it matches XPath, that's a problem
+		// If node matches XPath, color it even if there are no explicit markers
+		// (PMD found a violation, so we should show it)
+		if (hasViolationSection) {
+			return alreadyCovered ? 'dark-red' : 'red';
+		}
+		if (hasValidSection) {
+			// Node matches XPath but is in valid section - this indicates the rule incorrectly triggers
+			// Color it green to show it's valid code, or orange to show the mismatch
+			return alreadyCovered ? 'dark-green' : 'green';
+		}
+		// Node matches XPath but no clear section - still color it red since PMD found a violation
+		return alreadyCovered ? 'dark-red' : 'red';
+	}
+
+	// Fallback: no XPath match results - use section-based coloring
 	// If node matches both sections, show orange to indicate ambiguity
 	// Note: We check marker existence to ensure there are actual tests defined
 	if (hasViolationSection && hasValidSection) {
@@ -1204,6 +1366,16 @@ interface XmlNodeToTreeNodeOptions {
 		  }>
 		| undefined;
 	exampleContent: Readonly<string>;
+
+	/**
+	 * Set of line numbers in the test file that match the XPath (from PMD violations).
+	 */
+	xpathMatchLines?: ReadonlySet<number>;
+
+	/**
+	 * FullMethodName attribute for MethodCallExpression nodes (e.g., 'Pattern.compile', 'input.replaceFirst').
+	 */
+	fullMethodName?: string;
 }
 
 /**
@@ -1226,6 +1398,9 @@ function xmlNodeToTreeNode(
 		previousExamplesCoverage,
 		validMarkers,
 		violationMarkers,
+		xpath,
+		xpathMatchLines,
+		wrapperInfo,
 	} = options;
 	const EQUALS_SEPARATOR = '=';
 	const QUOTE_CHAR = "'";
@@ -1259,15 +1434,19 @@ function xmlNodeToTreeNode(
 				nodeToCheck.getAttribute('EndLine') ??
 				nodeToCheck.getAttribute('endline');
 
+			// Return line numbers if we have at least BeginLine (EndLine is optional)
+			// This handles cases where nodes only have BeginLine but not EndLine
 			if (
 				beginLineAttr !== null &&
-				beginLineAttr.length > EMPTY_STRING.length &&
-				endLineAttr !== null &&
-				endLineAttr.length > EMPTY_STRING.length
+				beginLineAttr.length > EMPTY_STRING.length
 			) {
 				return {
 					beginLine: parseInt(beginLineAttr, PARSE_INT_RADIX),
-					endLine: parseInt(endLineAttr, PARSE_INT_RADIX),
+					endLine:
+						endLineAttr !== null &&
+						endLineAttr.length > EMPTY_STRING.length
+							? parseInt(endLineAttr, PARSE_INT_RADIX)
+							: null,
 				};
 			}
 
@@ -1293,6 +1472,11 @@ function xmlNodeToTreeNode(
 	// Extract Image attribute for source code matching (before filtering attributes)
 	const IMAGE_ATTR = 'Image';
 	const nodeImage = node.getAttribute(IMAGE_ATTR) ?? '';
+
+	// Extract FullMethodName for MethodCallExpression nodes (for XPath matching)
+	const FULL_METHOD_NAME_ATTR = 'FullMethodName';
+	const fullMethodName =
+		node.getAttribute(FULL_METHOD_NAME_ATTR) ?? undefined;
 
 	// Get all attributes and format them, omitting empty or 'false' values
 	const attributes: string[] = [];
@@ -1333,28 +1517,39 @@ function xmlNodeToTreeNode(
 		beginLine,
 		endLine,
 		exampleContent,
+		fullMethodName,
 		nodeImage,
 		nodeType: nodeName,
 		previousExamplesCoverage,
 		validMarkers,
 		violationMarkers,
-		wrapperInfo: options.wrapperInfo,
-		xpath: options.xpath,
+		wrapperInfo,
+		xpath: xpath ?? null,
+		xpathMatchLines,
 	});
 
 	return {
 		children: children.map(
 			// eslint-disable-next-line @typescript-eslint/prefer-readonly-parameter-types -- Callback parameter for map
-			(child) =>
-				xmlNodeToTreeNode({
+			(child) => {
+				// Extract FullMethodName for child MethodCallExpression nodes
+				const childFullMethodName =
+					child.nodeName === 'MethodCallExpression'
+						? (child.getAttribute(FULL_METHOD_NAME_ATTR) ??
+							undefined)
+						: undefined;
+				return xmlNodeToTreeNode({
 					exampleContent,
+					fullMethodName: childFullMethodName,
 					node: child,
 					previousExamplesCoverage,
 					validMarkers,
 					violationMarkers,
-					wrapperInfo: options.wrapperInfo,
-					xpath: options.xpath,
-				}),
+					wrapperInfo,
+					xpath: xpath ?? null,
+					xpathMatchLines,
+				});
+			},
 		),
 		color,
 		name: displayName,
@@ -1422,6 +1617,7 @@ function parseXmlAstAndStripWrappers(
 		violationMarkers,
 		wrapperInfo,
 		xmlAstOutput,
+		xpathMatchLines,
 	} = options;
 	const parser = new DOMParser();
 	const doc = parser.parseFromString(xmlAstOutput, 'text/xml');
@@ -1484,6 +1680,7 @@ function parseXmlAstAndStripWrappers(
 		violationMarkers,
 		wrapperInfo,
 		xpath,
+		xpathMatchLines,
 	});
 
 	// Use stringify-tree to render the tree with 2 space indent
@@ -1556,6 +1753,26 @@ async function runDiagnostics(
 			includeViolations: true,
 		});
 
+		// Run PMD with the rule to get actual XPath matches (violations)
+		// This tells us which lines in the test file match the XPath
+		let xpathMatchLines: Set<number> | undefined = undefined;
+		if (xpath !== null && xpath.length > EMPTY_STRING_LENGTH) {
+			const pmdResult = await runPMD(
+				testFileResult.filePath,
+				ruleFilePath,
+			);
+			if (pmdResult.success && pmdResult.data) {
+				const violationLines = pmdResult.data.violations.map(
+					(v: Readonly<{ line: number }>) => v.line,
+				);
+				// Only create the set if there are violations
+				// If empty, leave as undefined to fall back to node type checking
+				if (violationLines.length > EMPTY_MARKERS_LENGTH) {
+					xpathMatchLines = new Set(violationLines);
+				}
+			}
+		}
+
 		// Run PMD AST dump
 		const astResult = await runPmdAstDump(
 			testFileResult.filePath,
@@ -1607,6 +1824,7 @@ async function runDiagnostics(
 			wrapperInfo,
 			xmlAstOutput: rawXmlAst,
 			xpath,
+			xpathMatchLines,
 		});
 
 		// Print cleaned AST dump to stdout

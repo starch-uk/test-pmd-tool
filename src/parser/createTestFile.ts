@@ -525,8 +525,12 @@ export function createTestFile({
 	// Create a map of method name to method signature for efficient filtering
 	const helperMethodMap = new Map<string, string>();
 	for (const method of allHelperMethods) {
-		// Extract method name from signature like "public Boolean methodName() {"
-		const methodNameMatch = /public\s+\w+\s+(\w+)\s*\(/.exec(method);
+		// Extract method name from signature like "public Boolean methodName() {" or "public List<String> methodName() {"
+		// Handle both simple types (Boolean, String) and generic types (List<String>, Map<String, Integer>)
+		const methodNameMatch =
+			/public\s+(?:\w+(?:<[^>]+(?:,\s*[^>]+)?>)?)\s+(\w+)\s*\(/.exec(
+				method,
+			);
 		const methodName = methodNameMatch?.[FIRST_CAPTURE_GROUP];
 		if (
 			methodName !== undefined &&
