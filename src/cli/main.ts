@@ -33,6 +33,7 @@ const NODE_TYPE_ELEMENT = 1;
 const EMPTY_ARRAY_LENGTH = 0;
 const SINGLE_ELEMENT_INDEX = 0;
 const MIN_ARRAY_INDEX = 0;
+const DOT_SEPARATOR_LENGTH = 1;
 
 /**
  * Determine if this module is being executed as the CLI entrypoint.
@@ -271,8 +272,16 @@ function removeWrappersFromXmlDom(
 		const allNodes = doc.getElementsByTagName('*');
 		for (const node of Array.from(allNodes)) {
 			const definingType = node.getAttribute('DefiningType');
+			if (definingType === null) {
+				continue;
+			}
 			if (definingType === wrapperClassName) {
 				node.removeAttribute('DefiningType');
+			} else if (definingType.startsWith(`${wrapperClassName}.`)) {
+				const classNameWithoutPrefix = definingType.slice(
+					wrapperClassName.length + DOT_SEPARATOR_LENGTH,
+				);
+				node.setAttribute('DefiningType', classNameWithoutPrefix);
 			}
 		}
 		return;
@@ -490,12 +499,20 @@ function removeWrappersFromXmlDom(
 		}
 	}
 
-	// Remove DefiningType attribute from all nodes if it references the wrapper class
+	// Remove or strip wrapper class prefix from DefiningType attribute on all nodes
 	const allNodes = doc.getElementsByTagName('*');
 	for (const node of Array.from(allNodes)) {
 		const definingType = node.getAttribute('DefiningType');
+		if (definingType === null) {
+			continue;
+		}
 		if (definingType === wrapperClassName) {
 			node.removeAttribute('DefiningType');
+		} else if (definingType.startsWith(`${wrapperClassName}.`)) {
+			const classNameWithoutPrefix = definingType.slice(
+				wrapperClassName.length + DOT_SEPARATOR_LENGTH,
+			);
+			node.setAttribute('DefiningType', classNameWithoutPrefix);
 		}
 	}
 }
@@ -508,7 +525,7 @@ function removeWrappersFromXmlDom(
  */
 interface TreeNode {
 	children: TreeNode[];
-	color?: 'dark-green' | 'dark-red' | 'green' | 'red';
+	color?: 'dark-green' | 'dark-red' | 'green' | 'orange' | 'red';
 	name: string;
 }
 
@@ -754,7 +771,7 @@ const EMPTY_MARKERS_LENGTH = 0;
 function determineNodeColor(
 	// eslint-disable-next-line @typescript-eslint/prefer-readonly-parameter-types -- Options object needs to be mutable for destructuring
 	options: NodeColorOptions,
-): 'dark-green' | 'dark-red' | 'green' | 'red' | undefined {
+): 'dark-green' | 'dark-red' | 'green' | 'orange' | 'red' | undefined {
 	const {
 		nodeType,
 		nodeImage,
@@ -805,17 +822,21 @@ function determineNodeColor(
 	}
 
 	// Determine which section(s) these lines belong to
-	let hasViolationSection = false;
-	let hasValidSection = false;
+	// Count matches in each section to determine the primary section
+	let violationMatchCount = 0;
+	let validMatchCount = 0;
 
 	for (const lineNum of matchingLines) {
 		const section = lineSectionMap.get(lineNum);
 		if (section === 'violation') {
-			hasViolationSection = true;
+			violationMatchCount++;
 		} else if (section === 'valid') {
-			hasValidSection = true;
+			validMatchCount++;
 		}
 	}
+
+	const hasViolationSection = violationMatchCount > EMPTY_MARKERS_LENGTH;
+	const hasValidSection = validMatchCount > EMPTY_MARKERS_LENGTH;
 
 	// Check if this node tests XPath branches that were already tested by previous examples
 	// We check if the node type appears in the XPath, and if code matching that node type
@@ -932,13 +953,30 @@ function determineNodeColor(
 		}
 	}
 
-	// Color based on section type (violation tests take precedence if both exist)
+	// Color based on section type
+	// If node matches both sections, show orange to indicate ambiguity
 	// Note: We check marker existence to ensure there are actual tests defined
-	if (hasViolationSection && violationMarkers.length > EMPTY_MARKERS_LENGTH) {
+	if (hasViolationSection && hasValidSection) {
+		// Node matches both sections - show orange to indicate ambiguity
+		if (
+			violationMarkers.length > EMPTY_MARKERS_LENGTH &&
+			validMarkers.length > EMPTY_MARKERS_LENGTH
+		) {
+			return 'orange';
+		}
+		// If only one type of marker exists, use that color
+		if (violationMarkers.length > EMPTY_MARKERS_LENGTH) {
+			return alreadyCovered ? 'dark-red' : 'red';
+		}
+		if (validMarkers.length > EMPTY_MARKERS_LENGTH) {
+			return alreadyCovered ? 'dark-green' : 'green';
+		}
+	} else if (
+		hasViolationSection &&
+		violationMarkers.length > EMPTY_MARKERS_LENGTH
+	) {
 		return alreadyCovered ? 'dark-red' : 'red';
-	}
-
-	if (hasValidSection && validMarkers.length > EMPTY_MARKERS_LENGTH) {
+	} else if (hasValidSection && validMarkers.length > EMPTY_MARKERS_LENGTH) {
 		return alreadyCovered ? 'dark-green' : 'green';
 	}
 
@@ -1129,12 +1167,12 @@ function xmlNodeToTreeNode(
 /**
  * Apply ANSI color codes to node name based on color.
  * @param nodeName - Node name to colorize.
- * @param color - Color to apply (green, dark-green, red, or dark-red).
+ * @param color - Color to apply (green, dark-green, red, dark-red, or orange).
  * @returns Colored node name string with ANSI escape codes.
  */
 function applyColorToNodeName(
 	nodeName: string,
-	color: 'dark-green' | 'dark-red' | 'green' | 'red' | undefined,
+	color: 'dark-green' | 'dark-red' | 'green' | 'orange' | 'red' | undefined,
 ): string {
 	if (color === undefined) {
 		return nodeName;
@@ -1146,6 +1184,7 @@ function applyColorToNodeName(
 	const ANSI_DARK_GREEN = '\x1b[32;2m';
 	const ANSI_RED = '\x1b[31m';
 	const ANSI_DARK_RED = '\x1b[31;2m';
+	const ANSI_ORANGE = '\x1b[33m';
 
 	if (color === 'green') {
 		return `${ANSI_GREEN}${nodeName}${ANSI_RESET}`;
@@ -1159,8 +1198,12 @@ function applyColorToNodeName(
 		return `${ANSI_RED}${nodeName}${ANSI_RESET}`;
 	}
 
-	// color === 'dark-red'
-	return `${ANSI_DARK_RED}${nodeName}${ANSI_RESET}`;
+	if (color === 'dark-red') {
+		return `${ANSI_DARK_RED}${nodeName}${ANSI_RESET}`;
+	}
+
+	// color === 'orange'
+	return `${ANSI_ORANGE}${nodeName}${ANSI_RESET}`;
 }
 
 /**

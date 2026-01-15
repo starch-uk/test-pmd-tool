@@ -15,6 +15,7 @@ const SPACE_CHAR = ' ';
 const DEFAULT_INDENT = '    ';
 const FIRST_ELEMENT_INDEX = 0;
 const LAST_ELEMENT_OFFSET = 1;
+const SINGLE_COUNT = 1;
 
 /**
  * Removes inline markers from a code line while preserving leading indentation.
@@ -384,9 +385,11 @@ export function createTestFile({
 	const fullExampleContent = parsed.content;
 
 	// Check for top-level class (not inner class) in the original content
+	// If there are multiple top-level classes, treat them all as inner classes
+	// This ensures that when there are multiple classes, they're all wrapped together
 	const ZERO_BRACE_DEPTH = 0;
-	const hasTopLevelClass = ((): boolean => {
-		let foundTopLevelClass = false;
+	const topLevelClassCount = ((): number => {
+		let count = 0;
 		let braceDepth = ZERO_BRACE_DEPTH;
 		const exampleLines = fullExampleContent.split('\n');
 		for (const line of exampleLines) {
@@ -397,8 +400,7 @@ export function createTestFile({
 				trimmed.startsWith('private class ');
 
 			if (isClassDef && braceDepth === ZERO_BRACE_DEPTH) {
-				foundTopLevelClass = true;
-				break;
+				count++;
 			}
 
 			// Track brace depth to detect inner classes
@@ -412,13 +414,39 @@ export function createTestFile({
 				: ZERO_BRACE_DEPTH;
 			braceDepth += openBraces - closeBraces;
 		}
-		return foundTopLevelClass;
+		return count;
 	})();
+	// Count how many class definitions are in the included content
+	const classDefCountInIncluded = codeToInclude.filter((line) => {
+		const trimmed = line.trim();
+		return (
+			trimmed.startsWith('public class ') ||
+			trimmed.startsWith('class ') ||
+			trimmed.startsWith('private class ')
+		);
+	}).length;
+	// Only treat as top-level class if:
+	// 1. There's exactly one class in the original content, OR
+	// 2. There are multiple classes in the original but only one class definition is in the included content
+	// If multiple class definitions are in the included content, treat them as inner classes
+	const hasTopLevelClass =
+		topLevelClassCount === SINGLE_COUNT ||
+		(topLevelClassCount > SINGLE_COUNT &&
+			classDefCountInIncluded <= SINGLE_COUNT);
 
 	// Check for class-like structures (attributes, methods, inner classes) without top-level class
+	// Also includes cases with multiple top-level classes (which should be treated as inner classes)
 	const hasClassLikeStructures = ((): boolean => {
 		if (hasTopLevelClass) {
 			return false;
+		}
+		// If there are multiple top-level classes, check if multiple classes will be included
+		// If only one class's content is included, treat it as top-level (handled by hasTopLevelClass)
+		// If multiple classes' content is included, treat them as inner classes
+		if (topLevelClassCount > SINGLE_COUNT) {
+			// If multiple class definitions are in the included content, multiple classes are included
+			// Otherwise, only one class's content is included, so treat it as top-level
+			return classDefCountInIncluded > SINGLE_COUNT;
 		}
 		const fieldDeclarationRegex =
 			/^\s*(public|private|protected)\s+\w+\s+\w+\s*[;=]/;
