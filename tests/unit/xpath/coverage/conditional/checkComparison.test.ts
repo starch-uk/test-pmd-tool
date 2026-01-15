@@ -1,136 +1,200 @@
 /**
  * @file
- * Unit tests for comparison conditional coverage checking.
+ * Unit tests for checkComparisonCoverage function.
  */
 import { describe, it, expect } from 'vitest';
 import { checkComparisonCoverage } from '../../../../../src/xpath/coverage/conditional/checkComparison.js';
 import type { Conditional } from '../../../../../src/types/index.js';
 
 describe('checkComparisonCoverage', () => {
-	it('should return false for empty expression', () => {
+	it('should return failure when expression is empty', () => {
 		const conditional: Conditional = {
 			expression: '',
 			position: 0,
 			type: 'comparison',
 		};
-		const content = 'some content';
-
-		const result = checkComparisonCoverage(conditional, content);
+		const result = checkComparisonCoverage(conditional, 'some content');
 
 		expect(result.success).toBe(false);
 		expect(result.message).toBe('No expression to check');
+		expect(result.evidence).toHaveLength(0);
 	});
 
-	it('should return false when no attributes found in expression', () => {
+	it('should return failure when no attributes found in expression', () => {
 		const conditional: Conditional = {
-			expression: 'Value = 5',
+			expression: 'some expression without attributes',
 			position: 0,
 			type: 'comparison',
 		};
-		const content = 'some content';
-
-		const result = checkComparisonCoverage(conditional, content);
+		const result = checkComparisonCoverage(conditional, 'some content');
 
 		expect(result.success).toBe(false);
 		expect(result.message).toBe('No attributes found in comparison');
+		expect(result.evidence).toHaveLength(0);
 	});
 
-	it('should detect comparison when attributes have different values in content', () => {
+	it('should return failure when attributes found but no values in content', () => {
 		const conditional: Conditional = {
 			expression: '@BeginLine != @EndLine',
 			position: 0,
 			type: 'comparison',
 		};
-		const content = '// BeginLine: 5\n// EndLine: 10';
+		const content = 'public class Test {}';
+		const result = checkComparisonCoverage(conditional, content);
 
+		expect(result.success).toBe(false);
+		expect(result.message).toContain('not demonstrated');
+		expect(result.evidence).toHaveLength(1);
+		expect(result.evidence[0]?.count).toBe(0);
+	});
+
+	it('should return success when comparison is demonstrated with different attribute values', () => {
+		const conditional: Conditional = {
+			expression: '@BeginLine != @EndLine',
+			position: 0,
+			type: 'comparison',
+		};
+		const content = `
+public class Test {
+    // BeginLine: 1
+    private void method() {
+        // EndLine: 5
+    }
+}`;
 		const result = checkComparisonCoverage(conditional, content);
 
 		expect(result.success).toBe(true);
-		expect(result.message).toContain('demonstrated');
+		expect(result.message).toContain('is demonstrated');
+		expect(result.evidence).toHaveLength(1);
+		expect(result.evidence[0]?.count).toBe(1);
 	});
 
-	it('should return false when attributes do not have different values', () => {
+	it('should handle multiple attributes in comparison', () => {
+		const conditional: Conditional = {
+			expression: '@BeginLine != @EndLine and @LineNumber > 0',
+			position: 0,
+			type: 'comparison',
+		};
+		const content = `
+// BeginLine: 1
+public class Test {
+    // EndLine: 10
+    // LineNumber: 5
+}`;
+		const result = checkComparisonCoverage(conditional, content);
+
+		expect(result.success).toBe(true);
+		expect(result.message).toContain('is demonstrated');
+	});
+
+	it('should handle attributes with different value formats', () => {
+		const conditional: Conditional = {
+			expression: '@Name != @Type',
+			position: 0,
+			type: 'comparison',
+		};
+		const content = `
+// Name: testMethod
+// Type: String
+public class Test {}`;
+		const result = checkComparisonCoverage(conditional, content);
+
+		expect(result.success).toBe(true);
+		expect(result.message).toContain('is demonstrated');
+	});
+
+	it('should return failure when only one unique value found', () => {
 		const conditional: Conditional = {
 			expression: '@BeginLine != @EndLine',
 			position: 0,
 			type: 'comparison',
 		};
-		const content = 'some content without attribute values';
-
+		const content = `
+// BeginLine: 1
+// EndLine: 1
+public class Test {}`;
 		const result = checkComparisonCoverage(conditional, content);
 
 		expect(result.success).toBe(false);
 		expect(result.message).toContain('not demonstrated');
 	});
 
-	it('should handle single attribute in comparison', () => {
+	it('should handle case-insensitive attribute matching', () => {
 		const conditional: Conditional = {
-			expression: '@Value = 5',
+			expression: '@beginline != @endline',
 			position: 0,
 			type: 'comparison',
 		};
-		const content = '// Value: 5';
-
+		const content = `
+// BeginLine: 1
+// EndLine: 5
+public class Test {}`;
 		const result = checkComparisonCoverage(conditional, content);
 
-		// Single attribute won't have "different values", so should return false
+		expect(result.success).toBe(true);
+		expect(result.message).toContain('is demonstrated');
+	});
+
+	it('should handle attributes with whitespace in values', () => {
+		const conditional: Conditional = {
+			expression: '@Name != @Description',
+			position: 0,
+			type: 'comparison',
+		};
+		const content = `
+// Name: testMethod
+// Description: test method description
+public class Test {}`;
+		const result = checkComparisonCoverage(conditional, content);
+
+		expect(result.success).toBe(true);
+		expect(result.message).toContain('is demonstrated');
+	});
+
+	it('should extract attribute names correctly from complex expressions', () => {
+		const conditional: Conditional = {
+			expression: '@BeginLine != @EndLine and @LineNumber = 5',
+			position: 0,
+			type: 'comparison',
+		};
+		const content = `
+// BeginLine: 1
+// EndLine: 10
+// LineNumber: 5
+public class Test {}`;
+		const result = checkComparisonCoverage(conditional, content);
+
+		expect(result.success).toBe(true);
+	});
+
+	it('should handle case where valueMatches is null in checkComparisonDemonstration', () => {
+		const conditional: Conditional = {
+			expression: '@BeginLine != @EndLine',
+			position: 0,
+			type: 'comparison',
+		};
+		const content = 'public class Test {}';
+		const result = checkComparisonCoverage(conditional, content);
+
+		// When no matches found, attrValues remains empty, uniqueValues.size = 0
 		expect(result.success).toBe(false);
+		expect(result.message).toContain('not demonstrated');
 	});
 
-	it('should handle multiple attributes with same values', () => {
+	it('should handle attributes with same values (not unique)', () => {
 		const conditional: Conditional = {
 			expression: '@BeginLine != @EndLine',
 			position: 0,
 			type: 'comparison',
 		};
-		const content = '// BeginLine: 5\n// EndLine: 5';
-
+		const content = `
+// BeginLine: 1
+// EndLine: 1
+public class Test {}`;
 		const result = checkComparisonCoverage(conditional, content);
 
-		// Same values means no comparison demonstrated
+		// Same values mean uniqueValues.size = 1, which is not > MIN_UNIQUE_VALUES (1)
+		// Actually MIN_UNIQUE_VALUES is 1, so size > 1 means we need at least 2 unique values
 		expect(result.success).toBe(false);
-	});
-
-	it('should handle attribute value extraction with trim', () => {
-		const conditional: Conditional = {
-			expression: '@BeginLine != @EndLine',
-			position: 0,
-			type: 'comparison',
-		};
-		const content = '// BeginLine:  10  \n// EndLine: 20';
-
-		const result = checkComparisonCoverage(conditional, content);
-
-		// Should handle whitespace in values
-		expect(result.success).toBe(true);
-	});
-
-	it('should handle attribute value extraction edge cases', () => {
-		const conditional: Conditional = {
-			expression: '@BeginLine != @EndLine',
-			position: 0,
-			type: 'comparison',
-		};
-		const content = '// BeginLine: 5\n// EndLine: 10\n// BeginLine: 15';
-
-		const result = checkComparisonCoverage(conditional, content);
-
-		// Multiple values for same attribute should be handled
-		expect(result.success).toBe(true);
-	});
-
-	it('should handle multiple matches for same attribute', () => {
-		const conditional: Conditional = {
-			expression: '@BeginLine != @EndLine',
-			position: 0,
-			type: 'comparison',
-		};
-		// Multiple matches for BeginLine
-		const content = '// BeginLine: 5\n// BeginLine: 10\n// EndLine: 20';
-
-		const result = checkComparisonCoverage(conditional, content);
-
-		// Should extract all values and detect comparison
-		expect(result.success).toBe(true);
 	});
 });

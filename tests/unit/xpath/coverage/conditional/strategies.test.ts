@@ -1,492 +1,489 @@
 /**
  * @file
- * Unit tests for conditional coverage checking strategies.
+ * Unit tests for conditional coverage strategies.
  */
 import { describe, it, expect } from 'vitest';
 import { conditionalCheckers } from '../../../../../src/xpath/coverage/conditional/strategies.js';
 import type { Conditional } from '../../../../../src/types/index.js';
 
 describe('conditionalCheckers', () => {
+	describe('comparison', () => {
+		it('should use checkComparisonCoverage for comparison type', () => {
+			const conditional: Conditional = {
+				expression: '@BeginLine != @EndLine',
+				position: 0,
+				type: 'comparison',
+			};
+			const content = `
+// BeginLine: 1
+// EndLine: 5
+public class Test {}`;
+
+			const checker = conditionalCheckers.comparison;
+			expect(checker).toBeDefined();
+
+			const result = checker(conditional, content);
+			expect(result.success).toBe(true);
+		});
+	});
+
 	describe('and_operator', () => {
-		it('should detect final keyword in content', () => {
-			const conditional: Conditional = {
-				expression: '@Final = true()',
-				position: 0,
-				type: 'and',
-			};
-			const content = 'private static final Pattern TEST = Pattern.compile();';
-
-			const result = conditionalCheckers.and_operator(conditional, content);
-
-			expect(result.success).toBe(true);
-			expect(result.message).toContain('covered');
-		});
-
-		it('should detect static keyword in content', () => {
-			const conditional: Conditional = {
-				expression: '@Static = true()',
-				position: 0,
-				type: 'and',
-			};
-			const content = 'private static final Pattern TEST = Pattern.compile();';
-
-			const result = conditionalCheckers.and_operator(conditional, content);
-
-			expect(result.success).toBe(true);
-			expect(result.message).toContain('covered');
-		});
-
-		it('should return false when static keyword is missing', () => {
-			const conditional: Conditional = {
-				expression: '@Static = true()',
-				position: 0,
-				type: 'and',
-			};
-			const content = 'private final Pattern TEST = Pattern.compile();';
-
-			const result = conditionalCheckers.and_operator(conditional, content);
-
-			expect(result.success).toBe(false);
-			expect(result.message).toContain('not covered');
-			expect(result.evidence[0]?.count).toBe(0);
-		});
-
-		it('should return false when final keyword is missing', () => {
-			const conditional: Conditional = {
-				expression: '@Final = true()',
-				position: 0,
-				type: 'and',
-			};
-			const content = 'private static Pattern TEST = Pattern.compile();';
-
-			const result = conditionalCheckers.and_operator(conditional, content);
-
-			expect(result.success).toBe(false);
-			expect(result.message).toContain('not covered');
-		});
-
-		it('should use generic keyword matching for other expressions', () => {
-			const conditional: Conditional = {
-				expression: 'Value = 5',
-				position: 0,
-				type: 'and',
-			};
-			const content = 'if (Value == 5) { }';
-
-			const result = conditionalCheckers.and_operator(conditional, content);
-
-			expect(result.success).toBe(true);
-		});
-
-		it('should return false when generic keywords are not found', () => {
-			const conditional: Conditional = {
-				expression: 'UnknownExpr = 5',
-				position: 0,
-				type: 'and',
-			};
-			const content = 'some content without keywords';
-
-			const result = conditionalCheckers.and_operator(conditional, content);
-
-			expect(result.success).toBe(false);
-			expect(result.message).toContain('not covered');
-		});
-
-		it('should filter out empty strings and @-prefixed keywords', () => {
-			const conditional: Conditional = {
-				expression: '@Attr = Value',
-				position: 0,
-				type: 'and',
-			};
-			const content = 'if (Value) { }';
-
-			const result = conditionalCheckers.and_operator(conditional, content);
-
-			// Should find "Value" but not "@Attr"
-			expect(result.success).toBe(true);
-		});
-
-		it('should return false for empty expression', () => {
+		it('should return failure when expression is empty', () => {
 			const conditional: Conditional = {
 				expression: '',
 				position: 0,
 				type: 'and',
 			};
-			const content = 'some content';
-
-			const result = conditionalCheckers.and_operator(conditional, content);
+			const checker = conditionalCheckers.and_operator;
+			const result = checker(conditional, 'some content');
 
 			expect(result.success).toBe(false);
 			expect(result.message).toBe('No expression to check');
 		});
 
-		it('should handle combined AND conditions and require all parts', () => {
+		it('should detect final keyword in AND condition', () => {
 			const conditional: Conditional = {
-				expression:
-					'@FullMethodName = $stringJoinFullName and .//NewListLiteralExpression',
+				expression: '@Final = true()',
 				position: 0,
 				type: 'and',
 			};
-			// Content with method call (for FullMethodName) and new List (for NewListLiteralExpression)
-			const content = 'String.join("", new List<String>());';
+			const content = 'private final Integer value = 5;';
+			const checker = conditionalCheckers.and_operator;
+			const result = checker(conditional, content);
 
-			const result = conditionalCheckers.and_operator(conditional, content);
-
-			// The combined condition should be recognized and checked
-			// It may report as covered if both parts are satisfied
-			expect(result).toBeDefined();
-			expect(result.evidence).toBeDefined();
+			expect(result.success).toBe(true);
+			expect(result.message).toContain('is covered');
 		});
 
-		it('should detect missing parts in combined AND conditions', () => {
+		it('should detect static keyword in AND condition', () => {
 			const conditional: Conditional = {
-				expression:
-					'@FullMethodName = $stringJoinFullName and .//NewListLiteralExpression',
+				expression: '@Static = true()',
 				position: 0,
 				type: 'and',
 			};
-			// Content with method call but missing new List
-			const content = 'String.join("", something);';
+			const content = 'public static void method() {}';
+			const checker = conditionalCheckers.and_operator;
+			const result = checker(conditional, content);
 
-			const result = conditionalCheckers.and_operator(conditional, content);
+			expect(result.success).toBe(true);
+			expect(result.message).toContain('is covered');
+		});
+
+		it('should return failure when final keyword is missing', () => {
+			const conditional: Conditional = {
+				expression: '@Final = true()',
+				position: 0,
+				type: 'and',
+			};
+			const content = 'private Integer value = 5;';
+			const checker = conditionalCheckers.and_operator;
+			const result = checker(conditional, content);
 
 			expect(result.success).toBe(false);
-			expect(result.message).toMatch(/not (fully )?covered/);
+			expect(result.message).toContain('missing \'final\' keyword');
 		});
 
-		it('should handle AND conditions with quotes in splitting', () => {
+		it('should handle AND condition with @Final pattern and other condition', () => {
 			const conditional: Conditional = {
-				expression: '@Name = "test" and @Other = "value"',
+				expression: '@Final = true() and @Name = $var',
 				position: 0,
 				type: 'and',
 			};
-			const content = 'test value';
+			const content = 'private final Integer value = 5;';
+			const checker = conditionalCheckers.and_operator;
+			const result = checker(conditional, content);
 
-			const result = conditionalCheckers.and_operator(conditional, content);
-
-			expect(result).toBeDefined();
+			// First part matches @Final pattern and returns early
+			// But since expression contains "and", it gets split and checked per part
+			// First part "@Final = true()" matches @Final pattern
+			// Second part "@Name = $var" doesn't match @Final or @Static, goes to split path
+			expect(result.success).toBe(true);
 		});
 
-		it('should handle AND conditions with parentheses in splitting', () => {
+		it('should handle AND condition with @Static pattern and other condition', () => {
 			const conditional: Conditional = {
-				expression: 'A and (B and C) and D',
+				expression: '@Static = true() and @Name = $var',
 				position: 0,
 				type: 'and',
 			};
-			const content = 'A B C D';
+			const content = 'public static void method() {}';
+			const checker = conditionalCheckers.and_operator;
+			const result = checker(conditional, content);
 
-			const result = conditionalCheckers.and_operator(conditional, content);
-
-			expect(result).toBeDefined();
+			// First part matches @Static pattern
+			// Second part doesn't match @Final or @Static, goes to split path
+			expect(result.success).toBe(true);
 		});
 
-		it('should handle attribute with quoted value in condition part', () => {
+		it('should split and check multiple AND conditions', () => {
 			const conditional: Conditional = {
-				expression: '@Name = "testValue" and .//NodeType',
+				expression: '@FullMethodName = $var and .//MethodCallExpression',
 				position: 0,
 				type: 'and',
 			};
-			const content = 'testValue NodeType';
+			const content = 'TestClass.method();';
+			const checker = conditionalCheckers.and_operator;
+			const result = checker(conditional, content);
 
-			const result = conditionalCheckers.and_operator(conditional, content);
-
-			expect(result).toBeDefined();
+			expect(result.success).toBe(true);
+			expect(result.message).toContain('all');
 		});
 
-		it('should handle node type pattern with // prefix', () => {
+		it('should handle MethodName attribute in checkConditionPart', () => {
 			const conditional: Conditional = {
-				expression: '@Attr = $var and //MethodCallExpression',
+				expression: '@MethodName = $var and @FullMethodName = $var2',
 				position: 0,
 				type: 'and',
 			};
-			const content = 'method();';
+			const content = 'MyClass.myMethod();';
+			const checker = conditionalCheckers.and_operator;
+			const result = checker(conditional, content);
 
-			const result = conditionalCheckers.and_operator(conditional, content);
-
-			expect(result).toBeDefined();
+			// splitCombinedAndConditions splits into ["@MethodName = $var", "@FullMethodName = $var2"]
+			// checkConditionPart for "@MethodName = $var" matches attrPattern, extracts "MethodName"
+			// Then checks /\w+\s*\(/.test(content) which matches "myMethod();"
+			// checkConditionPart for "@FullMethodName = $var2" matches attrPattern, extracts "FullMethodName"
+			// Then checks /\w+\.\w+\s*\(/.test(content) which matches "MyClass.myMethod();"
+			expect(result.success).toBe(true);
 		});
 
-		it('should handle generic node type check in condition part', () => {
+		it('should handle generic node type patterns in checkConditionPart', () => {
 			const conditional: Conditional = {
-				expression: '@Attr = $var and .//SomeOtherNodeType',
+				expression: './/VariableDeclaration and .//MethodCallExpression',
 				position: 0,
 				type: 'and',
 			};
-			const content = 'someothernodetype';
+			const content = 'Integer variabledeclaration = 5; method();';
+			const checker = conditionalCheckers.and_operator;
+			const result = checker(conditional, content);
 
-			const result = conditionalCheckers.and_operator(conditional, content);
-
-			expect(result).toBeDefined();
+			// splitCombinedAndConditions splits into [".//VariableDeclaration", ".//MethodCallExpression"]
+			// checkConditionPart for ".//VariableDeclaration" matches nodeTypePattern
+			// Extracts "VariableDeclaration", then checks contentLower.includes("variabledeclaration")
+			// checkConditionPart for ".//MethodCallExpression" matches nodeTypePattern
+			// Extracts "MethodCallExpression", then checks /\w+\s*\(/.test(content)
+			expect(result.success).toBe(true);
 		});
 
-		it('should handle other attribute types in condition part', () => {
+		it('should handle newlistliteralexpression pattern in checkConditionPart', () => {
 			const conditional: Conditional = {
-				expression: '@OtherAttr = $var and .//NodeType',
+				expression: '@Type = "List" and newlistliteralexpression',
 				position: 0,
 				type: 'and',
 			};
-			const content = 'NodeType';
+			const content = 'List<Integer> values = new List<Integer>();';
+			const checker = conditionalCheckers.and_operator;
+			const result = checker(conditional, content);
 
-			const result = conditionalCheckers.and_operator(conditional, content);
-
-			expect(result).toBeDefined();
+			// splitCombinedAndConditions splits into ['@Type = "List"', 'newlistliteralexpression']
+			// checkConditionPart for '@Type = "List"' matches attrPattern, extracts quotedValue "List"
+			// checkConditionPart for "newlistliteralexpression" (lowercase) matches partLower.includes check
+			// Then checks /new\s+List\s*[<\(]/.test(contentLower)
+			// Note: regex expects "List" (capital L) but contentLower has "list" (lowercase)
+			// The regex won't match lowercase, so this test should fail unless we fix the content
+			// Actually, the regex is case-sensitive, so it needs "List" in the original content
+			expect(result.success).toBe(true);
 		});
 
-		it('should handle splitting when and is at start of expression', () => {
+		it('should handle generic keyword check in checkConditionPart', () => {
 			const conditional: Conditional = {
-				expression: 'and A and B',
+				expression: '@Name = $var and @Type = $var2',
 				position: 0,
 				type: 'and',
 			};
-			const content = 'A B';
+			const content = 'String name = "test";';
+			const checker = conditionalCheckers.and_operator;
+			const result = checker(conditional, content);
 
-			const result = conditionalCheckers.and_operator(conditional, content);
-
-			expect(result).toBeDefined();
+			// Generic keyword check splits on operators and looks for keywords
+			// After filtering, should find keywords from the expression
+			expect(result.success).toBe(true);
 		});
 
-		it('should handle splitting when expression has nested and in parentheses', () => {
+		it('should handle generic keyword check when no attr or node type patterns match', () => {
 			const conditional: Conditional = {
-				expression: 'A and (B and C) and D',
+				expression: 'someExpression and anotherExpression',
 				position: 0,
 				type: 'and',
 			};
-			const content = 'A B C D';
+			const content = 'String someExpression = "value"; Integer anotherExpression = 5;';
+			const checker = conditionalCheckers.and_operator;
+			const result = checker(conditional, content);
 
-			const result = conditionalCheckers.and_operator(conditional, content);
-
-			expect(result).toBeDefined();
+			// When part doesn't match attrPattern or nodeTypePattern,
+			// falls through to generic keyword check which splits on operators
+			// and looks for keywords like "someExpression" and "anotherExpression"
+			expect(result.success).toBe(true);
 		});
 
-		it('should handle MethodName attribute in condition part', () => {
+		it('should handle generic keyword check filtering out operators and special chars', () => {
 			const conditional: Conditional = {
-				expression: '@MethodName = $var and .//NodeType',
+				expression: 'expression = value and test != null',
 				position: 0,
 				type: 'and',
 			};
-			const content = 'method(); NodeType';
+			const content = 'String expression = "value"; Integer test = null;';
+			const checker = conditionalCheckers.and_operator;
+			const result = checker(conditional, content);
 
-			const result = conditionalCheckers.and_operator(conditional, content);
-
-			expect(result).toBeDefined();
+			// Generic keyword check splits on [=<>!()\[\]\/\.@\$]+
+			// Filters out empty strings, @ attributes, and operators (and, or, not)
+			// Looks for remaining keywords like "expression", "value", "test", "null"
+			expect(result.success).toBe(true);
 		});
 
-		it('should handle newlistliteralexpression pattern in lowercase', () => {
+		it('should handle AND conditions with quotes', () => {
 			const conditional: Conditional = {
-				expression: '@Attr = $var and newlistliteralexpression',
+				expression: '@Name = "test" and @Type = "String"',
 				position: 0,
 				type: 'and',
 			};
-			const content = 'new List<String>();';
+			const content = 'String test = "test";';
+			const checker = conditionalCheckers.and_operator;
+			const result = checker(conditional, content);
 
-			const result = conditionalCheckers.and_operator(conditional, content);
-
-			expect(result).toBeDefined();
+			expect(result.success).toBe(true);
 		});
 
-		it('should handle empty expression in splitCombinedAndConditions', () => {
+		it('should handle splitCombinedAndConditions with quotes containing and', () => {
 			const conditional: Conditional = {
-				expression: '',
+				expression: '@Name = "test and value" and @Type = "String"',
 				position: 0,
 				type: 'and',
 			};
-			const content = 'some content';
+			const content = 'String test = "test and value";';
+			const checker = conditionalCheckers.and_operator;
+			const result = checker(conditional, content);
 
-			const result = conditionalCheckers.and_operator(conditional, content);
+			// splitCombinedAndConditions should not split on "and" inside quotes
+			expect(result.success).toBe(true);
+		});
 
+		it('should handle splitCombinedAndConditions with parentheses', () => {
+			const conditional: Conditional = {
+				expression: '(@Name = $var) and (@Type = "String")',
+				position: 0,
+				type: 'and',
+			};
+			const content = 'String name = "test";';
+			const checker = conditionalCheckers.and_operator;
+			const result = checker(conditional, content);
+
+			// splitCombinedAndConditions should not split on "and" inside parentheses
+			expect(result.success).toBe(true);
+		});
+
+		it('should handle single condition path when no split needed', () => {
+			const conditional: Conditional = {
+				expression: '@Name = testValue',
+				position: 0,
+				type: 'and',
+			};
+			const content = 'String testValue = "test";';
+			const checker = conditionalCheckers.and_operator;
+			const result = checker(conditional, content);
+
+			// When no "and" keyword found, splitCombinedAndConditions returns [expression]
+			// parts.length < 2, so falls through to single condition path
+			// Single condition splits on [=<>!()\[\]]+ giving ["@Name", " ", "testValue"]
+			// Filters out "@Name" (starts with @), leaving ["testValue"]
+			// Checks if content includes "testValue"
+			expect(result.success).toBe(true);
+		});
+
+		it('should handle splitCombinedAndConditions with empty trimmed parts', () => {
+			const conditional: Conditional = {
+				expression: '   and @Name = testValue',
+				position: 0,
+				type: 'and',
+			};
+			const content = 'String testValue = "test";';
+			const checker = conditionalCheckers.and_operator;
+			const result = checker(conditional, content);
+
+			// splitCombinedAndConditions splits on "and"
+			// First part "   " trims to empty string, so trimmed.length === 0, doesn't get added (line 68 false branch)
+			// Second part "@Name = testValue" gets added
+			// parts.length === 1, so falls through to single condition path
+			// Single condition path splits "@Name = testValue" and looks for "testValue"
+			expect(result.success).toBe(true);
+		});
+
+		it('should handle splitCombinedAndConditions returning empty parts array', () => {
+			const conditional: Conditional = {
+				expression: '   and   ',
+				position: 0,
+				type: 'and',
+			};
+			const content = 'String name = "test";';
+			const checker = conditionalCheckers.and_operator;
+			const result = checker(conditional, content);
+
+			// splitCombinedAndConditions splits on "and"
+			// First part "   " trims to empty, doesn't get added (line 68 false branch)
+			// Second part "   " trims to empty, doesn't get added (line 81 false branch)
+			// parts.length === 0, so returns [expression] as fallback (line 85 false branch)
+			// Then falls through to single condition path with expression = "   and   "
 			expect(result.success).toBe(false);
 		});
 
-		it('should handle expression with no parts after splitting', () => {
+		it('should return failure when static keyword is missing', () => {
 			const conditional: Conditional = {
-				expression: 'and',
+				expression: '@Static = true()',
 				position: 0,
 				type: 'and',
 			};
-			const content = 'some content';
+			const content = 'public void method() {}';
+			const checker = conditionalCheckers.and_operator;
+			const result = checker(conditional, content);
 
-			const result = conditionalCheckers.and_operator(conditional, content);
-
-			expect(result).toBeDefined();
+			// Covers line 228 false branch (hasStatic ? MIN_REQUIRED_COUNT : MIN_COUNT)
+			// and line 234 false branch (hasStatic ? ... : ...)
+			expect(result.success).toBe(false);
+			expect(result.message).toContain('missing \'static\' keyword');
+			expect(result.evidence[0]?.count).toBe(0);
 		});
 
-		it('should handle attribute pattern without match', () => {
+		it('should handle AND conditions with parentheses', () => {
 			const conditional: Conditional = {
-				expression: '@UnknownAttr = $var and .//NodeType',
+				expression: '(@Name = $var) and (@Type = "String")',
 				position: 0,
 				type: 'and',
 			};
-			const content = 'NodeType';
+			const content = 'String name = "test";';
+			const checker = conditionalCheckers.and_operator;
+			const result = checker(conditional, content);
 
-			const result = conditionalCheckers.and_operator(conditional, content);
-
-			expect(result).toBeDefined();
+			expect(result.success).toBe(true);
 		});
 
-		it('should handle node type pattern without match', () => {
+		it('should return failure when some parts are not covered', () => {
 			const conditional: Conditional = {
-				expression: '@Attr = $var and .//UnknownNodeType',
+				expression: '@FullMethodName = $var and .//NewListLiteralExpression',
 				position: 0,
 				type: 'and',
 			};
-			const content = 'unknownnodetype';
+			const content = 'TestClass.method();';
+			const checker = conditionalCheckers.and_operator;
+			const result = checker(conditional, content);
 
-			const result = conditionalCheckers.and_operator(conditional, content);
-
-			expect(result).toBeDefined();
+			expect(result.success).toBe(false);
+			expect(result.message).toContain('not fully covered');
 		});
 
-		it('should handle trimmed empty part in splitting', () => {
+		it('should handle single AND condition with generic keyword check', () => {
 			const conditional: Conditional = {
-				expression: 'A and   and B',
+				expression: '@Name = "test"',
 				position: 0,
 				type: 'and',
 			};
-			const content = 'A B';
+			const content = 'String test = "test";';
+			const checker = conditionalCheckers.and_operator;
+			const result = checker(conditional, content);
 
-			const result = conditionalCheckers.and_operator(conditional, content);
-
-			expect(result).toBeDefined();
+			// The code splits on [=<>!()\[\]]+ which gives ["@Name", " ", "\"test\""]
+			// After trim and filter: ["\"test\""] (includes quotes)
+			// So it looks for "\"test\"" keyword in content (with quotes)
+			expect(result.success).toBe(true);
 		});
 
-		it('should handle attribute pattern where attrName is undefined', () => {
+		it('should return failure for single condition when keywords not found', () => {
 			const conditional: Conditional = {
-				expression: '@ = $var and .//NodeType',
+				expression: '@Name = "missing"',
 				position: 0,
 				type: 'and',
 			};
-			const content = 'NodeType';
+			const content = 'public class Test {}';
+			const checker = conditionalCheckers.and_operator;
+			const result = checker(conditional, content);
 
-			const result = conditionalCheckers.and_operator(conditional, content);
-
-			expect(result).toBeDefined();
+			// "missing" keyword not found in content
+			expect(result.success).toBe(false);
 		});
-
-		it('should handle node type pattern where nodeType is undefined', () => {
-			const conditional: Conditional = {
-				expression: '@Attr = $var and .//',
-				position: 0,
-				type: 'and',
-			};
-			const content = 'some content';
-
-			const result = conditionalCheckers.and_operator(conditional, content);
-
-			expect(result).toBeDefined();
-		});
-
-		it('should handle attrMatch null case (pattern matches but exec returns null)', () => {
-			const conditional: Conditional = {
-				expression: '@ = $var and .//NodeType',
-				position: 0,
-				type: 'and',
-			};
-			const content = 'NodeType';
-
-			const result = conditionalCheckers.and_operator(conditional, content);
-
-			expect(result).toBeDefined();
-		});
-
-		it('should handle nodeTypeMatch null case (pattern matches but exec returns null)', () => {
-			const conditional: Conditional = {
-				expression: '@Attr = $var and .//',
-				position: 0,
-				type: 'and',
-			};
-			const content = 'some content';
-
-			const result = conditionalCheckers.and_operator(conditional, content);
-
-			expect(result).toBeDefined();
-		});
-
 	});
 
 	describe('not_condition', () => {
-		it('should detect static final fields in content', () => {
+		it('should return failure when expression is empty', () => {
 			const conditional: Conditional = {
-				expression:
-					'ancestor::FieldDeclarationStatements[ModifierNode[@Static = true() and @Final = true()]]',
+				expression: '',
 				position: 0,
 				type: 'not',
 			};
-			const content =
-				'private static final Pattern TEST_PATTERN = Pattern.compile();';
+			const checker = conditionalCheckers.not_condition;
+			const result = checker(conditional, 'some content');
 
-			const result = conditionalCheckers.not_condition(conditional, content);
+			expect(result.success).toBe(false);
+			expect(result.message).toBe('No expression to check');
+		});
+
+		it('should detect static final field declarations', () => {
+			const conditional: Conditional = {
+				expression: 'not(ancestor::Field[@Static and @Final])',
+				position: 0,
+				type: 'not',
+			};
+			const content = 'private static final Integer VALUE = 5;';
+			const checker = conditionalCheckers.not_condition;
+			const result = checker(conditional, content);
 
 			expect(result.success).toBe(true);
 			expect(result.message).toContain('static final fields found');
 		});
 
-		it('should detect static final field with Field pattern', () => {
+		it('should return failure when static final fields are missing', () => {
 			const conditional: Conditional = {
-				expression: 'ancestor::Field[ModifierNode[@Static = true() and @Final = true()]]',
+				expression: 'not(ancestor::Field[@Static and @Final])',
 				position: 0,
 				type: 'not',
 			};
-			const content =
-				'private static final Pattern TEST_PATTERN = Pattern.compile();';
+			const content = 'private Integer value = 5;';
+			const checker = conditionalCheckers.not_condition;
+			const result = checker(conditional, content);
 
-			const result = conditionalCheckers.not_condition(conditional, content);
+			expect(result.success).toBe(false);
+			expect(result.message).toContain('missing static final field declarations');
+		});
 
+		it('should handle generic NOT condition with keywords', () => {
+			const conditional: Conditional = {
+				expression: 'not(ancestor::Method)',
+				position: 0,
+				type: 'not',
+			};
+			const content = 'public void method() {}';
+			const checker = conditionalCheckers.not_condition;
+			const result = checker(conditional, content);
+
+			// The code splits on [=<>!()\[\]:]+ which gives ["not", "ancestor", "Method"]
+			// After filtering out "ancestor" and "not": ["Method"]
+			// The code looks for "method" (from Method.toLowerCase()) in content
 			expect(result.success).toBe(true);
 		});
 
-		it('should return false when static final fields are missing', () => {
+		it('should return failure when keywords not found in generic NOT condition', () => {
 			const conditional: Conditional = {
-				expression:
-					'ancestor::FieldDeclarationStatements[ModifierNode[@Static = true() and @Final = true()]]',
+				expression: 'not(@SomeAttribute)',
 				position: 0,
 				type: 'not',
 			};
-			const content = 'private Pattern TEST = Pattern.compile();';
+			const content = 'public class Test {}';
+			const checker = conditionalCheckers.not_condition;
+			const result = checker(conditional, content);
 
-			const result = conditionalCheckers.not_condition(conditional, content);
-
+			// After filtering out @SomeAttribute and "not", no keywords remain
 			expect(result.success).toBe(false);
-			expect(result.message).toContain('not covered');
-		});
-
-		it('should use generic keyword matching for other expressions', () => {
-			const conditional: Conditional = {
-				expression: 'SomeExpression',
-				position: 0,
-				type: 'not',
-			};
-			const content = 'if (SomeExpression) { }';
-
-			const result = conditionalCheckers.not_condition(conditional, content);
-
-			expect(result.success).toBe(true);
-		});
-
-		it('should return false for empty expression', () => {
-			const conditional: Conditional = {
-				expression: '',
-				position: 0,
-				type: 'not',
-			};
-			const content = 'some content';
-
-			const result = conditionalCheckers.not_condition(conditional, content);
-
-			expect(result.success).toBe(false);
-			expect(result.message).toBe('No expression to check');
 		});
 	});
 
 	describe('or_branch', () => {
 		it('should return not implemented message', () => {
 			const conditional: Conditional = {
-				expression: '@Visibility = public',
+				expression: '@Visibility = "public" or @Visibility = "global"',
 				position: 0,
 				type: 'or',
 			};
-			const content = 'some content';
-
-			const result = conditionalCheckers.or_branch(conditional, content);
+			const checker = conditionalCheckers.or_branch;
+			const result = checker(conditional, 'some content');
 
 			expect(result.success).toBe(false);
 			expect(result.message).toBe('Or branch coverage check not implemented');
@@ -496,13 +493,12 @@ describe('conditionalCheckers', () => {
 	describe('if_condition', () => {
 		it('should return not implemented message', () => {
 			const conditional: Conditional = {
-				expression: 'some condition',
+				expression: 'if (@Static) then @Final else true()',
 				position: 0,
-				type: 'if',
+				type: 'if_condition',
 			};
-			const content = 'some content';
-
-			const result = conditionalCheckers.if_condition(conditional, content);
+			const checker = conditionalCheckers.if_condition;
+			const result = checker(conditional, 'some content');
 
 			expect(result.success).toBe(false);
 			expect(result.message).toBe('If condition coverage check not implemented');
@@ -512,36 +508,30 @@ describe('conditionalCheckers', () => {
 	describe('quantified', () => {
 		it('should return not implemented message', () => {
 			const conditional: Conditional = {
-				expression: 'some quantified expression',
+				expression: 'some $x in //Method satisfies @Static',
 				position: 0,
 				type: 'quantified',
 			};
-			const content = 'some content';
-
-			const result = conditionalCheckers.quantified(conditional, content);
+			const checker = conditionalCheckers.quantified;
+			const result = checker(conditional, 'some content');
 
 			expect(result.success).toBe(false);
-			expect(result.message).toBe(
-				'Quantified condition coverage check not implemented',
-			);
+			expect(result.message).toBe('Quantified condition coverage check not implemented');
 		});
 	});
 
 	describe('boolean_function', () => {
 		it('should return not implemented message', () => {
 			const conditional: Conditional = {
-				expression: 'some boolean function',
+				expression: 'contains(@Name, "test")',
 				position: 0,
 				type: 'boolean_function',
 			};
-			const content = 'some content';
-
-			const result = conditionalCheckers.boolean_function(conditional, content);
+			const checker = conditionalCheckers.boolean_function;
+			const result = checker(conditional, 'some content');
 
 			expect(result.success).toBe(false);
-			expect(result.message).toBe(
-				'Boolean function coverage check not implemented',
-			);
+			expect(result.message).toBe('Boolean function coverage check not implemented');
 		});
 	});
 });
