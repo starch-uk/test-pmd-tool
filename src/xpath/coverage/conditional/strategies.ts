@@ -152,7 +152,8 @@ function checkConditionPart(part: Readonly<string>, content: Readonly<string>): 
 
 	// Check for specific patterns
 	if (partLower.includes('newlistliteralexpression')) {
-		return /new\s+List\s*[<\(]/.test(contentLower);
+		// Use case-insensitive regex to match "new List" or "new list" in content
+		return /new\s+list\s*[<\(]/i.test(content);
 	}
 
 	// Generic keyword check
