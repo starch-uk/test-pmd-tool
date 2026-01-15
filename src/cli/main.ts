@@ -1282,9 +1282,10 @@ function determineNodeColor(
 		}
 	}
 
-	// Color based on section type
+	// Color based on XPath match results (PMD's actual violation detection)
 	// If we have XPath match results, only color nodes that match the XPath
-	// The color is determined by which section the node is in (violation = red, valid = green)
+	// When PMD finds a violation, the node is colored red regardless of section type
+	// (PMD's actual results take precedence over section markers)
 	if (
 		xpathMatchLines !== undefined &&
 		xpathMatchLines.size > EMPTY_MARKERS_LENGTH
@@ -1295,20 +1296,12 @@ function determineNodeColor(
 			return undefined;
 		}
 
-		// Node matches XPath - color based on section type
-		// If in violation section, it should trigger (red)
-		// If in valid section, it shouldn't trigger (green) - but if it matches XPath, that's a problem
+		// Node matches XPath - PMD found a violation on this node
+		// Color it red regardless of section type, because PMD's actual results take precedence
+		// If it's in a valid section but PMD found a violation, that indicates the rule incorrectly triggers
+		// but we still show it in red because PMD found a violation
 		// If node matches XPath, color it even if there are no explicit markers
 		// (PMD found a violation, so we should show it)
-		if (hasViolationSection) {
-			return alreadyCovered ? 'dark-red' : 'red';
-		}
-		if (hasValidSection) {
-			// Node matches XPath but is in valid section - this indicates the rule incorrectly triggers
-			// Color it green to show it's valid code, or orange to show the mismatch
-			return alreadyCovered ? 'dark-green' : 'green';
-		}
-		// Node matches XPath but no clear section - still color it red since PMD found a violation
 		return alreadyCovered ? 'dark-red' : 'red';
 	}
 
