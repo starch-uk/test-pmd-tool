@@ -716,7 +716,7 @@ export class RuleTester {
 			const markerLineInExample = exampleContentLines[markerLineIndex]!;
 
 			// Extract the code part (without the comment marker)
-			let codeToFind = markerLineInExample;
+			let codeToFind: string;
 			if (markerLineInExample.includes('// ❌')) {
 				const splitResult = markerLineInExample.split('// ❌');
 				// split() always returns at least one element, so [0] is always defined
