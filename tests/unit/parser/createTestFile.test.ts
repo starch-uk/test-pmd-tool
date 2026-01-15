@@ -1452,4 +1452,94 @@ public class Example {
 		// Method at wrong depth should not be treated as method declaration
 		expect(writtenContent).toContain('public class TestClass70');
 	});
+
+	it('should skip method calls preceded by a dot (Pattern.compile, String.matches, etc.)', () => {
+		const exampleContent = `
+public class TestClass {
+    public void exampleMethod() {
+        Pattern.compile("test"); // ❌ Should not generate helper for Pattern.compile
+        String.matches("pattern", "text"); // ❌ Should not generate helper for String.matches
+        someMethod(); // ❌ Should generate helper for standalone method
+    }
+}
+`;
+
+		const result = createTestFile({
+			exampleContent,
+			exampleIndex: 1,
+			includeValids: false,
+			includeViolations: true,
+		});
+
+		expect(result.filePath).toBeDefined();
+		const writtenContent = capturedContent;
+
+		// Should NOT generate helper for Pattern.compile (preceded by dot)
+		expect(writtenContent).not.toContain('public Pattern compile()');
+		// Should NOT generate helper for String.matches (preceded by dot)
+		expect(writtenContent).not.toContain('public String matches()');
+		// Should generate helper for standalone method
+		expect(writtenContent).toContain('public Boolean someMethod()');
+	});
+
+	it('should add filtered helper methods to class content', () => {
+		const exampleContent = `
+public class TestClass {
+    public void exampleMethod() {
+        helperMethod1(); // ❌
+        helperMethod2(); // ❌
+    }
+    
+    // helperMethod1 is already defined, so it should be filtered out
+    public Boolean helperMethod1() {
+        return true;
+    }
+}
+`;
+
+		const result = createTestFile({
+			exampleContent,
+			exampleIndex: 1,
+			includeValids: false,
+			includeViolations: true,
+		});
+
+		expect(result.filePath).toBeDefined();
+		const writtenContent = capturedContent;
+
+		// helperMethod1 should NOT be added (already defined)
+		const helperMethod1Count = (
+			writtenContent.match(/public Boolean helperMethod1\(\)/g) ?? []
+		).length;
+		expect(helperMethod1Count).toBe(1); // Only the original definition
+
+		// helperMethod2 should be added (not defined)
+		expect(writtenContent).toContain('public Boolean helperMethod2()');
+	});
+
+	it('should add filtered helper methods when hasClassLikeStructures is true', () => {
+		// Test case where hasClassLikeStructures is true and helper methods need to be added
+		// This covers line 812: for (const method of filteredHelperMethods)
+		const exampleContent = `
+    private Integer field = 42; // ❌
+    public void exampleMethod() {
+        helperMethod(); // ❌ Should generate helper
+    }
+`;
+
+		const result = createTestFile({
+			exampleContent,
+			exampleIndex: 1,
+			includeValids: false,
+			includeViolations: true,
+		});
+
+		expect(result.filePath).toBeDefined();
+		const writtenContent = capturedContent;
+
+		// Should have wrapped in class and added helper method
+		expect(writtenContent).toContain('public class TestClass1');
+		expect(writtenContent).toContain('private Integer field = 42;');
+		expect(writtenContent).toContain('public Boolean helperMethod()');
+	});
 });

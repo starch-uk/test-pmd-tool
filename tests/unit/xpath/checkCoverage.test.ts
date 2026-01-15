@@ -3477,4 +3477,41 @@ public class OuterClass {
 		expect(conditionalResult?.success).toBe(true);
 		expect(conditionalResult?.message).toContain('1/1 covered');
 	});
+
+	it('should check FullMethodName attribute coverage with Pattern.compile()', () => {
+		mockedAnalyzeXPath.mockReturnValue({
+			attributes: ['FullMethodName'],
+			conditionals: [],
+			hasLetExpressions: false,
+			hasUnions: false,
+			nodeTypes: ['MethodCallExpression'],
+			operators: [],
+			patterns: [],
+		});
+
+		const examples: ExampleData[] = [
+			{
+				content: 'Pattern.compile("test");',
+				exampleIndex: 1,
+				validMarkers: [],
+				valids: [],
+				violationMarkers: [],
+				violations: [],
+			},
+		];
+
+		const result = checkXPathCoverage(
+			'//MethodCallExpression[@FullMethodName="Pattern.compile"]',
+			examples,
+			'/path/to/rule.xml',
+		);
+
+		const attributeResult = result.coverage.find(
+			// eslint-disable-next-line @typescript-eslint/prefer-readonly-parameter-types -- Callback parameter for Array.prototype.find
+			(c) => c.message.includes('Attributes:'),
+		);
+		expect(attributeResult).toBeDefined();
+		expect(attributeResult?.success).toBe(true);
+		expect(attributeResult?.message).toContain('1/1 covered');
+	});
 });

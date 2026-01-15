@@ -16,8 +16,9 @@ import {
 	type CoverageData,
 } from '../coverage/trackCoverage.js';
 import { generateLcovReport } from '../coverage/generateLcov.js';
-import { runPmdAstDump } from '../pmd/runPMD.js';
+import { runPMD, runPmdAstDump } from '../pmd/runPMD.js';
 import { createTestFile } from '../parser/createTestFile.js';
+import { extractNodeTypes } from '../xpath/extractors/extractNodeTypes.js';
 import { parseCliArgs, printUsage } from './args.js';
 
 const EXIT_CODE_SUCCESS = 0;
@@ -555,6 +556,16 @@ interface NodeColorOptions {
 				helperMethodNames: readonly string[];
 		  }>
 		| undefined;
+
+	/**
+	 * Set of line numbers in the test file that match the XPath (from PMD violations).
+	 */
+	xpathMatchLines?: ReadonlySet<number>;
+
+	/**
+	 * FullMethodName attribute for MethodCallExpression nodes (e.g., 'Pattern.compile', 'input.replaceFirst').
+	 */
+	fullMethodName?: string;
 }
 
 /**
@@ -581,6 +592,11 @@ interface ParseXmlAstOptions {
 		violationMarkers: readonly { lineNumber: number }[];
 		exampleContent: string;
 	}[];
+
+	/**
+	 * Set of line numbers in the test file that match the XPath (from PMD violations).
+	 */
+	xpathMatchLines?: ReadonlySet<number>;
 }
 
 /**
@@ -780,6 +796,8 @@ function determineNodeColor(
 		validMarkers,
 		violationMarkers,
 		previousExamplesCoverage,
+		beginLine,
+		xpathMatchLines,
 	} = options;
 
 	// Map each line in example to its section (violation/valid)
@@ -838,9 +856,136 @@ function determineNodeColor(
 	const hasViolationSection = violationMatchCount > EMPTY_MARKERS_LENGTH;
 	const hasValidSection = validMatchCount > EMPTY_MARKERS_LENGTH;
 
+	// Check if this node is actually matched by the XPath expression
+	// Use PMD's actual XPath evaluation results (xpathMatchLines) if available
+	// When xpathMatchLines is defined (even if empty), we use it as the authoritative source
+	// Only fall back to node type checking if xpathMatchLines is undefined
+	let nodeMatchesXPath = false;
+	if (xpath !== null && xpath.length > EMPTY_STRING_LENGTH) {
+		// If we have XPath match results (defined, even if empty), use those exclusively
+		if (xpathMatchLines !== undefined) {
+			// We have XPath match results - check if this node is involved in a match
+			// A node matches if any violation line falls within the node's line range
+			if (xpathMatchLines.size > EMPTY_MARKERS_LENGTH) {
+				// We have violations - check if this node is on a violation line
+				// Violation lines are from the test file (which includes wrapper),
+				// and AST node line numbers are also from the test file, so they should match directly
+				if (beginLine !== null) {
+					const { endLine } = options;
+					const nodeStartLine = beginLine;
+					const nodeEndLine = endLine ?? nodeStartLine;
+
+					// Check if any violation line falls within this node's range
+					for (const violationLine of xpathMatchLines) {
+						if (
+							violationLine >= nodeStartLine &&
+							violationLine <= nodeEndLine
+						) {
+							nodeMatchesXPath = true;
+							break;
+						}
+					}
+				} else {
+					// Node has no line number after traversing up the tree
+					// Fallback: if node type matches XPath and we have violations,
+					// and for MethodCallExpression, the FullMethodName matches XPath constraints,
+					// then consider it a match (nodes without line numbers but matching XPath conditions)
+					const xpathNodeTypes = extractNodeTypes(xpath);
+					if (xpathNodeTypes.includes(nodeType)) {
+						// Node type matches XPath - for MethodCallExpression, also verify FullMethodName
+						if (nodeType === 'MethodCallExpression') {
+							const fullMethodNameMatches = xpath.matchAll(
+								/@FullMethodName\s*=\s*['"]([^'"]+)['"]/g,
+							);
+							const expectedMethodNames = new Set<string>();
+							const FIRST_CAPTURE_GROUP = 1;
+							for (const match of fullMethodNameMatches) {
+								const methodName = match[FIRST_CAPTURE_GROUP];
+								if (methodName !== undefined) {
+									expectedMethodNames.add(methodName);
+								}
+							}
+							// If XPath has FullMethodName constraints, node must match
+							if (
+								expectedMethodNames.size > EMPTY_MARKERS_LENGTH
+							) {
+								const nodeFullMethodName =
+									options.fullMethodName;
+								if (
+									nodeFullMethodName !== undefined &&
+									expectedMethodNames.has(nodeFullMethodName)
+								) {
+									nodeMatchesXPath = true;
+								}
+							} else {
+								// No FullMethodName constraints - any MethodCallExpression matches
+								nodeMatchesXPath = true;
+							}
+						} else {
+							// Non-MethodCallExpression node type matches XPath
+							nodeMatchesXPath = true;
+						}
+					}
+				}
+			} else {
+				// xpathMatchLines is defined but empty (no violations) - don't color anything
+				return undefined;
+			}
+
+			// If node is on a violation line, also verify it matches XPath conditions
+			// For MethodCallExpression, check if the FullMethodName matches what XPath expects
+			if (nodeMatchesXPath && nodeType === 'MethodCallExpression') {
+				// Extract FullMethodName values from XPath (e.g., 'Pattern.compile', 'Pattern.matches')
+				const fullMethodNameMatches = xpath.matchAll(
+					/@FullMethodName\s*=\s*['"]([^'"]+)['"]/g,
+				);
+				const expectedMethodNames = new Set<string>();
+				const FIRST_CAPTURE_GROUP = 1;
+				for (const match of fullMethodNameMatches) {
+					const methodName = match[FIRST_CAPTURE_GROUP];
+					if (methodName !== undefined) {
+						expectedMethodNames.add(methodName);
+					}
+				}
+
+				// Check if this node's FullMethodName matches any expected method name
+				if (expectedMethodNames.size > EMPTY_MARKERS_LENGTH) {
+					// We have FullMethodName constraints in XPath - check if node's FullMethodName matches
+					const nodeFullMethodName = options.fullMethodName;
+					// Only reject if we have a FullMethodName and it doesn't match
+					// If FullMethodName is undefined, we can't verify, so allow it (might be a child node)
+					if (
+						nodeFullMethodName !== undefined &&
+						!expectedMethodNames.has(nodeFullMethodName)
+					) {
+						// Node's FullMethodName doesn't match any expected method name
+						nodeMatchesXPath = false;
+					}
+				}
+				// If no FullMethodName constraints in XPath, any MethodCallExpression on violation line matches
+			}
+
+			// If xpathMatchLines is empty (no violations) or node doesn't match, don't color
+			// This ensures we only color nodes that PMD actually found violations on
+			if (!nodeMatchesXPath) {
+				return undefined;
+			}
+		} else {
+			// Fallback: xpathMatchLines is undefined - use node type checking
+			// This happens when XPath is null/empty or PMD execution failed
+			const xpathNodeTypes = extractNodeTypes(xpath);
+			nodeMatchesXPath = xpathNodeTypes.includes(nodeType);
+			if (!nodeMatchesXPath) {
+				// Node type is not matched by XPath, so it shouldn't be tested
+				return undefined;
+			}
+		}
+	}
+
 	// Check if this node tests XPath branches that were already tested by previous examples
-	// We check if the node type appears in the XPath, and if code matching that node type
-	// was already tested in previous examples
+	// We need to check if the EXACT same XPath branch combination was tested, not just
+	// if the node type was tested. This means checking if code with the same attributes
+	// (like FullMethodName for MethodCallExpression) was tested in previous examples.
 	let alreadyCovered = false;
 
 	if (
@@ -852,108 +997,322 @@ function determineNodeColor(
 		const nodeTypeInXPath = xpath.includes(nodeType);
 
 		if (nodeTypeInXPath) {
-			// Check if previous examples tested code that would match this node type
-			// by checking if any previous example's markers tested code lines that would
-			// produce this node type
-			for (const prevExampleCoverage of previousExamplesCoverage) {
-				const prevExampleContent = prevExampleCoverage.exampleContent;
-				const prevExampleLines = prevExampleContent.split('\n');
+			// Check if the exact same XPath branch combination was tested
+			// This means: same node type, same attributes (like method name), AND same section type
+			// For MethodCallExpression, we check the exact method name
+			// We also need to check if it was tested in the same section (violation vs valid)
+			const isInViolationSection = hasViolationSection;
+			const isInValidSection = hasValidSection;
 
-				// Check if any marker line in previous example would match this node type
-				const allPrevMarkers = [
-					...prevExampleCoverage.validMarkers,
-					...prevExampleCoverage.violationMarkers,
-				];
+			if (
+				nodeType === 'MethodCallExpression' &&
+				nodeImage.length > EMPTY_STRING_LENGTH
+			) {
+				// Check if previous examples tested code that would produce this exact method call
+				// in the same section type (violation or valid)
+				for (const prevExampleCoverage of previousExamplesCoverage) {
+					const prevExampleContent =
+						prevExampleCoverage.exampleContent;
+					const prevExampleLines = prevExampleContent.split('\n');
+					const prevLineSectionMap =
+						mapLinesToSections(prevExampleContent);
 
-				for (const marker of allPrevMarkers) {
-					const markerLineIndex =
-						marker.lineNumber - LINE_NUMBER_OFFSET;
-					if (
-						markerLineIndex >= MIN_ARRAY_INDEX &&
-						markerLineIndex < prevExampleLines.length
-					) {
-						const markerLine =
-							prevExampleLines[markerLineIndex]
-								?.replace(/\/\/\s*❌/g, '')
-								.replace(/\/\/\s*✅/g, '')
-								.trim() ?? '';
+					// Check violation markers if current node is in violation section
+					if (isInViolationSection) {
+						for (const marker of prevExampleCoverage.violationMarkers) {
+							const markerLineIndex =
+								marker.lineNumber - LINE_NUMBER_OFFSET;
+							if (
+								markerLineIndex >= MIN_ARRAY_INDEX &&
+								markerLineIndex < prevExampleLines.length
+							) {
+								const markerLine =
+									prevExampleLines[markerLineIndex]
+										?.replace(/\/\/\s*❌/g, '')
+										.replace(/\/\/\s*✅/g, '')
+										.trim() ?? '';
 
-						// Check if this marker line would produce a node of the same type
-						// using the same pattern matching logic as coverage checking
-						let wouldMatch = false;
-
-						switch (nodeType) {
-							case 'MethodCallExpression': {
-								if (nodeImage.length > EMPTY_STRING_LENGTH) {
-									wouldMatch = markerLine.includes(
-										`${nodeImage}(`,
-									);
-								} else {
-									wouldMatch = /\w+\s*\(/.test(markerLine);
-								}
-								break;
-							}
-							case 'VariableDeclaration': {
-								if (nodeImage.length > EMPTY_STRING_LENGTH) {
-									wouldMatch = new RegExp(
-										`\\b${nodeImage}\\s*[=;]`,
-									).test(markerLine);
-								} else {
-									wouldMatch = /\w+\s+\w+\s*[=;]/.test(
-										markerLine,
-									);
-								}
-								break;
-							}
-							case 'BinaryExpression': {
-								wouldMatch = /[+\-*/=<>!&|]{1,2}/.test(
-									markerLine,
+								// Check if this marker line contains the exact same method call
+								// and is in a violation section
+								const markerSection = prevLineSectionMap.get(
+									marker.lineNumber,
 								);
-								break;
-							}
-							case 'LiteralExpression': {
-								wouldMatch =
-									/\b\d+(\.\d+)?\b|'(?:[^'\\]|\\.)*'|"[^"]*"|\bnull\b|\btrue\b|\bfalse\b/.test(
-										markerLine.toLowerCase(),
-									);
-								break;
-							}
-							case 'IfBlockStatement': {
-								wouldMatch = /\bif\b/.test(
-									markerLine.toLowerCase(),
-								);
-								break;
-							}
-							default: {
-								if (nodeImage.length > EMPTY_STRING_LENGTH) {
-									wouldMatch = markerLine.includes(nodeImage);
-								} else {
-									wouldMatch = markerLine
-										.toLowerCase()
-										.includes(nodeType.toLowerCase());
+								if (
+									markerSection === 'violation' &&
+									markerLine.includes(`${nodeImage}(`)
+								) {
+									alreadyCovered = true;
+									break;
 								}
-								break;
 							}
-						}
-
-						if (
-							wouldMatch &&
-							markerLine.length > EMPTY_STRING_LENGTH
-						) {
-							alreadyCovered = true;
-							break;
 						}
 					}
-				}
 
-				if (alreadyCovered) {
-					break;
+					// Check valid markers if current node is in valid section
+					if (!alreadyCovered && isInValidSection) {
+						for (const marker of prevExampleCoverage.validMarkers) {
+							const markerLineIndex =
+								marker.lineNumber - LINE_NUMBER_OFFSET;
+							if (
+								markerLineIndex >= MIN_ARRAY_INDEX &&
+								markerLineIndex < prevExampleLines.length
+							) {
+								const markerLine =
+									prevExampleLines[markerLineIndex]
+										?.replace(/\/\/\s*❌/g, '')
+										.replace(/\/\/\s*✅/g, '')
+										.trim() ?? '';
+
+								// Check if this marker line contains the exact same method call
+								// and is in a valid section
+								const markerSection = prevLineSectionMap.get(
+									marker.lineNumber,
+								);
+								if (
+									markerSection === 'valid' &&
+									markerLine.includes(`${nodeImage}(`)
+								) {
+									alreadyCovered = true;
+									break;
+								}
+							}
+						}
+					}
+
+					if (alreadyCovered) {
+						break;
+					}
+				}
+			} else {
+				// For other node types, check if the same node type was tested in the same section
+				// This is less precise than MethodCallExpression (which checks exact method name)
+				// but still ensures we check the section type for branch combination accuracy
+				for (const prevExampleCoverage of previousExamplesCoverage) {
+					const prevExampleContent =
+						prevExampleCoverage.exampleContent;
+					const prevExampleLines = prevExampleContent.split('\n');
+					const prevLineSectionMap =
+						mapLinesToSections(prevExampleContent);
+
+					// Check violation markers if current node is in violation section
+					if (isInViolationSection) {
+						for (const marker of prevExampleCoverage.violationMarkers) {
+							const markerLineIndex =
+								marker.lineNumber - LINE_NUMBER_OFFSET;
+							if (
+								markerLineIndex >= MIN_ARRAY_INDEX &&
+								markerLineIndex < prevExampleLines.length
+							) {
+								const markerLine =
+									prevExampleLines[markerLineIndex]
+										?.replace(/\/\/\s*❌/g, '')
+										.replace(/\/\/\s*✅/g, '')
+										.trim() ?? '';
+
+								const markerSection = prevLineSectionMap.get(
+									marker.lineNumber,
+								);
+								if (markerSection !== 'violation') {
+									continue;
+								}
+
+								// Check if this marker line would produce a node of the same type
+								let wouldMatch = false;
+
+								switch (nodeType) {
+									case 'VariableDeclaration': {
+										if (
+											nodeImage.length >
+											EMPTY_STRING_LENGTH
+										) {
+											wouldMatch = new RegExp(
+												`\\b${nodeImage}\\s*[=;]`,
+											).test(markerLine);
+										} else {
+											wouldMatch =
+												/\w+\s+\w+\s*[=;]/.test(
+													markerLine,
+												);
+										}
+										break;
+									}
+									case 'BinaryExpression': {
+										wouldMatch = /[+\-*/=<>!&|]{1,2}/.test(
+											markerLine,
+										);
+										break;
+									}
+									case 'LiteralExpression': {
+										wouldMatch =
+											/\b\d+(\.\d+)?\b|'(?:[^'\\]|\\.)*'|"[^"]*"|\bnull\b|\btrue\b|\bfalse\b/.test(
+												markerLine.toLowerCase(),
+											);
+										break;
+									}
+									case 'IfBlockStatement': {
+										wouldMatch = /\bif\b/.test(
+											markerLine.toLowerCase(),
+										);
+										break;
+									}
+									default: {
+										if (
+											nodeImage.length >
+											EMPTY_STRING_LENGTH
+										) {
+											wouldMatch =
+												markerLine.includes(nodeImage);
+										} else {
+											wouldMatch = markerLine
+												.toLowerCase()
+												.includes(
+													nodeType.toLowerCase(),
+												);
+										}
+										break;
+									}
+								}
+
+								if (
+									wouldMatch &&
+									markerLine.length > EMPTY_STRING_LENGTH
+								) {
+									alreadyCovered = true;
+									break;
+								}
+							}
+						}
+					}
+
+					// Check valid markers if current node is in valid section
+					if (!alreadyCovered && isInValidSection) {
+						for (const marker of prevExampleCoverage.validMarkers) {
+							const markerLineIndex =
+								marker.lineNumber - LINE_NUMBER_OFFSET;
+							if (
+								markerLineIndex >= MIN_ARRAY_INDEX &&
+								markerLineIndex < prevExampleLines.length
+							) {
+								const markerLine =
+									prevExampleLines[markerLineIndex]
+										?.replace(/\/\/\s*❌/g, '')
+										.replace(/\/\/\s*✅/g, '')
+										.trim() ?? '';
+
+								const markerSection = prevLineSectionMap.get(
+									marker.lineNumber,
+								);
+								if (markerSection !== 'valid') {
+									continue;
+								}
+
+								// Check if this marker line would produce a node of the same type
+								let wouldMatch = false;
+
+								switch (nodeType) {
+									case 'VariableDeclaration': {
+										if (
+											nodeImage.length >
+											EMPTY_STRING_LENGTH
+										) {
+											wouldMatch = new RegExp(
+												`\\b${nodeImage}\\s*[=;]`,
+											).test(markerLine);
+										} else {
+											wouldMatch =
+												/\w+\s+\w+\s*[=;]/.test(
+													markerLine,
+												);
+										}
+										break;
+									}
+									case 'BinaryExpression': {
+										wouldMatch = /[+\-*/=<>!&|]{1,2}/.test(
+											markerLine,
+										);
+										break;
+									}
+									case 'LiteralExpression': {
+										wouldMatch =
+											/\b\d+(\.\d+)?\b|'(?:[^'\\]|\\.)*'|"[^"]*"|\bnull\b|\btrue\b|\bfalse\b/.test(
+												markerLine.toLowerCase(),
+											);
+										break;
+									}
+									case 'IfBlockStatement': {
+										wouldMatch = /\bif\b/.test(
+											markerLine.toLowerCase(),
+										);
+										break;
+									}
+									default: {
+										if (
+											nodeImage.length >
+											EMPTY_STRING_LENGTH
+										) {
+											wouldMatch =
+												markerLine.includes(nodeImage);
+										} else {
+											wouldMatch = markerLine
+												.toLowerCase()
+												.includes(
+													nodeType.toLowerCase(),
+												);
+										}
+										break;
+									}
+								}
+
+								if (
+									wouldMatch &&
+									markerLine.length > EMPTY_STRING_LENGTH
+								) {
+									alreadyCovered = true;
+									break;
+								}
+							}
+						}
+					}
+
+					if (alreadyCovered) {
+						break;
+					}
 				}
 			}
 		}
 	}
 
 	// Color based on section type
+	// If we have XPath match results, only color nodes that match the XPath
+	// The color is determined by which section the node is in (violation = red, valid = green)
+	if (
+		xpathMatchLines !== undefined &&
+		xpathMatchLines.size > EMPTY_MARKERS_LENGTH
+	) {
+		// We have XPath match results - only color nodes that actually match
+		if (!nodeMatchesXPath) {
+			// Node doesn't match XPath - don't color it
+			return undefined;
+		}
+
+		// Node matches XPath - color based on section type
+		// If in violation section, it should trigger (red)
+		// If in valid section, it shouldn't trigger (green) - but if it matches XPath, that's a problem
+		// If node matches XPath, color it even if there are no explicit markers
+		// (PMD found a violation, so we should show it)
+		if (hasViolationSection) {
+			return alreadyCovered ? 'dark-red' : 'red';
+		}
+		if (hasValidSection) {
+			// Node matches XPath but is in valid section - this indicates the rule incorrectly triggers
+			// Color it green to show it's valid code, or orange to show the mismatch
+			return alreadyCovered ? 'dark-green' : 'green';
+		}
+		// Node matches XPath but no clear section - still color it red since PMD found a violation
+		return alreadyCovered ? 'dark-red' : 'red';
+	}
+
+	// Fallback: no XPath match results - use section-based coloring
 	// If node matches both sections, show orange to indicate ambiguity
 	// Note: We check marker existence to ensure there are actual tests defined
 	if (hasViolationSection && hasValidSection) {
@@ -1007,6 +1366,16 @@ interface XmlNodeToTreeNodeOptions {
 		  }>
 		| undefined;
 	exampleContent: Readonly<string>;
+
+	/**
+	 * Set of line numbers in the test file that match the XPath (from PMD violations).
+	 */
+	xpathMatchLines?: ReadonlySet<number>;
+
+	/**
+	 * FullMethodName attribute for MethodCallExpression nodes (e.g., 'Pattern.compile', 'input.replaceFirst').
+	 */
+	fullMethodName?: string;
 }
 
 /**
@@ -1029,6 +1398,9 @@ function xmlNodeToTreeNode(
 		previousExamplesCoverage,
 		validMarkers,
 		violationMarkers,
+		xpath,
+		xpathMatchLines,
+		wrapperInfo,
 	} = options;
 	const EQUALS_SEPARATOR = '=';
 	const QUOTE_CHAR = "'";
@@ -1062,15 +1434,19 @@ function xmlNodeToTreeNode(
 				nodeToCheck.getAttribute('EndLine') ??
 				nodeToCheck.getAttribute('endline');
 
+			// Return line numbers if we have at least BeginLine (EndLine is optional)
+			// This handles cases where nodes only have BeginLine but not EndLine
 			if (
 				beginLineAttr !== null &&
-				beginLineAttr.length > EMPTY_STRING.length &&
-				endLineAttr !== null &&
-				endLineAttr.length > EMPTY_STRING.length
+				beginLineAttr.length > EMPTY_STRING.length
 			) {
 				return {
 					beginLine: parseInt(beginLineAttr, PARSE_INT_RADIX),
-					endLine: parseInt(endLineAttr, PARSE_INT_RADIX),
+					endLine:
+						endLineAttr !== null &&
+						endLineAttr.length > EMPTY_STRING.length
+							? parseInt(endLineAttr, PARSE_INT_RADIX)
+							: null,
 				};
 			}
 
@@ -1096,6 +1472,11 @@ function xmlNodeToTreeNode(
 	// Extract Image attribute for source code matching (before filtering attributes)
 	const IMAGE_ATTR = 'Image';
 	const nodeImage = node.getAttribute(IMAGE_ATTR) ?? '';
+
+	// Extract FullMethodName for MethodCallExpression nodes (for XPath matching)
+	const FULL_METHOD_NAME_ATTR = 'FullMethodName';
+	const fullMethodName =
+		node.getAttribute(FULL_METHOD_NAME_ATTR) ?? undefined;
 
 	// Get all attributes and format them, omitting empty or 'false' values
 	const attributes: string[] = [];
@@ -1136,28 +1517,39 @@ function xmlNodeToTreeNode(
 		beginLine,
 		endLine,
 		exampleContent,
+		fullMethodName,
 		nodeImage,
 		nodeType: nodeName,
 		previousExamplesCoverage,
 		validMarkers,
 		violationMarkers,
-		wrapperInfo: options.wrapperInfo,
-		xpath: options.xpath,
+		wrapperInfo,
+		xpath: xpath ?? null,
+		xpathMatchLines,
 	});
 
 	return {
 		children: children.map(
 			// eslint-disable-next-line @typescript-eslint/prefer-readonly-parameter-types -- Callback parameter for map
-			(child) =>
-				xmlNodeToTreeNode({
+			(child) => {
+				// Extract FullMethodName for child MethodCallExpression nodes
+				const childFullMethodName =
+					child.nodeName === 'MethodCallExpression'
+						? (child.getAttribute(FULL_METHOD_NAME_ATTR) ??
+							undefined)
+						: undefined;
+				return xmlNodeToTreeNode({
 					exampleContent,
+					fullMethodName: childFullMethodName,
 					node: child,
 					previousExamplesCoverage,
 					validMarkers,
 					violationMarkers,
-					wrapperInfo: options.wrapperInfo,
-					xpath: options.xpath,
-				}),
+					wrapperInfo,
+					xpath: xpath ?? null,
+					xpathMatchLines,
+				});
+			},
 		),
 		color,
 		name: displayName,
@@ -1225,6 +1617,7 @@ function parseXmlAstAndStripWrappers(
 		violationMarkers,
 		wrapperInfo,
 		xmlAstOutput,
+		xpathMatchLines,
 	} = options;
 	const parser = new DOMParser();
 	const doc = parser.parseFromString(xmlAstOutput, 'text/xml');
@@ -1287,6 +1680,7 @@ function parseXmlAstAndStripWrappers(
 		violationMarkers,
 		wrapperInfo,
 		xpath,
+		xpathMatchLines,
 	});
 
 	// Use stringify-tree to render the tree with 2 space indent
@@ -1359,6 +1753,26 @@ async function runDiagnostics(
 			includeViolations: true,
 		});
 
+		// Run PMD with the rule to get actual XPath matches (violations)
+		// This tells us which lines in the test file match the XPath
+		let xpathMatchLines: Set<number> | undefined = undefined;
+		if (xpath !== null && xpath.length > EMPTY_STRING_LENGTH) {
+			const pmdResult = await runPMD(
+				testFileResult.filePath,
+				ruleFilePath,
+			);
+			if (pmdResult.success && pmdResult.data) {
+				const violationLines = pmdResult.data.violations.map(
+					(v: Readonly<{ line: number }>) => v.line,
+				);
+				// Only create the set if there are violations
+				// If empty, leave as undefined to fall back to node type checking
+				if (violationLines.length > EMPTY_MARKERS_LENGTH) {
+					xpathMatchLines = new Set(violationLines);
+				}
+			}
+		}
+
 		// Run PMD AST dump
 		const astResult = await runPmdAstDump(
 			testFileResult.filePath,
@@ -1410,6 +1824,7 @@ async function runDiagnostics(
 			wrapperInfo,
 			xmlAstOutput: rawXmlAst,
 			xpath,
+			xpathMatchLines,
 		});
 
 		// Print cleaned AST dump to stdout

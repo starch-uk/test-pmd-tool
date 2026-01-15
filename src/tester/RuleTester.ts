@@ -392,39 +392,46 @@ export class RuleTester {
 					includeViolations: true,
 				});
 
-				let violationTestPassed = false;
+				let pmdViolations: readonly { line: number }[] = [];
 				try {
 					const pmdResult = await runPMD(
 						violationTestFile.filePath,
 						this.ruleFilePath,
 					);
-					const ZERO_VIOLATIONS_COUNT = 0;
 					if (pmdResult.success && pmdResult.data) {
-						violationTestPassed =
-							pmdResult.data.violations.length >
-							ZERO_VIOLATIONS_COUNT;
-						actualViolations += pmdResult.data.violations.length;
+						pmdViolations = pmdResult.data.violations;
+						actualViolations += pmdViolations.length;
 					}
 				} catch {
 					// PMD execution failed
 				}
 
-				if (!violationTestPassed) {
-					passed = false;
-				}
-
 				// Create one test case result per violation marker
+				// Match each marker to violations by line number
 				for (const marker of example.violationMarkers) {
 					const xmlLineNumber = this.findMarkerLineNumber(
 						example,
 						exampleIndex,
 						marker.lineNumber,
 					);
+					const testFileLineNumber = this.findMarkerLineInTestFile(
+						example,
+						marker.lineNumber,
+						violationTestFile.filePath,
+					);
+					const markerPassed =
+						testFileLineNumber !== undefined &&
+						pmdViolations.some(
+							(v: Readonly<{ line: number }>) =>
+								v.line === testFileLineNumber,
+						);
+					// If any marker fails, the test fails
+					passed = passed && markerPassed;
 					testCaseResults.push({
 						description: `Violation test for example ${String(exampleIndex)}`,
 						exampleIndex,
 						lineNumber: xmlLineNumber,
-						passed: violationTestPassed,
+						passed: markerPassed,
 						testType: 'violation',
 					});
 				}
@@ -657,6 +664,91 @@ export class RuleTester {
 				// and markerLineNumber is bounded by exampleContentLines.length,
 				// xmlLineIndex should always be within bounds
 				return xmlLineIndex;
+			}
+
+			return undefined;
+		} catch {
+			// Ignore errors when finding line numbers
+		}
+		return undefined;
+	}
+
+	/**
+	 * Maps a marker's line number (within example content) to test file line number.
+	 * Finds the code from the marker line in the generated test file.
+	 * @param example - The example data containing the marker.
+	 * @param markerLineNumber - 1-based line number within the example content.
+	 * @param testFilePath - Path to the generated test file.
+	 * @returns Line number in the test file, or undefined if not found.
+	 * @private
+	 */
+	private findMarkerLineInTestFile(
+		// eslint-disable-next-line @typescript-eslint/prefer-readonly-parameter-types -- ExampleData needs to be mutable for property access
+		example: Readonly<ExampleData>,
+		markerLineNumber: Readonly<number>,
+		testFilePath: Readonly<string>,
+	): number | undefined {
+		// Use this.ruleFilePath to satisfy class-methods-use-this
+		void this.ruleFilePath;
+		try {
+			if (!existsSync(testFilePath)) {
+				return undefined;
+			}
+
+			const testFileContent = readFileSync(testFilePath, 'utf-8');
+			const testFileLines = testFileContent.split('\n');
+
+			// Get the line from example content that contains the marker
+			const LINE_NUMBER_OFFSET = 1;
+			const exampleContentLines = example.content.split('\n');
+			const markerLineIndex = markerLineNumber - LINE_NUMBER_OFFSET;
+			const ZERO_INDEX = 0;
+			if (
+				markerLineIndex < ZERO_INDEX ||
+				markerLineIndex >= exampleContentLines.length
+			) {
+				return undefined;
+			}
+
+			// split('\n') always returns a dense array, so exampleContentLines[markerLineIndex] is always defined
+			// eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Bounds checked above
+			const markerLineInExample = exampleContentLines[markerLineIndex]!;
+
+			// Extract the code part (without the comment marker)
+			let codeToFind = '';
+			if (markerLineInExample.includes('// ❌')) {
+				const splitResult = markerLineInExample.split('// ❌');
+				// split() always returns at least one element, so [0] is always defined
+				// eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- split() always returns at least one element
+				codeToFind = splitResult[ZERO_INDEX]!.trim();
+			} else if (markerLineInExample.includes('// ✅')) {
+				const splitResult = markerLineInExample.split('// ✅');
+				// split() always returns at least one element, so [0] is always defined
+				// eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- split() always returns at least one element
+				codeToFind = splitResult[ZERO_INDEX]!.trim();
+			} else {
+				codeToFind = markerLineInExample.trim();
+			}
+
+			const EMPTY_STRING_LENGTH = 0;
+			if (codeToFind.length === EMPTY_STRING_LENGTH) {
+				return undefined;
+			}
+
+			// Find the line in the test file that contains this code
+			// Match by comparing trimmed versions to handle indentation differences
+			const trimmedCodeToFind = codeToFind.trim();
+			for (let i = 0; i < testFileLines.length; i++) {
+				// split('\n') always returns a dense array, so testFileLines[i] is always defined
+				// eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Loop condition ensures valid index, split() returns dense array
+				const testLine = testFileLines[i]!;
+				const trimmedTestLine = testLine.trim();
+
+				// Check if the trimmed code appears in the trimmed test line
+				// This handles indentation differences while ensuring the code matches
+				if (trimmedTestLine.includes(trimmedCodeToFind)) {
+					return i + LINE_NUMBER_OFFSET;
+				}
 			}
 
 			return undefined;
