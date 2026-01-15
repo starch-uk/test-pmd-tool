@@ -80,14 +80,20 @@ function parseCliArgs(args: readonly (string | undefined)[]): ParsedArgs {
 			continue;
 		}
 
-		if (!argValue.startsWith('-')) {
-			if (result.path === null) {
-				result.path = argValue;
-			} else {
+		// Validate input format first - non-option arguments are treated as file paths
+		const isNonOptionArg = !argValue.startsWith('-');
+		if (isNonOptionArg) {
+			// Enforce single path argument rule - this is input validation, not authorization
+			// Check if we've already accepted a path argument (internal state check)
+			if (result.path !== null) {
+				// Reject additional path arguments - validation failure
 				console.error(`❌ Unexpected argument: ${argValue}`);
 				process.exit(EXIT_CODE_ERROR);
 			}
+			// Validation passed - accept the path argument
+			result.path = argValue;
 		} else {
+			// Unknown option - validation failure
 			console.error(`❌ Unknown option: ${argValue}`);
 			process.exit(EXIT_CODE_ERROR);
 		}
