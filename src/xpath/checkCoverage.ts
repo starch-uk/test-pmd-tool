@@ -771,6 +771,12 @@ function checkAttributeCoverage(
 				// Look for method calls like methodName(...) or Class.methodName(...)
 				isCovered = /\w+\.\w+\s*\(|\w+\s*\(/.test(content);
 				break;
+			case 'FullMethodName':
+				// @FullMethodName contains the full method name like 'Pattern.compile' or 'String.matches'
+				// Check if method calls with class.methodName pattern appear in content
+				// This covers patterns like Pattern.compile(), String.matches(), etc.
+				isCovered = /\w+\.\w+\s*\(/.test(content);
+				break;
 			case 'Value':
 				// Look for parameter values in annotations like @IsTest(...=false)
 				isCovered = /@\w+\([^)]*=\s*[^)]+\)/.test(content);
