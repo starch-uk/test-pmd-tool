@@ -22,7 +22,7 @@ interface ParsedArgs {
 
 /**
  * Parse command line arguments.
- * @param args - Array of command line arguments.
+ * @param args - Array of command line arguments (from process.argv.slice(2)).
  * @returns Parsed arguments structure.
  */
 function parseCliArgs(args: readonly (string | undefined)[]): ParsedArgs {
@@ -33,32 +33,36 @@ function parseCliArgs(args: readonly (string | undefined)[]): ParsedArgs {
 		path: null,
 	};
 
+	// Filter out undefined values upfront to avoid security concerns with user-controlled data
+	// process.argv always returns string[], but we handle undefined for defensive programming
+	const filteredArgs = args.filter((arg): arg is string => arg !== undefined);
+
 	const MIN_ARGS_LENGTH = 0;
-	if (args.length === MIN_ARGS_LENGTH) {
+	if (filteredArgs.length === MIN_ARGS_LENGTH) {
 		return result;
 	}
 
-	let i = 0;
-	while (i < args.length) {
-		const arg = args[i];
-		if (arg === undefined) {
-			i += ARG_INCREMENT;
-			continue;
-		}
+	// Use index-based iteration to handle --diag flag that needs next argument
+	for (let i = 0; i < filteredArgs.length; i += ARG_INCREMENT) {
+		// After filtering with type predicate, filteredArgs[i] is guaranteed to be a string
+		// TypeScript array access typing can return undefined, but our bounds check (i < length)
+		// and filter guarantee it's defined. Use non-null assertion for type safety.
+		// eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Filter and bounds check guarantee value exists
+		const argValue = filteredArgs[i]!;
 
-		if (arg === '--help' || arg === '-h') {
+		if (argValue === '--help' || argValue === '-h') {
 			result.help = true;
 			return result;
 		}
 
-		if (arg === '--coverage' || arg === '-c') {
+		if (argValue === '--coverage' || argValue === '-c') {
 			result.coverage = true;
-			i += ARG_INCREMENT;
 			continue;
 		}
 
-		if (arg === '--diag' || arg === '-d') {
-			const nextArg = args[i + ARG_INCREMENT];
+		if (argValue === '--diag' || argValue === '-d') {
+			const nextIndex = i + ARG_INCREMENT;
+			const nextArg = filteredArgs[nextIndex];
 			if (nextArg === undefined) {
 				console.error('❌ --diag/-d requires an example index number');
 				process.exit(EXIT_CODE_ERROR);
@@ -71,23 +75,22 @@ function parseCliArgs(args: readonly (string | undefined)[]): ParsedArgs {
 				process.exit(EXIT_CODE_ERROR);
 			}
 			result.diag = diagIndex;
-			i += ARG_INCREMENT_DIAG;
+			// Skip both the flag and its value (total of 2 arguments)
+			i += ARG_INCREMENT_DIAG - ARG_INCREMENT; // Adjust for loop increment
 			continue;
 		}
 
-		if (!arg.startsWith('-')) {
+		if (!argValue.startsWith('-')) {
 			if (result.path === null) {
-				result.path = arg;
+				result.path = argValue;
 			} else {
-				console.error(`❌ Unexpected argument: ${arg}`);
+				console.error(`❌ Unexpected argument: ${argValue}`);
 				process.exit(EXIT_CODE_ERROR);
 			}
 		} else {
-			console.error(`❌ Unknown option: ${arg}`);
+			console.error(`❌ Unknown option: ${argValue}`);
 			process.exit(EXIT_CODE_ERROR);
 		}
-
-		i += ARG_INCREMENT;
 	}
 
 	return result;
