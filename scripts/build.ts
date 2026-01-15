@@ -5,7 +5,7 @@ build({
 	bundle: true,
 	platform: 'node',
 	outfile: 'dist/test-pmd-rule.js',
-	external: ['@xmldom/xmldom', 'tmp'],
+	external: ['@xmldom/xmldom', 'tmp', 'stringify-tree'],
 	banner: { js: '#!/usr/bin/env node' },
 	format: 'esm',
 	target: 'node25',
