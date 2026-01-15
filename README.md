@@ -162,6 +162,10 @@ public class TestClass {
 1. **Extraction**: The tool reads all `<example>` tags from your rule XML file
 2. **Parsing**: Each example is parsed to identify violation and valid code sections
 3. **Test File Creation**: Temporary Apex test files are generated with the example code
+    - If an example contains a single top-level class, it's renamed to a test class name
+    - If an example contains multiple top-level classes, they're wrapped as inner classes within a test class
+    - If an example contains only methods/fields without a class, they're wrapped in a test class
+    - If an example contains only standalone code, it's wrapped in a test method within a test class
 4. **PMD Execution**: PMD is run against the test files to check if violations occur as expected
 5. **Validation**: The tool verifies that:
     - Violation examples actually trigger the rule
@@ -213,6 +217,7 @@ The AST nodes are color-coded to indicate which parts of your example code are b
 - **Dark Red (dim)**: Node is tested by **violation** examples but was already covered in previous examples
 - **Green (bright)**: Node is tested by **valid** examples in the current example
 - **Dark Green (dim)**: Node is tested by **valid** examples but was already covered in previous examples
+- **Orange**: Node matches both **violation** and **valid** sections (indicates ambiguity - the same code appears in both sections)
 - **No color**: Node is not tested or couldn't be matched to example code
 
 This color coding helps you understand:
@@ -220,6 +225,7 @@ This color coding helps you understand:
 - Which AST nodes correspond to your violation/valid markers
 - Whether nodes are being tested by the current example or were already covered
 - Which parts of the AST structure your XPath expression should target
+- When the same code appears in both violation and valid sections (orange indicates this ambiguity)
 
 **Notes:**
 
@@ -228,6 +234,7 @@ This color coding helps you understand:
 - If the generated test file has syntax errors, the tool will display the generated file content to help debug issues
 - The AST output includes all node attributes and can be quite verbose - use it when you need detailed insight into PMD's parsing
 - Colors use ANSI escape codes and will automatically be disabled if your terminal doesn't support them
+- **Wrapper class cleanup**: The tool automatically strips wrapper class prefixes from `DefiningType` attributes (e.g., `DefiningType='TestClass1.MyClassViolation'` becomes `DefiningType='MyClassViolation'`) to make the output cleaner and more readable
 
 ## Requirements
 
