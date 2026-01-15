@@ -107,6 +107,10 @@ function parseCliArgs(args: readonly (string | undefined)[]): ParsedArgs {
 		return result;
 	}
 
+	// Track internal state for path argument acceptance (server-controlled, not user-controlled)
+	// This flag tracks whether we've already accepted a path argument, enforcing single path rule
+	let pathArgumentAccepted = false;
+
 	// Use index-based iteration to handle --diag flag that needs next argument
 	for (let i = 0; i < filteredArgs.length; i += ARG_INCREMENT) {
 		// After filtering with type predicate, filteredArgs[i] is guaranteed to be a string
@@ -130,14 +134,18 @@ function parseCliArgs(args: readonly (string | undefined)[]): ParsedArgs {
 		// Validate diag flag against whitelist - this is input validation, not authorization
 		// The isValidDiagFlag function checks user input against fixed whitelist values only
 		if (isValidDiagFlag(argValue)) {
-			// Diag flag requires a value argument - get the next argument
+			// Diag flag requires a value argument - validate bounds first (not user-controlled)
+			// Check array bounds using array length (server-controlled), not user input
 			const nextIndex = i + ARG_INCREMENT;
-			const nextArg = filteredArgs[nextIndex];
-			// Validate that the required argument exists - this is input validation
-			if (nextArg === undefined) {
+			const isNextIndexInBounds = nextIndex < filteredArgs.length;
+			if (!isNextIndexInBounds) {
+				// Bounds check failed - missing required argument
 				console.error('❌ --diag/-d requires an example index number');
 				process.exit(EXIT_CODE_ERROR);
 			}
+			// Bounds validated - safe to access array element
+			// eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Bounds check guarantees value exists
+			const nextArg = filteredArgs[nextIndex]!;
 			const diagIndex = Number.parseInt(nextArg, PARSE_INT_RADIX);
 			if (Number.isNaN(diagIndex) || diagIndex < MIN_DIAG_INDEX) {
 				console.error(
@@ -155,14 +163,15 @@ function parseCliArgs(args: readonly (string | undefined)[]): ParsedArgs {
 		const isNonOptionArg = !argValue.startsWith('-');
 		if (isNonOptionArg) {
 			// Enforce single path argument rule - this is input validation, not authorization
-			// Check if we've already accepted a path argument (internal state check)
-			if (result.path !== null) {
+			// Check internal state flag (server-controlled) to enforce single path argument rule
+			if (pathArgumentAccepted) {
 				// Reject additional path arguments - validation failure
 				console.error(`❌ Unexpected argument: ${argValue}`);
 				process.exit(EXIT_CODE_ERROR);
 			}
-			// Validation passed - accept the path argument
+			// Validation passed - accept the path argument and update state
 			result.path = argValue;
+			pathArgumentAccepted = true;
 		} else {
 			// Unknown option - validation failure
 			console.error(`❌ Unknown option: ${argValue}`);
