@@ -46,7 +46,7 @@ const mockedRealpathSync = vi.mocked(realpathSync);
 const mockedResolve = vi.mocked(resolve);
 const mockedRunPMD = vi.mocked(runPMD);
 
-describe('RuleTester Integration', () => {
+describe.sequential('RuleTester Integration', () => {
 	let tester: RuleTester | undefined = undefined;
 
 	beforeEach(() => {
@@ -79,14 +79,14 @@ describe('RuleTester Integration', () => {
   <example>
 // Violation: Public method
 public class TestClass {
-    public void testMethod() { // ❌ Violation
+    public void exampleMethod() { // ❌ Violation
         // method body
     }
 }
 
 // Valid: Private method
 public class ValidClass {
-    private void testMethod() { // ✅ Valid
+    private void exampleMethod() { // ✅ Valid
         // method body
     }
 }
@@ -201,14 +201,14 @@ public class ValidClass {
   <example>
 // Violation: Public method
 public class TestClass {
-    public void testMethod() { // ❌ Violation
+    public void exampleMethod() { // ❌ Violation
         // method body
     }
 }
 
 // Valid: Private method
 public class ValidClass {
-    private void testMethod() { // ✅ Valid
+    private void exampleMethod() { // ✅ Valid
         // method body
     }
 }
@@ -285,7 +285,7 @@ public class ValidClass {
   <example>
 // Violation: Test
 public class TestClass {
-    public void testMethod() {
+    public void exampleMethod() {
     }
 }
   </example>
@@ -439,13 +439,13 @@ public class TestClass {
   <example>
 // Violation: Public method
 public class TestClass {
-    public void testMethod() { // ❌ Violation
+    public void exampleMethod() { // ❌ Violation
     }
 }
 
 // Valid: Private method
 public class ValidClass {
-    private void testMethod() { // ✅ Valid
+    private void exampleMethod() { // ✅ Valid
     }
 }
   </example>
@@ -590,14 +590,14 @@ public class ValidClass {
   <example>
 // Violation: Public method
 public class TestClass {
-    public void testMethod() {
+    public void exampleMethod() {
         // method body
     }
 }
 
 // Valid: Private method
 public class ValidClass {
-    private void testMethod() {
+    private void exampleMethod() {
         // method body
     }
 }
@@ -642,6 +642,44 @@ public class ValidClass {
 	it('should find example line numbers when PMD execution fails', async () => {
 		// beforeEach already resets mocks via vi.resetAllMocks()
 
+		// Use mockImplementation instead of mockReturnValue to ensure
+		// readFileSync always returns the XML for all calls (constructor + findMarkerLineNumber)
+		// According to VITEST.md, mockImplementation is more reliable for persistent behavior
+		// when there are multiple calls to the same mocked function
+		const testRuleXml = `<?xml version="1.0" encoding="UTF-8"?>
+<rule name="TestRule"
+      language="apex"
+      message="Test message"
+      class="net.sourceforge.pmd.lang.apex.rule.TestRule">
+  <description>Test rule description with sufficient length</description>
+  <priority>3</priority>
+  <properties>
+    <property name="xpath">
+      <value>//Method[@Visibility='public']</value>
+    </property>
+  </properties>
+  <example>
+// Violation: Public method
+public class TestClass {
+    public void exampleMethod() { // ❌ Violation
+        // method body
+    }
+}
+
+// Valid: Private method
+public class ValidClass {
+    private void exampleMethod() { // ✅ Valid
+        // method body
+    }
+}
+  </example>
+</rule>`;
+		// Use mockImplementation to ensure consistent behavior across all readFileSync calls
+		// This avoids mock state conflicts when readFileSync is called multiple times:
+		// 1. In constructor (extractRuleMetadata, extractExamples)
+		// 2. In findMarkerLineNumber (for each marker)
+		mockedReadFileSync.mockImplementation(() => testRuleXml);
+
 		// Mock PMD to throw an error
 		mockedRunPMD.mockRejectedValue(new Error('PMD execution failed'));
 
@@ -683,7 +721,7 @@ public class ValidClass {
   <example>
 // Violation: Public method
 public class TestClass {
-    public void testMethod() { // ❌ Violation
+    public void exampleMethod() { // ❌ Violation
         // method body
     }
 }
@@ -737,12 +775,12 @@ public class TestClass {
   <example>
 // Violation: Public method
 public class TestClass {
-    public void testMethod() {
+    public void exampleMethod() {
     }
 }
 // Valid: Private method
 public class ValidClass {
-    private void testMethod() {
+    private void exampleMethod() {
     }
 }
   </example>
@@ -854,7 +892,7 @@ public class ValidClass {
   <example>
 // Violation: Public method
 public class TestClass {
-    public void testMethod() {
+    public void exampleMethod() {
     }
 }
 // Valid: Private method
@@ -946,7 +984,7 @@ public class TestClass {
   <example>
 // Violation: Test
 public class TestClass {
-    public void testMethod() {
+    public void exampleMethod() {
     }
 }
   </example>
@@ -991,7 +1029,7 @@ public class TestClass {
   <example>
 // Violation: Test
 public class TestClass {
-    public void testMethod() {
+    public void exampleMethod() {
     }
 }
   </example>
@@ -1034,7 +1072,7 @@ public class TestClass {
   <example>
 // Violation: Test
 public class TestClass {
-    public void testMethod() {
+    public void exampleMethod() {
     }
 }
   </example>
@@ -1046,7 +1084,7 @@ public class TestClass {
   <example>
 // Violation: Test
 public class TestClass {
-    public void testMethod() {
+    public void exampleMethod() {
     }
 </rule>`;
 
@@ -1098,7 +1136,7 @@ public class TestClass {
   <example>
 // Violation: Test
 public class TestClass {
-    public void testMethod() {
+    public void exampleMethod() {
     }
 }
   </example>
@@ -1141,7 +1179,7 @@ public class TestClass {
   <example>
 // Valid: Private method
 public class ValidClass {
-    private void testMethod() {
+    private void exampleMethod() {
     }
 }
   </example>
@@ -1179,14 +1217,14 @@ public class ValidClass {
   <example>
 // Violation: Test 1
 public class TestClass1 {
-    public void testMethod() {
+    public void exampleMethod() {
     }
 }
   </example>
   <example>
 // Violation: Test 2
 public class TestClass2 {
-    public void testMethod() {
+    public void exampleMethod() {
     }
 }
   </example>
@@ -1273,14 +1311,14 @@ public class TestClass2 {
   <example>
 // Violation: Test 1
 public class TestClass1 {
-    public void testMethod() {
+    public void exampleMethod() {
     }
 }
   </example>
   <example>
 // Violation: Test 2
 public class TestClass2 {
-    public void testMethod() {
+    public void exampleMethod() {
     }
 }
   </example>
@@ -1325,7 +1363,7 @@ public class TestClass2 {
 /* This is a block comment start
 */ This is a block comment end
 public class TestClass {
-    public void testMethod() {
+    public void exampleMethod() {
     }
 }
   </example>

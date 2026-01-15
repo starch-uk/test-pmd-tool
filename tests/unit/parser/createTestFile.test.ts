@@ -773,7 +773,7 @@ public class Example {
 	it('should handle class-like structures path (methods without top-level class)', () => {
 		const exampleContent = `
 // Violation: Test method
-public void testMethod() {
+public void exampleMethod() {
   Integer value = 5;
 }
 `;
@@ -788,9 +788,9 @@ public void testMethod() {
 		const writtenContent = capturedContent;
 		// Should wrap in a class (hasClassLikeStructures path)
 		expect(writtenContent).toContain('public class TestClass40 {');
-		expect(writtenContent).toContain('public void testMethod() {');
+		expect(writtenContent).toContain('public void exampleMethod() {');
 		expect(writtenContent).toContain('Integer value = 5;');
-		expect(writtenContent).not.toContain('public void testMethod40() {');
+		expect(writtenContent).not.toContain('public void exampleMethod40() {');
 	});
 
 	it('should handle standalone lines outside class with inline markers', () => {
@@ -1374,7 +1374,7 @@ public class Example {
 		const exampleContent = `
 // Violation: Test
 public class Example {
-    public void testMethod() { // ❌ Method with 'void' - tests first || branch
+    public void exampleMethod() { // ❌ Method with 'void' - tests first || branch
         Integer value = 5;
     }
     public Integer getValue() { // ❌ Method with '(' - tests second || branch (void is false)
@@ -1396,7 +1396,7 @@ public class Example {
 		const writtenContent = capturedContent;
 		// All methods should be treated as method declarations
 		expect(writtenContent).toContain('public class TestClass68');
-		expect(writtenContent).toContain('public void testMethod()');
+		expect(writtenContent).toContain('public void exampleMethod()');
 		expect(writtenContent).toContain('public Integer getValue()');
 		expect(writtenContent).toContain('public String getName()');
 	});

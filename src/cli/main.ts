@@ -1414,16 +1414,61 @@ async function testRuleFile(
 			result.detailedTestResults.length > MIN_DETAILED_RESULTS_COUNT
 		) {
 			console.log('📋 Test Details:');
+
+			const forbiddenExampleIndices = new Set<number>();
+
+			// Surface forbidden method name failures as primary test failures
+			if (
+				result.qualityChecks &&
+				result.qualityChecks.issues.length > MIN_DETAILED_RESULTS_COUNT
+			) {
+				const FORBIDDEN_METHOD_MESSAGE =
+					"You can't call a method testMethod in examples";
+				const forbiddenMethodIssues =
+					result.qualityChecks.issues.filter((issue) =>
+						issue.includes(FORBIDDEN_METHOD_MESSAGE),
+					);
+				for (const issue of forbiddenMethodIssues) {
+					console.log(`   - ${issue} ❌`);
+
+					// Extract example index from message: "... Example N: ..."
+					const exampleMatch = /Example\s+(\d+):/.exec(issue);
+					const FIRST_CAPTURE_GROUP = 1;
+					const exampleIndexString =
+						exampleMatch?.[FIRST_CAPTURE_GROUP];
+					if (exampleIndexString !== undefined) {
+						const exampleIndex = Number.parseInt(
+							exampleIndexString,
+							PARSE_INT_RADIX,
+						);
+						if (!Number.isNaN(exampleIndex)) {
+							forbiddenExampleIndices.add(exampleIndex);
+						}
+					}
+				}
+			}
+
 			for (const testResult of result.detailedTestResults) {
+				// Skip further checks for examples that violated the testMethod rule
+				if (forbiddenExampleIndices.has(testResult.exampleIndex)) {
+					continue;
+				}
+
 				const status = testResult.passed ? '✅' : '❌';
-				const testType =
-					testResult.testType === 'violation' ? 'Violation' : 'Valid';
-				const lineInfo =
+				const lineNumber =
 					testResult.lineNumber !== undefined
-						? ` Line: ${String(testResult.lineNumber)}`
-						: '';
+						? String(testResult.lineNumber)
+						: '?';
+				const message =
+					testResult.testType === 'violation'
+						? testResult.passed
+							? 'Violation triggered'
+							: 'Violation not triggered'
+						: testResult.passed
+							? 'Valid not triggered'
+							: 'Valid triggered';
 				console.log(
-					`   - Example ${String(testResult.exampleIndex)} Test: ${testType} ${status}${lineInfo}`,
+					`   - Line: ${lineNumber}, Example ${String(testResult.exampleIndex)}: ${message} ${status}`,
 				);
 			}
 		}
@@ -1453,8 +1498,15 @@ async function testRuleFile(
 			} else {
 				console.log('  Status: ⚠️ Incomplete');
 				// Sort issues by line number, then by message
-				const sortedIssues = [...result.qualityChecks.issues].sort(
-					(a: string, b: string) => {
+				const FORBIDDEN_METHOD_MESSAGE =
+					"You can't call a method testMethod in examples";
+				const sortedIssues = result.qualityChecks.issues
+					// Exclude forbidden method name failures from Quality Checks output;
+					// they are shown under Test Details instead.
+					.filter(
+						(issue) => !issue.includes(FORBIDDEN_METHOD_MESSAGE),
+					)
+					.sort((a: string, b: string) => {
 						// Extract line numbers from "Line X: ..." format
 						const lineMatchA = /^Line\s+(\d+):/.exec(a);
 						const lineMatchB = /^Line\s+(\d+):/.exec(b);
@@ -1482,8 +1534,7 @@ async function testRuleFile(
 
 						// If same line number (or both have no line), sort by message
 						return a.localeCompare(b);
-					},
-				);
+					});
 				for (const issue of sortedIssues) {
 					console.log(`  - ${issue}`);
 				}

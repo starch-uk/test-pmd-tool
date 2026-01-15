@@ -1888,7 +1888,8 @@ describe('checkXPathCoverage', () => {
 	it('should check coverage for MethodName attribute', () => {
 		const examples = [
 			{
-				content: 'public void testMethod() { Helper.helperMethod(); }',
+				content:
+					'public void exampleMethod() { Helper.helperMethod(); }',
 				exampleIndex: 1,
 				validMarkers: [],
 				valids: [],
@@ -1911,13 +1912,13 @@ describe('checkXPathCoverage', () => {
 <rule name="TestRule">
   <properties>
     <property name="xpath">
-      <value>//Method[@MethodName = 'testMethod']</value>
+      <value>//Method[@MethodName = 'exampleMethod']</value>
     </property>
   </properties>
 </rule>`);
 
 		const result = checkXPathCoverage(
-			'//Method[@MethodName = "testMethod"]',
+			'//Method[@MethodName = "exampleMethod"]',
 			examples,
 			'/path/to/rule.xml',
 		);

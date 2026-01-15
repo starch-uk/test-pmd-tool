@@ -205,12 +205,29 @@ test-pmd-rule path/to/rule.xml --diag 1
 test-pmd-rule path/to/rule.xml -d 2
 ```
 
+**Color Coding:**
+
+The AST nodes are color-coded to indicate which parts of your example code are being tested:
+
+- **Red (bright)**: Node is tested by **violation** examples in the current example
+- **Dark Red (dim)**: Node is tested by **violation** examples but was already covered in previous examples
+- **Green (bright)**: Node is tested by **valid** examples in the current example
+- **Dark Green (dim)**: Node is tested by **valid** examples but was already covered in previous examples
+- **No color**: Node is not tested or couldn't be matched to example code
+
+This color coding helps you understand:
+
+- Which AST nodes correspond to your violation/valid markers
+- Whether nodes are being tested by the current example or were already covered
+- Which parts of the AST structure your XPath expression should target
+
 **Notes:**
 
 - The AST dump is printed to stdout, showing the hierarchical structure of nodes that PMD extracts from your example code
 - The diagnostic mode cannot be used with directories or combined with `--coverage`
 - If the generated test file has syntax errors, the tool will display the generated file content to help debug issues
 - The AST output includes all node attributes and can be quite verbose - use it when you need detailed insight into PMD's parsing
+- Colors use ANSI escape codes and will automatically be disabled if your terminal doesn't support them
 
 ## Requirements
 

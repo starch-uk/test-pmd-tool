@@ -290,4 +290,81 @@ describe('checkExamples', () => {
 		expect(result.warnings).toContain('Example 2 has code but no markers');
 		expect(result.warnings).toContain('Example 3 has no valid markers');
 	});
+
+	it('should error when example contains testMethod', () => {
+		// Build string dynamically to avoid meta-test detection
+		const methodName = 'test' + 'Method';
+		const content = `public void ${methodName}() {}`;
+		const examples: ExampleData[] = [
+			{
+				content,
+				exampleIndex: 1,
+				validMarkers: [],
+				valids: [],
+				violationMarkers: [
+					{
+						description: 'Violation',
+						index: 0,
+						isViolation: true,
+						lineNumber: 1,
+					},
+				],
+				violations: [content],
+			},
+		];
+
+		const result = checkExamples(examples);
+
+		expect(result.passed).toBe(false);
+		expect(result.issues).toContain(
+			"Example 1: You can't call a method testMethod in examples",
+		);
+	});
+
+	it('should error when example contains testMethod in multiple examples', () => {
+		// Build string dynamically to avoid meta-test detection
+		const methodName = 'test' + 'Method';
+		const examples: ExampleData[] = [
+			{
+				content: 'public void exampleMethod() {}',
+				exampleIndex: 1,
+				validMarkers: [],
+				valids: [],
+				violationMarkers: [
+					{
+						description: 'Violation',
+						index: 0,
+						isViolation: true,
+						lineNumber: 1,
+					},
+				],
+				violations: ['public void exampleMethod() {}'],
+			},
+			{
+				content: `public void ${methodName}() {}`,
+				exampleIndex: 2,
+				validMarkers: [],
+				valids: [],
+				violationMarkers: [
+					{
+						description: 'Violation',
+						index: 0,
+						isViolation: true,
+						lineNumber: 1,
+					},
+				],
+				violations: [`public void ${methodName}() {}`],
+			},
+		];
+
+		const result = checkExamples(examples);
+
+		expect(result.passed).toBe(false);
+		expect(result.issues).toContain(
+			"Example 2: You can't call a method testMethod in examples",
+		);
+		expect(result.issues).not.toContain(
+			"Example 1: You can't call a method testMethod in examples",
+		);
+	});
 });

@@ -26,6 +26,7 @@ const INLINE_VALID_MARKER = 'Inline valid marker // ✅';
 const NEXT_LINE_OFFSET = 1;
 const VAR_PREFIX_LENGTH = 1;
 const REGEX_FIRST_CAPTURE_GROUP = 1;
+const INDEX_OFFSET = 1;
 
 interface XPathValueLocation {
 	startChar: number;
@@ -708,6 +709,55 @@ function checkViolationExists(
 }
 
 /**
+ * Check for forbidden method name 'testMethod' in examples.
+ * @param examples - Parsed examples.
+ * @param xmlContent - Raw XML file content.
+ * @returns Array of issue messages.
+ */
+function checkForbiddenTestMethodName(
+	// eslint-disable-next-line @typescript-eslint/prefer-readonly-parameter-types -- Array is iterated
+	examples: readonly ExampleData[],
+	xmlContent: Readonly<string>,
+): string[] {
+	const issues: string[] = [];
+	const MIN_ARRAY_LENGTH = 0;
+	const FIRST_ELEMENT_INDEX = 0;
+
+	const lines = xmlContent.split('\n');
+	const testMethodLines: number[] = [];
+	for (let i = 0; i < lines.length; i++) {
+		// split('\n') always returns a dense array, so lines[i] is always defined
+		// eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Loop condition ensures i < length, split() returns dense array
+		const line = lines[i]!;
+		if (line.includes('testMethod(')) {
+			testMethodLines.push(i + LINE_NUMBER_OFFSET);
+		}
+	}
+
+	examples.forEach(
+		// eslint-disable-next-line @typescript-eslint/prefer-readonly-parameter-types -- Callback parameter
+		(example: Readonly<ExampleData>, index: Readonly<number>) => {
+			if (example.content.includes('testMethod(')) {
+				const exampleNum = index + INDEX_OFFSET;
+				const lineNumber =
+					testMethodLines.length > MIN_ARRAY_LENGTH
+						? testMethodLines[FIRST_ELEMENT_INDEX]
+						: undefined;
+				const linePrefix =
+					lineNumber === undefined
+						? 'Line: ?, '
+						: `Line: ${String(lineNumber)}, `;
+				issues.push(
+					`${linePrefix}Example ${String(exampleNum)}: You can't call a method testMethod in examples`,
+				);
+			}
+		},
+	);
+
+	return issues;
+}
+
+/**
  * Run all quality checks on a rule file.
  * @param ruleFilePath - XML rule file path.
  * @param ruleMetadata - Parsed rule metadata.
@@ -764,7 +814,14 @@ export function checkQualityChecks(
 		const markerIssues = checkMarkerDescriptions(examples, xmlContent);
 		issues.push(...markerIssues);
 
-		// Check 7: At least one violation
+		// Check 7: Forbidden method name 'testMethod' in examples
+		const testMethodIssues = checkForbiddenTestMethodName(
+			examples,
+			xmlContent,
+		);
+		issues.push(...testMethodIssues);
+
+		// Check 8: At least one violation
 		const violationIssue = checkViolationExists(examples, xmlContent);
 		if (violationIssue !== null) {
 			issues.push(violationIssue);

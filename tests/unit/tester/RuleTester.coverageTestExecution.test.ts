@@ -500,5 +500,83 @@ public class TestClass1 {
 			// Verify runPMD was called for violation counting
 			expect(mockedRunPMD).toHaveBeenCalled();
 		});
+
+		it('should handle valid test when PMD returns success=false to cover branch 451', async () => {
+			const xmlContent = `<?xml version="1.0" encoding="UTF-8"?>
+<rule name="TestRule"
+      language="apex"
+      message="Test message"
+      class="net.sourceforge.pmd.lang.apex.rule.TestRule">
+  <description>Test rule description</description>
+  <priority>3</priority>
+  <example>
+// Valid: This is valid
+public class TestClass {
+    private void method() {} // ✅
+}
+  </example>
+</rule>`;
+
+			mockedReadFileSync.mockReturnValue(xmlContent);
+			const xpathResult: FileOperationResult<string | null> = {
+				data: null,
+				success: true,
+			};
+			mockedExtractXPath.mockReturnValue(xpathResult);
+
+			const tester = new RuleTester('/path/to/test-rule.xml');
+			tester.extractExamples();
+
+			// Mock runPMD to return success=false for valid test to cover branch 451 false path
+			// Example has only valid markers (no violations), so only one PMD call for valid test
+			mockedRunPMD.mockResolvedValue({
+				data: undefined,
+				success: false,
+			}); // Covers branch 451 false (pmdResult.success && pmdResult.data !== undefined is false)
+
+			const result = await tester.runCoverageTest(false);
+
+			expect(result).toBeDefined();
+			expect(result.examplesTested).toBe(1);
+		});
+
+		it('should handle valid test when PMD returns success=true but data=undefined to cover branch 451', async () => {
+			const xmlContent = `<?xml version="1.0" encoding="UTF-8"?>
+<rule name="TestRule"
+      language="apex"
+      message="Test message"
+      class="net.sourceforge.pmd.lang.apex.rule.TestRule">
+  <description>Test rule description</description>
+  <priority>3</priority>
+  <example>
+// Valid: This is valid
+public class TestClass {
+    private void method() {} // ✅
+}
+  </example>
+</rule>`;
+
+			mockedReadFileSync.mockReturnValue(xmlContent);
+			const xpathResult: FileOperationResult<string | null> = {
+				data: null,
+				success: true,
+			};
+			mockedExtractXPath.mockReturnValue(xpathResult);
+
+			const tester = new RuleTester('/path/to/test-rule.xml');
+			tester.extractExamples();
+
+			// Mock runPMD to return success=true but data=undefined to cover branch 451 false path
+			// This covers the case where pmdResult.success is true but pmdResult.data is undefined
+			mockedRunPMD.mockResolvedValue({
+				data: undefined,
+				success: true,
+			}); // Covers branch 451 false (pmdResult.data !== undefined is false)
+
+			const result = await tester.runCoverageTest(false);
+
+			expect(result).toBeDefined();
+			expect(result.examplesTested).toBe(1);
+		});
 	});
 });
