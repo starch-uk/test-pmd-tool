@@ -32,6 +32,7 @@ const MIN_EXAMPLES_LENGTH = 0;
 const NODE_TYPE_ELEMENT = 1;
 const EMPTY_ARRAY_LENGTH = 0;
 const SINGLE_ELEMENT_INDEX = 0;
+const MIN_ARRAY_INDEX = 0;
 
 /**
  * Determine if this module is being executed as the CLI entrypoint.
@@ -495,18 +496,490 @@ function removeWrappersFromXmlDom(
  */
 interface TreeNode {
 	children: TreeNode[];
+	color?: 'dark-green' | 'dark-red' | 'green' | 'red';
 	name: string;
 }
 
 /**
+ * Options for determining node color.
+ */
+interface NodeColorOptions {
+	beginLine: number | null;
+	endLine: number | null;
+	exampleContent: string;
+	nodeImage: string;
+	nodeType: string;
+	xpath: string | null;
+	previousExamplesCoverage?: readonly {
+		validMarkers: readonly { lineNumber: number }[];
+		violationMarkers: readonly { lineNumber: number }[];
+		exampleContent: string;
+	}[];
+	validMarkers: readonly { lineNumber: number }[];
+	violationMarkers: readonly { lineNumber: number }[];
+	wrapperInfo?:
+		| Readonly<{
+				addedWrapperClass: boolean;
+				wrapperClassName: string;
+				addedWrapperMethod: boolean;
+				wrapperMethodName: string;
+				helperMethodNames: readonly string[];
+		  }>
+		| undefined;
+}
+
+/**
+ * Options for parsing XML AST and stripping wrappers.
+ */
+interface ParseXmlAstOptions {
+	exampleIndex: number;
+	exampleContent: string;
+	xpath: string | null;
+	validMarkers: readonly { lineNumber: number }[];
+	violationMarkers: readonly { lineNumber: number }[];
+	wrapperInfo:
+		| Readonly<{
+				addedWrapperClass: boolean;
+				wrapperClassName: string;
+				addedWrapperMethod: boolean;
+				wrapperMethodName: string;
+				helperMethodNames: readonly string[];
+		  }>
+		| undefined;
+	xmlAstOutput: string;
+	previousExamplesCoverage?: readonly {
+		validMarkers: readonly { lineNumber: number }[];
+		violationMarkers: readonly { lineNumber: number }[];
+		exampleContent: string;
+	}[];
+}
+
+/**
+ * Line number offset for converting 0-based array indices to 1-based line numbers.
+ */
+const LINE_NUMBER_OFFSET = 1;
+
+/**
+ * Empty string length constant for comparisons.
+ */
+const EMPTY_STRING_LENGTH = 0;
+
+/**
+ * Map each line in example content to its section type (violation/valid/null).
+ * Uses the same logic as parseExample to categorize lines.
+ * @param exampleContent - Original example content.
+ * @returns Map of line number (1-based) to section type.
+ */
+
+/**
+ * Map each line in example content to its section type (violation/valid/null).
+ * Uses the same logic as parseExample to categorize lines.
+ * @param exampleContent - Original example content.
+ * @returns Map of line number (1-based) to section type.
+ */
+function mapLinesToSections(
+	exampleContent: Readonly<string>,
+): Map<number, 'valid' | 'violation'> {
+	const lines = exampleContent.split('\n');
+	const lineSectionMap = new Map<number, 'valid' | 'violation'>();
+	let currentMode: 'valid' | 'violation' | null = null;
+
+	lines.forEach((line, index) => {
+		const trimmed = line.trim();
+		const lineNumber = index + LINE_NUMBER_OFFSET;
+
+		/**
+		 * Default to current mode.
+		 */
+		let lineMode = currentMode;
+
+		// Check for inline violation/valid markers
+		if (trimmed.includes('// ❌')) {
+			lineMode = 'violation';
+		} else if (trimmed.includes('// ✅')) {
+			lineMode = 'valid';
+		}
+
+		if (trimmed.startsWith('// Violation:')) {
+			currentMode = 'violation';
+		} else if (trimmed.startsWith('// Valid:')) {
+			currentMode = 'valid';
+		} else if (
+			trimmed.length > EMPTY_STRING_LENGTH &&
+			!trimmed.startsWith('//')
+		) {
+			// This is a code line - it belongs to the determined mode
+			if (lineMode === 'violation' || currentMode === 'violation') {
+				lineSectionMap.set(lineNumber, 'violation');
+			} else if (lineMode === 'valid' || currentMode === 'valid') {
+				lineSectionMap.set(lineNumber, 'valid');
+			}
+		}
+	});
+
+	return lineSectionMap;
+}
+
+/**
+ * Find which lines in the example contain the source code represented by an AST node.
+ * @param nodeType - AST node type name.
+ * @param nodeImage - Image attribute from node (method name, variable name, etc.).
+ * @param exampleContent - Original example content.
+ * @returns Array of line numbers (1-based) that contain this node's source code.
+ */
+function findLinesContainingNodeSource(
+	nodeType: Readonly<string>,
+	nodeImage: Readonly<string>,
+	exampleContent: Readonly<string>,
+): number[] {
+	const lines = exampleContent.split('\n');
+	const matchingLines: number[] = [];
+
+	// Pattern matching based on node type
+	let searchPattern: RegExp | string | null = null;
+
+	switch (nodeType) {
+		case 'MethodCallExpression': {
+			if (nodeImage.length > EMPTY_STRING_LENGTH) {
+				searchPattern = `${nodeImage}(`;
+			} else {
+				searchPattern = /\w+\s*\(/;
+			}
+			break;
+		}
+		case 'VariableDeclaration': {
+			if (nodeImage.length > EMPTY_STRING_LENGTH) {
+				searchPattern = new RegExp(`\\b${nodeImage}\\s*[=;]`);
+			} else {
+				searchPattern = /\w+\s+\w+\s*[=;]/;
+			}
+			break;
+		}
+		case 'BinaryExpression': {
+			searchPattern = /[+\-*/=<>!&|]{1,2}/;
+			break;
+		}
+		case 'LiteralExpression': {
+			searchPattern =
+				/\b\d+(\.\d+)?\b|'(?:[^'\\]|\\.)*'|"[^"]*"|\bnull\b|\btrue\b|\bfalse\b/;
+			break;
+		}
+		case 'IfBlockStatement': {
+			searchPattern = /\bif\b/;
+			break;
+		}
+		default: {
+			if (nodeImage.length > EMPTY_STRING_LENGTH) {
+				searchPattern = nodeImage;
+			} else {
+				// Try to match node type name in lowercase
+				searchPattern = nodeType.toLowerCase();
+			}
+			break;
+		}
+	}
+
+	// TypeScript flow analysis may not recognize all code paths assign searchPattern
+	// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+	const hasNoPattern = searchPattern === null;
+	if (hasNoPattern) {
+		return matchingLines;
+	}
+
+	// Search for pattern in each line
+	// Remove inline markers before matching to avoid false positives
+	lines.forEach((line, index) => {
+		const lineNumber = index + LINE_NUMBER_OFFSET;
+		// Remove inline markers for pattern matching
+		const lineWithoutMarkers = line
+			.replace(/\/\/\s*❌/g, '')
+			.replace(/\/\/\s*✅/g, '')
+			.trim();
+		const lowerLine = lineWithoutMarkers.toLowerCase();
+
+		let matches = false;
+		if (typeof searchPattern === 'string') {
+			matches =
+				lineWithoutMarkers.includes(searchPattern) ||
+				lowerLine.includes(searchPattern);
+		} else {
+			matches =
+				searchPattern.test(lineWithoutMarkers) ||
+				searchPattern.test(lowerLine);
+		}
+
+		if (matches && lineWithoutMarkers.length > EMPTY_STRING_LENGTH) {
+			matchingLines.push(lineNumber);
+		}
+	});
+
+	return matchingLines;
+}
+
+/**
+ * Empty coverage array length constant for comparisons.
+ */
+const EMPTY_COVERAGE_LENGTH = 0;
+
+/**
+ * Determine node color based on source code matching to example sections.
+ * Traces AST node back to example content, then determines which section it belongs to.
+ * @param options - Options for color determination.
+ * @returns Color for the node, or undefined if no tests.
+ */
+
+/**
+ * Empty markers array length constant for comparisons.
+ */
+const EMPTY_MARKERS_LENGTH = 0;
+
+/**
+ * Determine node color based on source code matching to example sections.
+ * Traces AST node back to example content, then determines which section it belongs to.
+ * @param options - Options for color determination.
+ * @returns Color for the node, or undefined if no tests.
+ */
+function determineNodeColor(
+	// eslint-disable-next-line @typescript-eslint/prefer-readonly-parameter-types -- Options object needs to be mutable for destructuring
+	options: NodeColorOptions,
+): 'dark-green' | 'dark-red' | 'green' | 'red' | undefined {
+	const {
+		nodeType,
+		nodeImage,
+		exampleContent,
+		xpath,
+		validMarkers,
+		violationMarkers,
+		previousExamplesCoverage,
+	} = options;
+
+	// Map each line in example to its section (violation/valid)
+	const lineSectionMap = mapLinesToSections(exampleContent);
+
+	// Find which lines in the example contain this node's source code
+	let matchingLines = findLinesContainingNodeSource(
+		nodeType,
+		nodeImage,
+		exampleContent,
+	);
+
+	// If no matches found via pattern matching, try checking if nodeImage appears
+	// anywhere in valid/violation sections as a fallback
+	if (matchingLines.length === EMPTY_MARKERS_LENGTH) {
+		// Try simpler fallback: if Image exists, search for it in sections
+		if (nodeImage.length > EMPTY_STRING_LENGTH) {
+			const allLines = exampleContent.split('\n');
+			for (let i = 0; i < allLines.length; i++) {
+				const line =
+					allLines[i]
+						?.replace(/\/\/\s*❌/g, '')
+						.replace(/\/\/\s*✅/g, '')
+						.trim() ?? '';
+				if (line.includes(nodeImage)) {
+					const lineNum = i + LINE_NUMBER_OFFSET;
+					matchingLines.push(lineNum);
+				}
+			}
+		}
+
+		// If still no matches, can't determine color
+		const matchCount = matchingLines.length;
+		// EMPTY_MARKERS_LENGTH is 0, so this checks if there are no matches
+		// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+		const hasNoMatches = matchCount === EMPTY_MARKERS_LENGTH;
+		if (hasNoMatches) {
+			return undefined;
+		}
+	}
+
+	// Determine which section(s) these lines belong to
+	let hasViolationSection = false;
+	let hasValidSection = false;
+
+	for (const lineNum of matchingLines) {
+		const section = lineSectionMap.get(lineNum);
+		if (section === 'violation') {
+			hasViolationSection = true;
+		} else if (section === 'valid') {
+			hasValidSection = true;
+		}
+	}
+
+	// Check if this node tests XPath branches that were already tested by previous examples
+	// We check if the node type appears in the XPath, and if code matching that node type
+	// was already tested in previous examples
+	let alreadyCovered = false;
+
+	if (
+		xpath !== null &&
+		previousExamplesCoverage !== undefined &&
+		previousExamplesCoverage.length > EMPTY_COVERAGE_LENGTH
+	) {
+		// Check if this node type appears in the XPath
+		const nodeTypeInXPath = xpath.includes(nodeType);
+
+		if (nodeTypeInXPath) {
+			// Check if previous examples tested code that would match this node type
+			// by checking if any previous example's markers tested code lines that would
+			// produce this node type
+			for (const prevExampleCoverage of previousExamplesCoverage) {
+				const prevExampleContent = prevExampleCoverage.exampleContent;
+				const prevExampleLines = prevExampleContent.split('\n');
+
+				// Check if any marker line in previous example would match this node type
+				const allPrevMarkers = [
+					...prevExampleCoverage.validMarkers,
+					...prevExampleCoverage.violationMarkers,
+				];
+
+				for (const marker of allPrevMarkers) {
+					const markerLineIndex =
+						marker.lineNumber - LINE_NUMBER_OFFSET;
+					if (
+						markerLineIndex >= MIN_ARRAY_INDEX &&
+						markerLineIndex < prevExampleLines.length
+					) {
+						const markerLine =
+							prevExampleLines[markerLineIndex]
+								?.replace(/\/\/\s*❌/g, '')
+								.replace(/\/\/\s*✅/g, '')
+								.trim() ?? '';
+
+						// Check if this marker line would produce a node of the same type
+						// using the same pattern matching logic as coverage checking
+						let wouldMatch = false;
+
+						switch (nodeType) {
+							case 'MethodCallExpression': {
+								if (nodeImage.length > EMPTY_STRING_LENGTH) {
+									wouldMatch = markerLine.includes(
+										`${nodeImage}(`,
+									);
+								} else {
+									wouldMatch = /\w+\s*\(/.test(markerLine);
+								}
+								break;
+							}
+							case 'VariableDeclaration': {
+								if (nodeImage.length > EMPTY_STRING_LENGTH) {
+									wouldMatch = new RegExp(
+										`\\b${nodeImage}\\s*[=;]`,
+									).test(markerLine);
+								} else {
+									wouldMatch = /\w+\s+\w+\s*[=;]/.test(
+										markerLine,
+									);
+								}
+								break;
+							}
+							case 'BinaryExpression': {
+								wouldMatch = /[+\-*/=<>!&|]{1,2}/.test(
+									markerLine,
+								);
+								break;
+							}
+							case 'LiteralExpression': {
+								wouldMatch =
+									/\b\d+(\.\d+)?\b|'(?:[^'\\]|\\.)*'|"[^"]*"|\bnull\b|\btrue\b|\bfalse\b/.test(
+										markerLine.toLowerCase(),
+									);
+								break;
+							}
+							case 'IfBlockStatement': {
+								wouldMatch = /\bif\b/.test(
+									markerLine.toLowerCase(),
+								);
+								break;
+							}
+							default: {
+								if (nodeImage.length > EMPTY_STRING_LENGTH) {
+									wouldMatch = markerLine.includes(nodeImage);
+								} else {
+									wouldMatch = markerLine
+										.toLowerCase()
+										.includes(nodeType.toLowerCase());
+								}
+								break;
+							}
+						}
+
+						if (
+							wouldMatch &&
+							markerLine.length > EMPTY_STRING_LENGTH
+						) {
+							alreadyCovered = true;
+							break;
+						}
+					}
+				}
+
+				if (alreadyCovered) {
+					break;
+				}
+			}
+		}
+	}
+
+	// Color based on section type (violation tests take precedence if both exist)
+	// Note: We check marker existence to ensure there are actual tests defined
+	if (hasViolationSection && violationMarkers.length > EMPTY_MARKERS_LENGTH) {
+		return alreadyCovered ? 'dark-red' : 'red';
+	}
+
+	if (hasValidSection && validMarkers.length > EMPTY_MARKERS_LENGTH) {
+		return alreadyCovered ? 'dark-green' : 'green';
+	}
+
+	// If node is in a section but no markers exist, don't color (no tests defined)
+	return undefined;
+}
+
+/**
+ * Options for converting XML node to tree node.
+ */
+interface XmlNodeToTreeNodeOptions {
+	node: Element;
+	xpath: string | null;
+	previousExamplesCoverage?: readonly {
+		validMarkers: readonly { lineNumber: number }[];
+		violationMarkers: readonly { lineNumber: number }[];
+		exampleContent: string;
+	}[];
+	validMarkers: readonly { lineNumber: number }[];
+	violationMarkers: readonly { lineNumber: number }[];
+	wrapperInfo?:
+		| Readonly<{
+				addedWrapperClass: boolean;
+				wrapperClassName: string;
+				addedWrapperMethod: boolean;
+				wrapperMethodName: string;
+				helperMethodNames: readonly string[];
+		  }>
+		| undefined;
+	exampleContent: Readonly<string>;
+}
+
+/**
  * Convert XML node to tree structure for stringify-tree.
- * @param node - XML DOM node.
- * @returns Tree node with name and children.
+ * @param options - Options for tree node conversion.
+ * @param options.node - XML DOM node.
+ * @param options.previousExamplesCoverage - Coverage data from previous examples.
+ * @param options.validMarkers - Valid test markers from example.
+ * @param options.violationMarkers - Violation test markers from example.
+ * @param options.exampleContent - Original example content for pattern matching.
+ * @returns Tree node with name, children, and color.
  */
 function xmlNodeToTreeNode(
-	// eslint-disable-next-line @typescript-eslint/prefer-readonly-parameter-types -- Element is DOM type, Readonly has no effect
-	node: Element,
+	// eslint-disable-next-line @typescript-eslint/prefer-readonly-parameter-types -- Options object needs to be mutable for destructuring
+	options: XmlNodeToTreeNodeOptions,
 ): TreeNode {
+	const {
+		exampleContent,
+		node,
+		previousExamplesCoverage,
+		validMarkers,
+		violationMarkers,
+	} = options;
 	const EQUALS_SEPARATOR = '=';
 	const QUOTE_CHAR = "'";
 	const EMPTY_STRING = '';
@@ -514,6 +987,65 @@ function xmlNodeToTreeNode(
 	const EMPTY_ARRAY_VALUE = '[]';
 
 	const { nodeName } = node;
+
+	/**
+	 * Extract BeginLine and EndLine for color determination.
+	 * If the node doesn't have line numbers, traverse up to parent nodes to find them.
+	 * PMD uses lowercase attribute names (beginline, endline) in violation XML,
+	 * but may use PascalCase (BeginLine, EndLine) in AST XML.
+	 * @param currentNode - Current XML node to check for line numbers.
+	 * @returns Object with beginLine and endLine, or nulls if not found.
+	 */
+	function findLineNumbers(
+		// eslint-disable-next-line @typescript-eslint/prefer-readonly-parameter-types -- Element is DOM type, needs to be mutable
+		currentNode: Element,
+	): {
+		beginLine: number | null;
+		endLine: number | null;
+	} {
+		let nodeToCheck: Element | null = currentNode;
+		while (nodeToCheck !== null) {
+			let beginLineAttr =
+				nodeToCheck.getAttribute('BeginLine') ??
+				nodeToCheck.getAttribute('beginline');
+			let endLineAttr =
+				nodeToCheck.getAttribute('EndLine') ??
+				nodeToCheck.getAttribute('endline');
+
+			if (
+				beginLineAttr !== null &&
+				beginLineAttr.length > EMPTY_STRING.length &&
+				endLineAttr !== null &&
+				endLineAttr.length > EMPTY_STRING.length
+			) {
+				return {
+					beginLine: parseInt(beginLineAttr, PARSE_INT_RADIX),
+					endLine: parseInt(endLineAttr, PARSE_INT_RADIX),
+				};
+			}
+
+			// Move to parent node
+			const parentNode: Node | null = nodeToCheck.parentNode;
+			if (
+				parentNode !== null &&
+				parentNode.nodeType === NODE_TYPE_ELEMENT
+			) {
+				// Type assertion is safe because we check nodeType first
+				// eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- Type assertion is safe after nodeType check
+				nodeToCheck = parentNode as Element;
+			} else {
+				nodeToCheck = null;
+			}
+		}
+
+		return { beginLine: null, endLine: null };
+	}
+
+	const { beginLine, endLine } = findLineNumbers(node);
+
+	// Extract Image attribute for source code matching (before filtering attributes)
+	const IMAGE_ATTR = 'Image';
+	const nodeImage = node.getAttribute(IMAGE_ATTR) ?? '';
 
 	// Get all attributes and format them, omitting empty or 'false' values
 	const attributes: string[] = [];
@@ -549,36 +1081,96 @@ function xmlNodeToTreeNode(
 		(child): child is Element => child.nodeType === NODE_TYPE_ELEMENT,
 	);
 
+	// Determine node color based on source code matching to example sections
+	const color = determineNodeColor({
+		beginLine,
+		endLine,
+		exampleContent,
+		nodeImage,
+		nodeType: nodeName,
+		previousExamplesCoverage,
+		validMarkers,
+		violationMarkers,
+		wrapperInfo: options.wrapperInfo,
+		xpath: options.xpath,
+	});
+
 	return {
 		children: children.map(
 			// eslint-disable-next-line @typescript-eslint/prefer-readonly-parameter-types -- Callback parameter for map
-			(child) => xmlNodeToTreeNode(child),
+			(child) =>
+				xmlNodeToTreeNode({
+					exampleContent,
+					node: child,
+					previousExamplesCoverage,
+					validMarkers,
+					violationMarkers,
+					wrapperInfo: options.wrapperInfo,
+					xpath: options.xpath,
+				}),
 		),
+		color,
 		name: displayName,
 	};
 }
 
 /**
+ * Apply ANSI color codes to node name based on color.
+ * @param nodeName - Node name to colorize.
+ * @param color - Color to apply (green, dark-green, red, or dark-red).
+ * @returns Colored node name string with ANSI escape codes.
+ */
+function applyColorToNodeName(
+	nodeName: string,
+	color: 'dark-green' | 'dark-red' | 'green' | 'red' | undefined,
+): string {
+	if (color === undefined) {
+		return nodeName;
+	}
+
+	// Use raw ANSI codes to ensure colors always work
+	const ANSI_RESET = '\x1b[0m';
+	const ANSI_GREEN = '\x1b[32m';
+	const ANSI_DARK_GREEN = '\x1b[32;2m';
+	const ANSI_RED = '\x1b[31m';
+	const ANSI_DARK_RED = '\x1b[31;2m';
+
+	if (color === 'green') {
+		return `${ANSI_GREEN}${nodeName}${ANSI_RESET}`;
+	}
+
+	if (color === 'dark-green') {
+		return `${ANSI_DARK_GREEN}${nodeName}${ANSI_RESET}`;
+	}
+
+	if (color === 'red') {
+		return `${ANSI_RED}${nodeName}${ANSI_RESET}`;
+	}
+
+	// color === 'dark-red'
+	return `${ANSI_DARK_RED}${nodeName}${ANSI_RESET}`;
+}
+
+/**
  * Parse XML AST dump and remove wrapper elements, then render as tree with all attributes.
  * Removes ONLY the wrapper elements added by createTestFile based on tracking info.
- * @param xmlAstOutput - Raw XML AST dump output from PMD.
- * @param exampleIndex - 1-based example index used for wrapper names.
- * @param wrapperInfo - Tracking information about what was added by createTestFile.
- * @returns Tree text format XML with wrappers removed, showing all attributes.
+ * @param options - Options for parsing XML AST.
+ * @returns Tree text format XML with wrappers removed, showing all attributes with colors.
  */
 function parseXmlAstAndStripWrappers(
-	xmlAstOutput: Readonly<string>,
-	exampleIndex: Readonly<number>,
-	wrapperInfo:
-		| Readonly<{
-				addedWrapperClass: boolean;
-				wrapperClassName: string;
-				addedWrapperMethod: boolean;
-				wrapperMethodName: string;
-				helperMethodNames: readonly string[];
-		  }>
-		| undefined,
+	// eslint-disable-next-line @typescript-eslint/prefer-readonly-parameter-types -- Options object needs to be mutable for destructuring
+	options: ParseXmlAstOptions,
 ): string {
+	const {
+		exampleIndex,
+		exampleContent,
+		xpath,
+		previousExamplesCoverage,
+		validMarkers,
+		violationMarkers,
+		wrapperInfo,
+		xmlAstOutput,
+	} = options;
 	const parser = new DOMParser();
 	const doc = parser.parseFromString(xmlAstOutput, 'text/xml');
 
@@ -631,14 +1223,22 @@ function parseXmlAstAndStripWrappers(
 		parent.replaceChild(exampleNode, apexFileElement);
 	}
 
-	// Convert XML node to tree structure
-	const treeNode = xmlNodeToTreeNode(exampleNode);
+	// Convert XML node to tree structure with color information
+	const treeNode = xmlNodeToTreeNode({
+		exampleContent,
+		node: exampleNode,
+		previousExamplesCoverage,
+		validMarkers,
+		violationMarkers,
+		wrapperInfo,
+		xpath,
+	});
 
 	// Use stringify-tree to render the tree with 2 space indent
 	const treeOutput = stringifyTree(
 		treeNode,
 		// eslint-disable-next-line @typescript-eslint/prefer-readonly-parameter-types -- Callback parameter for stringify-tree
-		(node) => node.name,
+		(node) => applyColorToNodeName(node.name, node.color),
 		// eslint-disable-next-line @typescript-eslint/prefer-readonly-parameter-types -- Callback parameter for stringify-tree
 		(node) => node.children,
 	);
@@ -679,6 +1279,23 @@ async function runDiagnostics(
 			process.exit(EXIT_CODE_ERROR);
 		}
 
+		// Get XPath from rule metadata
+		const ruleMetadata = tester.getRuleMetadata();
+		const xpath = ruleMetadata.xpath ?? null;
+
+		// Get coverage data from previous examples (examples before current index)
+		const SLICE_START_INDEX = 0;
+		const previousExamplesCoverage = examples
+			.slice(SLICE_START_INDEX, exampleIndex - EXAMPLE_INDEX_OFFSET)
+			.map(
+				// eslint-disable-next-line @typescript-eslint/prefer-readonly-parameter-types -- Callback parameter for map
+				(prevExample) => ({
+					exampleContent: prevExample.content,
+					validMarkers: prevExample.validMarkers,
+					violationMarkers: prevExample.violationMarkers,
+				}),
+			);
+
 		// Create test file for the example
 		const testFileResult = createTestFile({
 			exampleContent: example.content,
@@ -697,17 +1314,48 @@ async function runDiagnostics(
 			console.error(
 				`❌ Failed to generate AST dump: ${astResult.error ?? 'Unknown error'}`,
 			);
+			console.error(
+				`\n⚠️  The generated test file might have syntax errors. File path: ${testFileResult.filePath}`,
+			);
+			console.error(
+				'\n💡 This might be caused by invalid example code or issues with wrapper generation.',
+			);
+			console.error(
+				'   The test file has been preserved for debugging purposes.',
+			);
+
+			// Print the generated file content for debugging
+			try {
+				const { readFileSync } = await import('fs');
+				const generatedContent = readFileSync(
+					testFileResult.filePath,
+					'utf-8',
+				);
+				console.error('\n📄 Generated test file content:');
+				console.error('---');
+				console.error(generatedContent);
+				console.error('---');
+			} catch {
+				// Ignore errors reading the file
+			}
+
 			process.exit(EXIT_CODE_ERROR);
 		}
 
 		// Parse XML AST and strip wrappers, then render as tree with all attributes
 		const rawXmlAst = astResult.data ?? '';
 		const { wrapperInfo } = testFileResult;
-		const cleanedAst = parseXmlAstAndStripWrappers(
-			rawXmlAst,
+
+		const cleanedAst = parseXmlAstAndStripWrappers({
+			exampleContent: example.content,
 			exampleIndex,
+			previousExamplesCoverage,
+			validMarkers: example.validMarkers,
+			violationMarkers: example.violationMarkers,
 			wrapperInfo,
-		);
+			xmlAstOutput: rawXmlAst,
+			xpath,
+		});
 
 		// Print cleaned AST dump to stdout
 		console.log(

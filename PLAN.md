@@ -285,12 +285,25 @@ test-pmd-tool/
 - Track branch combinations across examples
 - **Target CC: 6-7** - split signature creation from tracking logic
 
-### 6. CLI Module (`src/cli/main.ts`)
+### 6. CLI Module (`src/cli/`)
 
-- Command-line argument parsing
+#### main.ts
+
+- Command-line entry point
+- Directory/file discovery and processing
+- Parallel execution orchestration
+- Output formatting with emojis and color
 - Error handling
 - Process exit codes
-- **Target CC: 2-3** - minimal logic, early exits for errors
+- **Target CC: 4-5** - orchestration logic, delegates to helpers
+
+#### args.ts (New)
+
+- Command-line argument parsing
+- Support for flags: `--coverage`/`-c`, `--diag`/`-d`, `--help`/`-h`
+- Validation of argument combinations
+- Help message generation
+- **Target CC: 3-4** - simple parsing with validation
 
 ### 7. Utils Module (`src/utils/`)
 
@@ -715,6 +728,67 @@ export default defineConfig({
 - Group related tests with `describe` blocks
 - Use `test.each` for parameterized tests
 
+## CLI Interface Design
+
+### Command-Line Arguments
+
+The CLI should support the following arguments and flags:
+
+**Required:**
+
+- `<rule.xml|directory>`: Path to XML rule file or directory containing XML files (recursive). Required unless using `--help`/`-h`.
+
+**Optional Flags:**
+
+- `--coverage`, `-c`: Generate LCOV coverage report in `coverage/lcov.info`
+    - Can be used with single files or directories
+    - Cannot be combined with `--diag`
+- `--diag <number>`, `-d <number>`: Output PMD AST dump for specified example (1-based index)
+    - Requires a single XML rule file, not a directory
+    - Useful for debugging XPath expressions
+    - Example indices are 1-based (first example = 1, second = 2, etc.)
+    - Cannot be combined with `--coverage`
+- `--help`, `-h`: Show help message and exit
+
+### Output Features
+
+**Emoji-Enhanced Output:**
+
+- Use emojis for visual indicators in console output:
+    - 🧪 Testing status
+    - 📋 Test details
+    - 📊 Test summary
+    - 🔍 XPath coverage analysis
+    - ✅ Pass/Success indicators
+    - ⚠️ Warning/Incomplete indicators
+    - ❌ Error/Failure indicators
+    - ⭐ Quality checks
+    - 🎯 Overall results
+    - 📄 Diagnostic file content
+
+**Color Output:**
+
+- Use terminal colors (ANSI escape codes) where supported:
+    - Green for success/pass indicators
+    - Yellow for warnings/incomplete status
+    - Red for errors/failures
+    - Blue/cyan for informational messages
+    - Respect terminal color capabilities (check if terminal supports colors)
+
+**Structured Output:**
+
+- Clear sections with proper indentation
+- Hierarchical display of test results
+- Line number references for missing coverage items
+- Summary statistics for batch processing
+
+**Error Messages:**
+
+- Clear, actionable error messages
+- Validation errors for invalid arguments
+- File not found errors with suggestions
+- Invalid argument combination errors
+
 ## Build Scripts
 
 Based on PNPM.md, use pnpm commands (scripts can be TypeScript with Node 25+):
@@ -919,8 +993,16 @@ The `docs/` folder will be symlinked from `node_modules/agent-docs/docs`, provid
     - [ ] `src/parser/parseExample.ts` - Example code parsing
     - [ ] `src/parser/extractMarkers.ts` - Violation/valid marker extraction
     - [ ] `src/parser/createTestFile.ts` - Test file generation
-- [ ] CLI module (minimal logic)
+- [ ] CLI module (argument parsing and orchestration)
+    - [ ] `src/cli/args.ts` - Command-line argument parsing with validation
+        - Support `--coverage`/`-c`, `--diag`/`-d`, `--help`/`-h` flags
+        - Validate argument combinations (e.g., `--coverage` cannot be used with `--diag`)
+        - Generate help message
     - [ ] `src/cli/main.ts` - CLI entry point
+        - Directory/file discovery
+        - Parallel execution orchestration
+        - Output formatting with emojis and color
+        - Error handling and exit codes
 
 ### Phase 3: Complex Modules (Refactored)
 
@@ -993,6 +1075,79 @@ The `docs/` folder will be symlinked from `node_modules/agent-docs/docs`, provid
 - [ ] All lint checks pass
 - [ ] All formatting checks pass
 
+## CLI Usage Examples
+
+### Basic Usage
+
+```bash
+# Test a single rule file
+test-pmd-rule path/to/rule.xml
+
+# Test all XML files in a directory (recursive)
+test-pmd-rule ../sca-extra/rulesets
+
+# Generate LCOV coverage report
+test-pmd-rule rulesets/code-style/AvoidMagicNumbers.xml --coverage
+test-pmd-rule rulesets/code-style/AvoidMagicNumbers.xml -c  # Short form
+
+# Test directory with coverage reports
+test-pmd-rule ../sca-extra/rulesets --coverage
+
+# Output AST dump for debugging (single file only)
+test-pmd-rule path/to/rule.xml --diag 1
+test-pmd-rule path/to/rule.xml -d 2  # Short form
+
+# Show help
+test-pmd-rule --help
+test-pmd-rule -h  # Short form
+
+# Use npx without installing globally
+npx test-pmd-rule path/to/rule.xml
+```
+
+### Argument Validation Rules
+
+- `--coverage` and `--diag` cannot be used together
+- `--diag` requires a single XML file, not a directory
+- `--diag` requires a valid example index (1-based, must exist in the file)
+- Path argument is required unless using `--help`/`-h`
+- Invalid argument combinations should display clear error messages
+
+### Output Format Examples
+
+**Single File Test Output:**
+
+```
+🧪 Testing rule: rulesets/code-style/MyRule.xml
+
+📋 Test Details:
+   - Example 1 Test: Violation ✅
+   - Example 1 Test: Valid ✅
+
+📊 Test Summary:
+  Examples tested: 1
+  Examples passed: 1
+  Total violations: 2
+  Rule triggers violations: ✅ Yes
+
+🔍 XPath Coverage:
+  Status: ✅ Complete
+
+✅ All tests passed!
+```
+
+**AST Diagnostic Output:**
+
+```
+🔍 AST Dump for Example 1:
+
+ApexFile
+  UserClass[SimpleName="TestClass1"]
+    Method[Image="testMethod1"]
+      BlockStatement
+        ...
+```
+
 ## Notes
 
 - Maintain backward compatibility with original script usage
@@ -1001,3 +1156,6 @@ The `docs/` folder will be symlinked from `node_modules/agent-docs/docs`, provid
 - Use async/await consistently
 - Handle errors gracefully with proper error messages
 - All code should be self-documenting through clear naming
+- CLI output should be user-friendly with emojis and colors
+- Support both long (`--flag`) and short (`-f`) flag forms
+- Validate all argument combinations and provide helpful error messages

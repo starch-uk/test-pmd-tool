@@ -719,6 +719,12 @@ public class Example {
 		expect(writtenContent).toContain('public Boolean getValue()');
 		expect(writtenContent).toContain('public Boolean getName()');
 		expect(writtenContent).toContain('Integer value = getValue();');
+		// Verify helper methods are before the closing brace
+		const getValueIndex = writtenContent.indexOf(
+			'public Boolean getValue()',
+		);
+		const lastBraceIndex = writtenContent.lastIndexOf('}');
+		expect(getValueIndex).toBeLessThan(lastBraceIndex);
 	});
 
 	it('should add closing brace when missing and insert helper methods', () => {
@@ -1160,5 +1166,290 @@ public class Example {
 		expect(writtenContent).not.toContain('Integer value = 5;');
 		// Should have closing braces for structure
 		expect(writtenContent.split('}').length).toBeGreaterThan(1);
+	});
+
+	it('should add closing brace when class ends without brace in extractedCode', () => {
+		// Tests line 636: classBraceDepth <= 0, insideClass is true, lastExtracted doesn't end with '}'
+		// This happens when we exit a class but the closing brace wasn't included in extractedCode
+		// We need: classBraceDepth becomes <= 0, insideClass is still true, and last line doesn't end with '}'
+		const exampleContent = `
+// Violation: Test
+public class Example {
+    public void method() {
+        Integer value = 5; // ❌
+    }
+    // Comment line - class closing brace missing, this line doesn't end with '}'
+`;
+
+		createTestFile({
+			exampleContent,
+			exampleIndex: 60,
+			includeValids: false,
+			includeViolations: true,
+		});
+
+		const writtenContent = capturedContent;
+		// Should have added the closing brace
+		expect(writtenContent).toContain('public class TestClass60');
+		expect(writtenContent.split('}').length).toBeGreaterThan(1);
+	});
+
+	it('should handle helper methods when no closing brace exists in class content', () => {
+		// Tests lines 688-692: helperMethods.length > 0 and lastBraceIndex === NOT_FOUND_INDEX
+		// This happens when classContentStr (extractedCode.join('\n')) has no '}' character
+		// We need a class that's missing its closing brace entirely, and helper methods are needed
+		const exampleContent = `
+// Violation: Test
+public class Example {
+    public void method() {
+        Integer value = getValue();
+        String name = getName();
+    }
+    // Missing closing brace - classContentStr will have no '}'
+`;
+
+		createTestFile({
+			exampleContent,
+			exampleIndex: 61,
+			includeValids: false,
+			includeViolations: true,
+		});
+
+		const writtenContent = capturedContent;
+		// Should have helper methods and closing brace added
+		expect(writtenContent).toContain('public Boolean getValue()');
+		expect(writtenContent).toContain('public Boolean getName()');
+		expect(writtenContent).toContain('}'); // Closing brace should be added
+		// Helper methods should be before the closing brace
+		const getValueIndex = writtenContent.indexOf(
+			'public Boolean getValue()',
+		);
+		const lastBraceIndex = writtenContent.lastIndexOf('}');
+		expect(getValueIndex).toBeLessThan(lastBraceIndex);
+	});
+
+	it('should add closing brace when class has no helper methods and no brace', () => {
+		// Tests line 699: needsClosingBrace is true (lastBraceIndex === NOT_FOUND_INDEX && hasTopLevelClass)
+		// and helperMethods.length === 0
+		// We need: hasTopLevelClass=true, classContentStr has no '}', and no helper methods
+		const exampleContent = `
+// Violation: Test
+public class Example {
+    public void method() {
+        Integer value = 5; // ❌
+    }
+    // Missing closing brace, no helper methods needed (no method calls)
+`;
+
+		createTestFile({
+			exampleContent,
+			exampleIndex: 62,
+			includeValids: false,
+			includeViolations: true,
+		});
+
+		const writtenContent = capturedContent;
+		// Should have added the closing brace even without helper methods
+		expect(writtenContent).toContain('public class TestClass62');
+		expect(writtenContent.split('}').length).toBeGreaterThan(1);
+	});
+
+	it('should add closing brace when class ends and lastExtracted does not end with brace', () => {
+		// Tests line 636: classBraceDepth <= 0, insideClass=true, lastExtracted doesn't end with '}'
+		// Conditions: classBraceDepth becomes <= 0 (class ended), insideClass is still true,
+		// lastExtracted exists, and lastExtracted.trim() doesn't end with '}'
+		// We need a scenario where we exit the class (classBraceDepth <= 0) but the last
+		// line in extractedCode is not a closing brace (e.g., a comment or code line)
+		const exampleContent = `// Violation: Test
+public class Example {
+    public void method() {
+        Integer value = 5; // ❌
+    }
+    // This comment line is the last thing before class ends - doesn't end with '}'
+    // Class closing brace is missing, so classBraceDepth becomes <= 0 when we finish processing
+`;
+
+		createTestFile({
+			exampleContent,
+			exampleIndex: 63,
+			includeValids: false,
+			includeViolations: true,
+		});
+
+		const writtenContent = capturedContent;
+		// Should have added the closing brace
+		expect(writtenContent).toContain('public class TestClass63');
+		expect(writtenContent.split('}').length).toBeGreaterThan(1);
+	});
+
+	it('should handle case where classContentStr has absolutely no closing brace with helper methods', () => {
+		// Tests lines 688-692: helperMethods.length > 0 AND lastBraceIndex === NOT_FOUND_INDEX
+		// We need extractedCode.join('\n') to have NO '}' character at all
+		// This requires: class missing closing brace, methods missing closing braces,
+		// and helper methods are needed
+		// The key is that extractedCode must not contain any '}' characters
+		const exampleContent = `// Violation: Test
+public class Example {
+    public void method() {
+        Integer value = getValue();
+        String name = getName();
+        // Method and class both missing closing braces - extractedCode will have no '}'
+`;
+
+		createTestFile({
+			exampleContent,
+			exampleIndex: 64,
+			includeValids: false,
+			includeViolations: true,
+		});
+
+		const writtenContent = capturedContent;
+		expect(writtenContent).toContain('public Boolean getValue()');
+		expect(writtenContent).toContain('public Boolean getName()');
+		expect(writtenContent).toContain('}'); // Closing brace should be added
+		// Verify helper methods are before the closing brace
+		const getValueIndex = writtenContent.indexOf(
+			'public Boolean getValue()',
+		);
+		const lastBraceIndex = writtenContent.lastIndexOf('}');
+		expect(getValueIndex).toBeLessThan(lastBraceIndex);
+	});
+
+	it('should add closing brace when no helper methods and classContentStr has no brace', () => {
+		// Tests line 699: needsClosingBrace=true (lastBraceIndex === NOT_FOUND_INDEX && hasTopLevelClass)
+		// AND helperMethods.length === 0
+		const exampleContent = `// Violation: Test
+public class Example {
+    public void method() {
+        Integer value = 5; // ❌
+    }
+    // No closing brace, no method calls (no helper methods needed)
+`;
+
+		createTestFile({
+			exampleContent,
+			exampleIndex: 65,
+			includeValids: false,
+			includeViolations: true,
+		});
+
+		const writtenContent = capturedContent;
+		expect(writtenContent).toContain('public class TestClass65');
+		expect(writtenContent.split('}').length).toBeGreaterThan(1);
+	});
+
+	it('should handle property blocks (not method declarations)', () => {
+		// Tests line 534: !isPropertyBlock branch when isPropertyBlock is true
+		// Property blocks have { but no ( and no void, at depth 1 (prevClassBraceDepth === INITIAL_BRACE_DEPTH)
+		// This tests the short-circuit branch where !isPropertyBlock is false
+		const exampleContent = `
+// Violation: Test
+public class Example {
+    public String name { get; set; } // ❌ Property block, not a method
+    public void method() { // ❌ This is a method, not a property
+        Integer value = 5;
+    }
+}
+`;
+
+		createTestFile({
+			exampleContent,
+			exampleIndex: 66,
+			includeValids: false,
+			includeViolations: true,
+		});
+
+		const writtenContent = capturedContent;
+		// Property block should be included but not treated as a method declaration
+		expect(writtenContent).toContain('public class TestClass66');
+		expect(writtenContent).toContain('public String name { get; set; }');
+		// Method should be treated as a method declaration
+		expect(writtenContent).toContain('public void method()');
+	});
+
+	it('should handle method declaration when isPropertyBlock is false and all conditions are met', () => {
+		// Tests line 540: when !isPropertyBlock is true and all method declaration conditions are met
+		// This ensures the isMethodDeclaration assignment is fully evaluated
+		// Tests all three branches of the || expression: 'void', '(', and hasMethodPattern
+		const exampleContent = `
+// Violation: Test
+public class Example {
+    public void testMethod() { // ❌ Method with 'void' - tests first || branch
+        Integer value = 5;
+    }
+    public Integer getValue() { // ❌ Method with '(' - tests second || branch (void is false)
+        return 5;
+    }
+    public String getName() { // ❌ Method with hasMethodPattern - tests third || branch (void and ( are false)
+        return 'test';
+    }
+}
+`;
+
+		createTestFile({
+			exampleContent,
+			exampleIndex: 68,
+			includeValids: false,
+			includeViolations: true,
+		});
+
+		const writtenContent = capturedContent;
+		// All methods should be treated as method declarations
+		expect(writtenContent).toContain('public class TestClass68');
+		expect(writtenContent).toContain('public void testMethod()');
+		expect(writtenContent).toContain('public Integer getValue()');
+		expect(writtenContent).toContain('public String getName()');
+	});
+
+	it('should add closing brace when last line does not end with brace', () => {
+		// Tests when !lastLine.trim().endsWith('}') is true
+		// This happens when the last line in extractedCode doesn't end with '}'
+		const exampleContent = `
+// Violation: Test
+public class Example {
+    public void method() {
+        Integer value = 5; // ❌
+    }
+    // Comment line - class missing closing brace
+`;
+
+		createTestFile({
+			exampleContent,
+			exampleIndex: 69,
+			includeValids: false,
+			includeViolations: true,
+		});
+
+		const writtenContent = capturedContent;
+		// Should have added the closing brace
+		expect(writtenContent).toContain('public class TestClass69');
+		expect(writtenContent.split('}').length).toBeGreaterThan(1);
+	});
+
+	it('should handle method declaration when some conditions are false', () => {
+		// Tests line 540: when !isPropertyBlock is true but some conditions fail
+		// This tests branches where the expression evaluates to false
+		// For example, when prevClassBraceDepth !== INITIAL_BRACE_DEPTH
+		const exampleContent = `
+// Violation: Test
+public class Example {
+    {
+        public void innerMethod() { // ❌ Method at depth > 1, not INITIAL_BRACE_DEPTH
+            Integer value = 5;
+        }
+    }
+}
+`;
+
+		createTestFile({
+			exampleContent,
+			exampleIndex: 70,
+			includeValids: false,
+			includeViolations: true,
+		});
+
+		const writtenContent = capturedContent;
+		// Method at wrong depth should not be treated as method declaration
+		expect(writtenContent).toContain('public class TestClass70');
 	});
 });

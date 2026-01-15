@@ -10,6 +10,7 @@ import type {
 } from '../../types/index.js';
 import { extractLetVariables } from '../../xpath/extractors/extractLetVariables.js';
 import { extractHardcodedValues } from '../../xpath/extractors/extractHardcodedValues.js';
+import { checkDuplicates } from './checkDuplicates.js';
 
 const MAX_MESSAGE_LENGTH = 80;
 const MIN_STRING_LENGTH = 0;
@@ -768,6 +769,15 @@ export function checkQualityChecks(
 		if (violationIssue !== null) {
 			issues.push(violationIssue);
 		}
+
+		// Check 8: Duplicate test patterns
+		const duplicatesResult = checkDuplicates(examples);
+		// Add duplicate warnings as issues (they're warnings in the old system, but issues in Quality Checks)
+		for (const warning of duplicatesResult.warnings) {
+			issues.push(warning);
+		}
+		// Also add any duplicate errors
+		issues.push(...duplicatesResult.issues);
 	} catch (error: unknown) {
 		const errorMessage =
 			error instanceof Error ? error.message : String(error);
