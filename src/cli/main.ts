@@ -18,6 +18,7 @@ import {
 import { generateLcovReport } from '../coverage/generateLcov.js';
 import { runPmdAstDump } from '../pmd/runPMD.js';
 import { createTestFile } from '../parser/createTestFile.js';
+import { extractNodeTypes } from '../xpath/extractors/extractNodeTypes.js';
 import { parseCliArgs, printUsage } from './args.js';
 
 const EXIT_CODE_SUCCESS = 0;
@@ -838,9 +839,21 @@ function determineNodeColor(
 	const hasViolationSection = violationMatchCount > EMPTY_MARKERS_LENGTH;
 	const hasValidSection = validMatchCount > EMPTY_MARKERS_LENGTH;
 
+	// Only color nodes if their type is actually matched by the XPath expression
+	// If the XPath doesn't match this node type, don't show it as needing coverage
+	if (xpath !== null && xpath.length > EMPTY_STRING_LENGTH) {
+		const xpathNodeTypes = extractNodeTypes(xpath);
+		const nodeTypeInXPath = xpathNodeTypes.includes(nodeType);
+		if (!nodeTypeInXPath) {
+			// Node type is not matched by XPath, so it shouldn't be tested
+			return undefined;
+		}
+	}
+
 	// Check if this node tests XPath branches that were already tested by previous examples
-	// We check if the node type appears in the XPath, and if code matching that node type
-	// was already tested in previous examples
+	// We need to check if the EXACT same XPath branch combination was tested, not just
+	// if the node type was tested. This means checking if code with the same attributes
+	// (like FullMethodName for MethodCallExpression) was tested in previous examples.
 	let alreadyCovered = false;
 
 	if (
@@ -852,102 +865,286 @@ function determineNodeColor(
 		const nodeTypeInXPath = xpath.includes(nodeType);
 
 		if (nodeTypeInXPath) {
-			// Check if previous examples tested code that would match this node type
-			// by checking if any previous example's markers tested code lines that would
-			// produce this node type
-			for (const prevExampleCoverage of previousExamplesCoverage) {
-				const prevExampleContent = prevExampleCoverage.exampleContent;
-				const prevExampleLines = prevExampleContent.split('\n');
+			// Check if the exact same XPath branch combination was tested
+			// This means: same node type, same attributes (like method name), AND same section type
+			// For MethodCallExpression, we check the exact method name
+			// We also need to check if it was tested in the same section (violation vs valid)
+			const isInViolationSection = hasViolationSection;
+			const isInValidSection = hasValidSection;
 
-				// Check if any marker line in previous example would match this node type
-				const allPrevMarkers = [
-					...prevExampleCoverage.validMarkers,
-					...prevExampleCoverage.violationMarkers,
-				];
+			if (
+				nodeType === 'MethodCallExpression' &&
+				nodeImage.length > EMPTY_STRING_LENGTH
+			) {
+				// Check if previous examples tested code that would produce this exact method call
+				// in the same section type (violation or valid)
+				for (const prevExampleCoverage of previousExamplesCoverage) {
+					const prevExampleContent =
+						prevExampleCoverage.exampleContent;
+					const prevExampleLines = prevExampleContent.split('\n');
+					const prevLineSectionMap =
+						mapLinesToSections(prevExampleContent);
 
-				for (const marker of allPrevMarkers) {
-					const markerLineIndex =
-						marker.lineNumber - LINE_NUMBER_OFFSET;
-					if (
-						markerLineIndex >= MIN_ARRAY_INDEX &&
-						markerLineIndex < prevExampleLines.length
-					) {
-						const markerLine =
-							prevExampleLines[markerLineIndex]
-								?.replace(/\/\/\s*❌/g, '')
-								.replace(/\/\/\s*✅/g, '')
-								.trim() ?? '';
+					// Check violation markers if current node is in violation section
+					if (isInViolationSection) {
+						for (const marker of prevExampleCoverage.violationMarkers) {
+							const markerLineIndex =
+								marker.lineNumber - LINE_NUMBER_OFFSET;
+							if (
+								markerLineIndex >= MIN_ARRAY_INDEX &&
+								markerLineIndex < prevExampleLines.length
+							) {
+								const markerLine =
+									prevExampleLines[markerLineIndex]
+										?.replace(/\/\/\s*❌/g, '')
+										.replace(/\/\/\s*✅/g, '')
+										.trim() ?? '';
 
-						// Check if this marker line would produce a node of the same type
-						// using the same pattern matching logic as coverage checking
-						let wouldMatch = false;
-
-						switch (nodeType) {
-							case 'MethodCallExpression': {
-								if (nodeImage.length > EMPTY_STRING_LENGTH) {
-									wouldMatch = markerLine.includes(
-										`${nodeImage}(`,
-									);
-								} else {
-									wouldMatch = /\w+\s*\(/.test(markerLine);
-								}
-								break;
-							}
-							case 'VariableDeclaration': {
-								if (nodeImage.length > EMPTY_STRING_LENGTH) {
-									wouldMatch = new RegExp(
-										`\\b${nodeImage}\\s*[=;]`,
-									).test(markerLine);
-								} else {
-									wouldMatch = /\w+\s+\w+\s*[=;]/.test(
-										markerLine,
-									);
-								}
-								break;
-							}
-							case 'BinaryExpression': {
-								wouldMatch = /[+\-*/=<>!&|]{1,2}/.test(
-									markerLine,
+								// Check if this marker line contains the exact same method call
+								// and is in a violation section
+								const markerSection = prevLineSectionMap.get(
+									marker.lineNumber,
 								);
-								break;
-							}
-							case 'LiteralExpression': {
-								wouldMatch =
-									/\b\d+(\.\d+)?\b|'(?:[^'\\]|\\.)*'|"[^"]*"|\bnull\b|\btrue\b|\bfalse\b/.test(
-										markerLine.toLowerCase(),
-									);
-								break;
-							}
-							case 'IfBlockStatement': {
-								wouldMatch = /\bif\b/.test(
-									markerLine.toLowerCase(),
-								);
-								break;
-							}
-							default: {
-								if (nodeImage.length > EMPTY_STRING_LENGTH) {
-									wouldMatch = markerLine.includes(nodeImage);
-								} else {
-									wouldMatch = markerLine
-										.toLowerCase()
-										.includes(nodeType.toLowerCase());
+								if (
+									markerSection === 'violation' &&
+									markerLine.includes(`${nodeImage}(`)
+								) {
+									alreadyCovered = true;
+									break;
 								}
-								break;
 							}
-						}
-
-						if (
-							wouldMatch &&
-							markerLine.length > EMPTY_STRING_LENGTH
-						) {
-							alreadyCovered = true;
-							break;
 						}
 					}
-				}
 
-				if (alreadyCovered) {
-					break;
+					// Check valid markers if current node is in valid section
+					if (!alreadyCovered && isInValidSection) {
+						for (const marker of prevExampleCoverage.validMarkers) {
+							const markerLineIndex =
+								marker.lineNumber - LINE_NUMBER_OFFSET;
+							if (
+								markerLineIndex >= MIN_ARRAY_INDEX &&
+								markerLineIndex < prevExampleLines.length
+							) {
+								const markerLine =
+									prevExampleLines[markerLineIndex]
+										?.replace(/\/\/\s*❌/g, '')
+										.replace(/\/\/\s*✅/g, '')
+										.trim() ?? '';
+
+								// Check if this marker line contains the exact same method call
+								// and is in a valid section
+								const markerSection = prevLineSectionMap.get(
+									marker.lineNumber,
+								);
+								if (
+									markerSection === 'valid' &&
+									markerLine.includes(`${nodeImage}(`)
+								) {
+									alreadyCovered = true;
+									break;
+								}
+							}
+						}
+					}
+
+					if (alreadyCovered) {
+						break;
+					}
+				}
+			} else {
+				// For other node types, check if the same node type was tested in the same section
+				// This is less precise than MethodCallExpression (which checks exact method name)
+				// but still ensures we check the section type for branch combination accuracy
+				for (const prevExampleCoverage of previousExamplesCoverage) {
+					const prevExampleContent =
+						prevExampleCoverage.exampleContent;
+					const prevExampleLines = prevExampleContent.split('\n');
+					const prevLineSectionMap =
+						mapLinesToSections(prevExampleContent);
+
+					// Check violation markers if current node is in violation section
+					if (isInViolationSection) {
+						for (const marker of prevExampleCoverage.violationMarkers) {
+							const markerLineIndex =
+								marker.lineNumber - LINE_NUMBER_OFFSET;
+							if (
+								markerLineIndex >= MIN_ARRAY_INDEX &&
+								markerLineIndex < prevExampleLines.length
+							) {
+								const markerLine =
+									prevExampleLines[markerLineIndex]
+										?.replace(/\/\/\s*❌/g, '')
+										.replace(/\/\/\s*✅/g, '')
+										.trim() ?? '';
+
+								const markerSection = prevLineSectionMap.get(
+									marker.lineNumber,
+								);
+								if (markerSection !== 'violation') {
+									continue;
+								}
+
+								// Check if this marker line would produce a node of the same type
+								let wouldMatch = false;
+
+								switch (nodeType) {
+									case 'VariableDeclaration': {
+										if (
+											nodeImage.length >
+											EMPTY_STRING_LENGTH
+										) {
+											wouldMatch = new RegExp(
+												`\\b${nodeImage}\\s*[=;]`,
+											).test(markerLine);
+										} else {
+											wouldMatch =
+												/\w+\s+\w+\s*[=;]/.test(
+													markerLine,
+												);
+										}
+										break;
+									}
+									case 'BinaryExpression': {
+										wouldMatch = /[+\-*/=<>!&|]{1,2}/.test(
+											markerLine,
+										);
+										break;
+									}
+									case 'LiteralExpression': {
+										wouldMatch =
+											/\b\d+(\.\d+)?\b|'(?:[^'\\]|\\.)*'|"[^"]*"|\bnull\b|\btrue\b|\bfalse\b/.test(
+												markerLine.toLowerCase(),
+											);
+										break;
+									}
+									case 'IfBlockStatement': {
+										wouldMatch = /\bif\b/.test(
+											markerLine.toLowerCase(),
+										);
+										break;
+									}
+									default: {
+										if (
+											nodeImage.length >
+											EMPTY_STRING_LENGTH
+										) {
+											wouldMatch =
+												markerLine.includes(nodeImage);
+										} else {
+											wouldMatch = markerLine
+												.toLowerCase()
+												.includes(
+													nodeType.toLowerCase(),
+												);
+										}
+										break;
+									}
+								}
+
+								if (
+									wouldMatch &&
+									markerLine.length > EMPTY_STRING_LENGTH
+								) {
+									alreadyCovered = true;
+									break;
+								}
+							}
+						}
+					}
+
+					// Check valid markers if current node is in valid section
+					if (!alreadyCovered && isInValidSection) {
+						for (const marker of prevExampleCoverage.validMarkers) {
+							const markerLineIndex =
+								marker.lineNumber - LINE_NUMBER_OFFSET;
+							if (
+								markerLineIndex >= MIN_ARRAY_INDEX &&
+								markerLineIndex < prevExampleLines.length
+							) {
+								const markerLine =
+									prevExampleLines[markerLineIndex]
+										?.replace(/\/\/\s*❌/g, '')
+										.replace(/\/\/\s*✅/g, '')
+										.trim() ?? '';
+
+								const markerSection = prevLineSectionMap.get(
+									marker.lineNumber,
+								);
+								if (markerSection !== 'valid') {
+									continue;
+								}
+
+								// Check if this marker line would produce a node of the same type
+								let wouldMatch = false;
+
+								switch (nodeType) {
+									case 'VariableDeclaration': {
+										if (
+											nodeImage.length >
+											EMPTY_STRING_LENGTH
+										) {
+											wouldMatch = new RegExp(
+												`\\b${nodeImage}\\s*[=;]`,
+											).test(markerLine);
+										} else {
+											wouldMatch =
+												/\w+\s+\w+\s*[=;]/.test(
+													markerLine,
+												);
+										}
+										break;
+									}
+									case 'BinaryExpression': {
+										wouldMatch = /[+\-*/=<>!&|]{1,2}/.test(
+											markerLine,
+										);
+										break;
+									}
+									case 'LiteralExpression': {
+										wouldMatch =
+											/\b\d+(\.\d+)?\b|'(?:[^'\\]|\\.)*'|"[^"]*"|\bnull\b|\btrue\b|\bfalse\b/.test(
+												markerLine.toLowerCase(),
+											);
+										break;
+									}
+									case 'IfBlockStatement': {
+										wouldMatch = /\bif\b/.test(
+											markerLine.toLowerCase(),
+										);
+										break;
+									}
+									default: {
+										if (
+											nodeImage.length >
+											EMPTY_STRING_LENGTH
+										) {
+											wouldMatch =
+												markerLine.includes(nodeImage);
+										} else {
+											wouldMatch = markerLine
+												.toLowerCase()
+												.includes(
+													nodeType.toLowerCase(),
+												);
+										}
+										break;
+									}
+								}
+
+								if (
+									wouldMatch &&
+									markerLine.length > EMPTY_STRING_LENGTH
+								) {
+									alreadyCovered = true;
+									break;
+								}
+							}
+						}
+					}
+
+					if (alreadyCovered) {
+						break;
+					}
 				}
 			}
 		}
