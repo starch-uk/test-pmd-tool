@@ -14,6 +14,7 @@ export default defineConfig({
 			exclude: [
 				'**/__mocks__/**',
 				'**/*.mock.ts',
+				'tests/**/helpers/**',
 			],
 			thresholds: {
 				lines: 100,

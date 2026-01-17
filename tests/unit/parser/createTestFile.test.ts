@@ -1169,7 +1169,7 @@ public class Example {
 	});
 
 	it('should add closing brace when class ends without brace in extractedCode', () => {
-		// Tests line 636: classBraceDepth <= 0, insideClass is true, lastExtracted doesn't end with '}'
+		// Test when classBraceDepth <= 0, insideClass is true, lastExtracted doesn't end with '}'
 		// This happens when we exit a class but the closing brace wasn't included in extractedCode
 		// We need: classBraceDepth becomes <= 0, insideClass is still true, and last line doesn't end with '}'
 		const exampleContent = `
@@ -1195,7 +1195,7 @@ public class Example {
 	});
 
 	it('should handle helper methods when no closing brace exists in class content', () => {
-		// Tests lines 688-692: helperMethods.length > 0 and lastBraceIndex === NOT_FOUND_INDEX
+		// Test when helperMethods.length > 0 and lastBraceIndex === NOT_FOUND_INDEX
 		// This happens when classContentStr (extractedCode.join('\n')) has no '}' character
 		// We need a class that's missing its closing brace entirely, and helper methods are needed
 		const exampleContent = `
@@ -1229,7 +1229,7 @@ public class Example {
 	});
 
 	it('should add closing brace when class has no helper methods and no brace', () => {
-		// Tests line 699: needsClosingBrace is true (lastBraceIndex === NOT_FOUND_INDEX && hasTopLevelClass)
+		// Test when needsClosingBrace is true (lastBraceIndex === NOT_FOUND_INDEX && hasTopLevelClass)
 		// and helperMethods.length === 0
 		// We need: hasTopLevelClass=true, classContentStr has no '}', and no helper methods
 		const exampleContent = `
@@ -1255,7 +1255,7 @@ public class Example {
 	});
 
 	it('should add closing brace when class ends and lastExtracted does not end with brace', () => {
-		// Tests line 636: classBraceDepth <= 0, insideClass=true, lastExtracted doesn't end with '}'
+		// Test when classBraceDepth <= 0, insideClass=true, lastExtracted doesn't end with '}'
 		// Conditions: classBraceDepth becomes <= 0 (class ended), insideClass is still true,
 		// lastExtracted exists, and lastExtracted.trim() doesn't end with '}'
 		// We need a scenario where we exit the class (classBraceDepth <= 0) but the last
@@ -1283,7 +1283,7 @@ public class Example {
 	});
 
 	it('should handle case where classContentStr has absolutely no closing brace with helper methods', () => {
-		// Tests lines 688-692: helperMethods.length > 0 AND lastBraceIndex === NOT_FOUND_INDEX
+		// Test when helperMethods.length > 0 AND lastBraceIndex === NOT_FOUND_INDEX
 		// We need extractedCode.join('\n') to have NO '}' character at all
 		// This requires: class missing closing brace, methods missing closing braces,
 		// and helper methods are needed
@@ -1316,7 +1316,7 @@ public class Example {
 	});
 
 	it('should add closing brace when no helper methods and classContentStr has no brace', () => {
-		// Tests line 699: needsClosingBrace=true (lastBraceIndex === NOT_FOUND_INDEX && hasTopLevelClass)
+		// Test when needsClosingBrace=true (lastBraceIndex === NOT_FOUND_INDEX && hasTopLevelClass)
 		// AND helperMethods.length === 0
 		const exampleContent = `// Violation: Test
 public class Example {
@@ -1339,7 +1339,7 @@ public class Example {
 	});
 
 	it('should handle property blocks (not method declarations)', () => {
-		// Tests line 534: !isPropertyBlock branch when isPropertyBlock is true
+		// Test !isPropertyBlock branch when isPropertyBlock is true
 		// Property blocks have { but no ( and no void, at depth 1 (prevClassBraceDepth === INITIAL_BRACE_DEPTH)
 		// This tests the short-circuit branch where !isPropertyBlock is false
 		const exampleContent = `
@@ -1368,7 +1368,7 @@ public class Example {
 	});
 
 	it('should handle method declaration when isPropertyBlock is false and all conditions are met', () => {
-		// Tests line 540: when !isPropertyBlock is true and all method declaration conditions are met
+		// Test when !isPropertyBlock is true and all method declaration conditions are met
 		// This ensures the isMethodDeclaration assignment is fully evaluated
 		// Tests all three branches of the || expression: 'void', '(', and hasMethodPattern
 		const exampleContent = `
@@ -1427,7 +1427,7 @@ public class Example {
 	});
 
 	it('should handle method declaration when some conditions are false', () => {
-		// Tests line 540: when !isPropertyBlock is true but some conditions fail
+		// Test when !isPropertyBlock is true but some conditions fail
 		// This tests branches where the expression evaluates to false
 		// For example, when prevClassBraceDepth !== INITIAL_BRACE_DEPTH
 		const exampleContent = `
@@ -1519,7 +1519,7 @@ public class TestClass {
 
 	it('should add filtered helper methods when hasClassLikeStructures is true', () => {
 		// Test case where hasClassLikeStructures is true and helper methods need to be added
-		// This covers line 812: for (const method of filteredHelperMethods)
+		// This covers the loop that processes filteredHelperMethods
 		const exampleContent = `
     private Integer field = 42; // ❌
     public void exampleMethod() {

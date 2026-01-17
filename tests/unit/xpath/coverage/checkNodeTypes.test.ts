@@ -301,7 +301,7 @@ public class TestClass {
 
 	it('should detect nested classes with single child node (not array)', () => {
 		// Test hasNestedClassInNode path where childNode is not array but is object
-		// This tests the else if branch (lines 130-142)
+		// This tests the else if branch
 		const content = `
 public class OuterClass {
     public class InnerClass {
@@ -316,8 +316,7 @@ public class OuterClass {
 	});
 
 	it('should return false when node is not ClassDeclaration in hasNestedClassInNode', () => {
-		// Test line 94: return false when node.kind !== 'ClassDeclaration'
-		// This tests the early return path
+		// Test early return when node.kind !== 'ClassDeclaration'
 		// We can't directly test hasNestedClassInNode, but we can test hasNestedClasses
 		// with content that has no nested classes
 		const content = `
@@ -333,8 +332,8 @@ public class TestClass {
 	});
 
 	it('should handle hasNestedClassInNode with array items that have non-string kind', () => {
-		// Test lines 130-140: else if branch for single child node
-		// Also tests array items with kind that is not a string (line 118: hasKindString false)
+		// Test else if branch for single child node
+		// Also tests array items with kind that is not a string
 		// This requires mocking ts-summit-ast to return specific AST structure
 		const content = `
 public class OuterClass {
@@ -505,7 +504,7 @@ public class Outer {
 	});
 
 	it('should reset insideClass when braceDepth returns to one', () => {
-		// Tests line 59: when braceDepth === BRACE_DEPTH_ONE, insideClass should be set to false
+		// Test when braceDepth === BRACE_DEPTH_ONE, insideClass should be set to false
 		// We need to process a closing brace that brings braceDepth from >1 back to exactly 1
 		// This happens when we close the outer class
 		const content = `public class Outer {

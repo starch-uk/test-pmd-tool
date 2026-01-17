@@ -67,8 +67,8 @@ public class ValidClass {
 		});
 	});
 
-	it('should use default description for section markers with empty description (line 181)', () => {
-		// Test line 181: 'Valid' branch when descriptionText is empty and isSectionValid is true
+	it('should use default description for section markers with empty description', () => {
+		// Test default description when section marker has empty description and is valid
 		const content = `
 // Valid:
 public class TestClass {
@@ -249,7 +249,7 @@ public class TestClass {
 
 	it('should handle markers with only whitespace after emoji', () => {
 		// Tests when firstMatch exists but trim() results in empty string
-		// This covers the optional chaining branches (lines 39, 55)
+		// This covers the optional chaining branches
 		const content = `
 public class TestClass {
     private String field; // ❌   
@@ -283,7 +283,7 @@ public class TestClass {
 	});
 
 	it('should verify rule triggering when xpathExpression is provided', () => {
-		// Test lines 139-151: when xpathExpression is provided and rule doesn't match
+		// Test when xpathExpression is provided and rule doesn't match
 		// This tests the wouldTriggerRule check and warning message
 		const content = `
 public class TestClass {
@@ -302,7 +302,7 @@ public class TestClass {
 	});
 
 	it('should handle section markers with pattern metadata', () => {
-		// Test lines 177-182: pattern metadata path for section markers
+		// Test pattern metadata path for section markers
 		// This tests the patternMetadata.matches path
 		const content = `
 // Violation: Test violation description

@@ -14,18 +14,18 @@ vi.mock('ts-summit-ast', async (importOriginal) => {
 	return {
 		...actual,
 		parseApexCode: vi.fn((source: string) => {
-			// Return AST with non-ClassDeclaration node to test line 94
+			// Return AST with non-ClassDeclaration node
 			if (source.includes('MethodDeclaration')) {
 				return {
 					ast: {
-						kind: 'MethodDeclaration', // Not ClassDeclaration - tests line 94
+						kind: 'MethodDeclaration', // Not ClassDeclaration
 						name: 'exampleMethod',
 					},
 					isUsable: true,
 					errors: [],
 				};
 			}
-			// Return AST with ClassDeclaration that has single child node (not array) - tests lines 130-140
+			// Return AST with ClassDeclaration that has single child node (not array)
 			if (source.includes('singleChild')) {
 				return {
 					ast: {
@@ -46,7 +46,7 @@ vi.mock('ts-summit-ast', async (importOriginal) => {
 					errors: [],
 				};
 			}
-			// Return AST with array items that have non-string kind (line 117 false branch)
+			// Return AST with array items that have non-string kind
 			if (source.includes('nonStringKind')) {
 				return {
 					ast: {
@@ -79,7 +79,7 @@ vi.mock('ts-summit-ast', async (importOriginal) => {
 								kind: 'ClassDeclaration',
 								name: 'OuterClass',
 								// Single child node that doesn't meet else if conditions
-								// Test line 128 false branch: childNode doesn't meet typeof === 'object' ||
+								// childNode doesn't meet typeof === 'object' ||
 								// 'kind' in childNode || typeof childNode.kind === 'string'
 								body: null, // null doesn't meet typeof === 'object' condition
 								// Also test with non-object, missing kind, and non-string kind
@@ -93,7 +93,7 @@ vi.mock('ts-summit-ast', async (importOriginal) => {
 					errors: [],
 				};
 			}
-			// Return AST with array items without kind or with non-string kind (lines 191, 199 false branches)
+			// Return AST with array items without kind or with non-string kind
 			// This tests collectClassDeclarations, not hasNestedClassInNode
 			if (source.includes('arrayItemsWithoutKind')) {
 				return {
@@ -105,9 +105,9 @@ vi.mock('ts-summit-ast', async (importOriginal) => {
 								name: 'OuterClass',
 								// Use 'children' property to test collectClassDeclarations
 								children: [
-									// Array item without 'kind' property (line 191 false branch in collectClassDeclarations)
+									// Array item without 'kind' property
 									{ name: 'test' },
-									// Array item with 'kind' that is not a string (line 199 false branch in collectClassDeclarations)
+									// Array item with 'kind' that is not a string
 									{ kind: 123 },
 									// Valid ClassDeclaration node
 									{
@@ -146,8 +146,7 @@ describe('hasNestedClasses edge cases', () => {
 	});
 
 	it('should return false when root node is not ClassDeclaration', () => {
-		// Test line 94: return false when node.kind !== 'ClassDeclaration'
-		// This tests hasNestedClassInNode early return
+		// Test early return when node.kind !== 'ClassDeclaration'
 		// We need to mock parseApexCode to return an AST where the root is CompilationUnit
 		// but has a MethodDeclaration child (not ClassDeclaration), so hasNestedClassInNode
 		// is never called with a non-ClassDeclaration node.
@@ -165,7 +164,7 @@ describe('hasNestedClasses edge cases', () => {
 	});
 
 	it('should handle single child node (not array) in hasNestedClassInNode', () => {
-		// Test lines 130-140: else if branch for single child node
+		// Test else if branch for single child node
 		const content = `
 public class OuterClass {
     public class InnerClass {
@@ -179,8 +178,8 @@ singleChild`;
 		expect(result).toBe(true);
 	});
 
-	it('should handle single child node that is not ClassDeclaration (line 137 false branch)', () => {
-		// Test line 137: if (childASTNode.kind === 'ClassDeclaration') false branch
+	it('should handle single child node that is not ClassDeclaration', () => {
+		// Test false branch when childASTNode.kind !== 'ClassDeclaration'
 		// This happens when a single child node exists but is not a ClassDeclaration
 		// Mock parseApexCode to return an AST where a ClassDeclaration has a single child
 		// that is not a ClassDeclaration (e.g., MethodDeclaration)
@@ -191,9 +190,9 @@ singleChild`;
 					{
 						kind: 'ClassDeclaration',
 						name: 'OuterClass',
-						// Single child node (not array) that is not ClassDeclaration
-						body: {
-							kind: 'MethodDeclaration', // Not ClassDeclaration - tests line 137 false branch
+								// Single child node (not array) that is not ClassDeclaration
+								body: {
+									kind: 'MethodDeclaration', // Not ClassDeclaration
 							name: 'method1',
 						},
 					},
@@ -210,8 +209,8 @@ singleChild`;
 		expect(result).toBe(false);
 	});
 
-	it('should handle array items with non-string kind (line 117 false branch)', () => {
-		// Test line 117: if (hasKindString) false branch in hasNestedClassInNode
+	it('should handle array items with non-string kind', () => {
+		// Test false branch when hasKindString is false in hasNestedClassInNode
 		const content = 'public class OuterClass { public void method1() {} } nonStringKind';
 		const result = hasNestedClasses(content);
 
@@ -219,8 +218,8 @@ singleChild`;
 		expect(result).toBe(false);
 	});
 
-	it('should handle single child that doesn\'t meet else if conditions (line 128 false branch)', () => {
-		// Test line 128: else if false branch when childNode doesn't meet conditions
+	it('should handle single child that doesn\'t meet else if conditions', () => {
+		// Test else if false branch when childNode doesn't meet conditions
 		const content = 'public class OuterClass {} invalidSingleChild';
 		const result = hasNestedClasses(content);
 
@@ -228,8 +227,8 @@ singleChild`;
 		expect(result).toBe(false);
 	});
 
-	it('should handle array items without kind property or with non-string kind (lines 191, 199 false branches)', () => {
-		// Test lines 191, 199: false branches when item doesn't meet conditions in collectClassDeclarations
+	it('should handle array items without kind property or with non-string kind', () => {
+		// Test false branches when item doesn't meet conditions in collectClassDeclarations
 		// Use a special marker string to trigger the mock setup
 		const content = 'public class OuterClass { public class InnerClass {} } arrayItemsWithoutKind';
 		const result = hasNestedClasses(content);

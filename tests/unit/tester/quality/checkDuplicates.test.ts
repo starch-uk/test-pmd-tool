@@ -4,329 +4,245 @@
  */
 import { describe, it, expect } from 'vitest';
 import { checkDuplicates } from '../../../../src/tester/quality/checkDuplicates.js';
-import type { ExampleData } from '../../../../src/types/index.js';
+import {
+	expectPassedWithNoIssues,
+	expectPassedWithNoIssuesOnly,
+	expectWarningCount,
+	expectWarningContaining,
+} from '../../helpers/assertions.js';
+import {
+	createExampleData,
+	createViolationMarker,
+	createValidMarker,
+} from '../../helpers/fixtures.js';
 
 describe('checkDuplicates', () => {
 	it('should return passed when fewer than 2 examples', () => {
-		const examples: ExampleData[] = [
-			{
+		const examples = [
+			createExampleData({
 				content: 'public class Test {}',
-				exampleIndex: 1,
-				validMarkers: [],
-				valids: [],
 				violationMarkers: [
-					{
-						description: 'Test',
-						index: 0,
-						isViolation: true,
-						lineNumber: 1,
-					},
+					createViolationMarker({ description: 'Test' }),
 				],
 				violations: ['public class Test {}'],
-			},
+			}),
 		];
 
 		const result = checkDuplicates(examples);
 
-		expect(result.passed).toBe(true);
-		expect(result.issues).toHaveLength(0);
-		expect(result.warnings).toHaveLength(0);
+		expectPassedWithNoIssues(result);
 	});
 
 	it('should return passed when no examples', () => {
 		const result = checkDuplicates([]);
 
-		expect(result.passed).toBe(true);
-		expect(result.issues).toHaveLength(0);
-		expect(result.warnings).toHaveLength(0);
+		expectPassedWithNoIssues(result);
 	});
 
 	it('should detect duplicate violation markers', () => {
-		const examples: ExampleData[] = [
-			{
+		const duplicateDescription =
+			'This is a test violation marker description';
+		const examples = [
+			createExampleData({
 				content: 'public class Test1 {}',
 				exampleIndex: 1,
-				validMarkers: [],
-				valids: [],
 				violationMarkers: [
-					{
-						description:
-							'This is a test violation marker description',
-						index: 0,
-						isViolation: true,
-						lineNumber: 1,
-					},
+					createViolationMarker({
+						description: duplicateDescription,
+					}),
 				],
 				violations: ['public class MyClass {}'],
-			},
-			{
+			}),
+			createExampleData({
 				content: 'public class Test2 {}',
 				exampleIndex: 2,
-				validMarkers: [],
-				valids: [],
 				violationMarkers: [
-					{
-						description:
-							'This is a test violation marker description',
-						index: 0,
-						isViolation: true,
-						lineNumber: 1,
-					},
+					createViolationMarker({
+						description: duplicateDescription,
+					}),
 				],
 				violations: ['public class MyClass {}'],
-			},
+			}),
 		];
 
 		const result = checkDuplicates(examples);
 
-		expect(result.passed).toBe(true);
-		expect(result.issues).toHaveLength(0);
-		expect(result.warnings).toHaveLength(1);
-		expect(result.warnings[0]).toContain('Duplicate marker description');
-		expect(result.warnings[0]).toContain('found in examples: 1, 2');
+		expectPassedWithNoIssuesOnly(result);
+		expectWarningCount(result, 1);
+		expectWarningContaining(result, 'Duplicate marker description');
+		expectWarningContaining(result, 'found in examples: 1, 2');
 	});
 
 	it('should detect duplicate valid markers', () => {
-		const examples: ExampleData[] = [
-			{
+		const duplicateDescription = 'This is a test valid marker description';
+		const examples = [
+			createExampleData({
 				content: 'public class Test1 {}',
 				exampleIndex: 1,
 				validMarkers: [
-					{
-						description: 'This is a test valid marker description',
-						index: 0,
-						isViolation: false,
-						lineNumber: 1,
-					},
+					createValidMarker({ description: duplicateDescription }),
 				],
 				valids: ['private int value;'],
-				violationMarkers: [],
-				violations: [],
-			},
-			{
+			}),
+			createExampleData({
 				content: 'public class Test2 {}',
 				exampleIndex: 2,
 				validMarkers: [
-					{
-						description: 'This is a test valid marker description',
-						index: 0,
-						isViolation: false,
-						lineNumber: 1,
-					},
+					createValidMarker({ description: duplicateDescription }),
 				],
 				valids: ['private int value;'],
-				violationMarkers: [],
-				violations: [],
-			},
+			}),
 		];
 
 		const result = checkDuplicates(examples);
 
-		expect(result.passed).toBe(true);
-		expect(result.issues).toHaveLength(0);
-		expect(result.warnings).toHaveLength(1);
-		expect(result.warnings[0]).toContain('Duplicate marker description');
-		expect(result.warnings[0]).toContain('found in examples: 1, 2');
+		expectPassedWithNoIssuesOnly(result);
+		expectWarningCount(result, 1);
+		expectWarningContaining(result, 'Duplicate marker description');
+		expectWarningContaining(result, 'found in examples: 1, 2');
 	});
 
 	it('should not warn for short patterns', () => {
-		const examples: ExampleData[] = [
-			{
+		const examples = [
+			createExampleData({
 				content: 'int x;',
 				exampleIndex: 1,
-				validMarkers: [],
-				valids: [],
 				violationMarkers: [
-					{
-						description: 'Test',
-						index: 0,
-						isViolation: true,
-						lineNumber: 1,
-					},
+					createViolationMarker({ description: 'Test' }),
 				],
 				violations: ['int x;'],
-			},
-			{
+			}),
+			createExampleData({
 				content: 'int y;',
 				exampleIndex: 2,
-				validMarkers: [],
-				valids: [],
 				violationMarkers: [
-					{
-						description: 'Test',
-						index: 0,
-						isViolation: true,
-						lineNumber: 1,
-					},
+					createViolationMarker({ description: 'Test' }),
 				],
 				violations: ['int x;'],
-			},
+			}),
 		];
 
 		const result = checkDuplicates(examples);
 
-		expect(result.passed).toBe(true);
-		expect(result.issues).toHaveLength(0);
-		expect(result.warnings).toHaveLength(0);
+		expectPassedWithNoIssues(result);
 	});
 
 	it('should handle multiple duplicates across different examples', () => {
-		const examples: ExampleData[] = [
-			{
+		const firstDescription = 'This is the first test marker description';
+		const secondDescription = 'This is the second test marker description';
+		const examples = [
+			createExampleData({
 				content: 'public class Test1 {}',
 				exampleIndex: 1,
-				validMarkers: [],
-				valids: [],
 				violationMarkers: [
-					{
-						description:
-							'This is the first test marker description',
+					createViolationMarker({
+						description: firstDescription,
 						index: 0,
-						isViolation: true,
-						lineNumber: 1,
-					},
-					{
-						description:
-							'This is the second test marker description',
+					}),
+					createViolationMarker({
+						description: secondDescription,
 						index: 1,
-						isViolation: true,
 						lineNumber: 2,
-					},
+					}),
 				],
 				violations: [
 					'public class MyClass {}',
 					'private void method() {}',
 				],
-			},
-			{
+			}),
+			createExampleData({
 				content: 'public class Test2 {}',
 				exampleIndex: 2,
-				validMarkers: [],
-				valids: [],
 				violationMarkers: [
-					{
-						description:
-							'This is the first test marker description',
+					createViolationMarker({
+						description: firstDescription,
 						index: 0,
-						isViolation: true,
-						lineNumber: 1,
-					},
-					{
-						description:
-							'This is the second test marker description',
+					}),
+					createViolationMarker({
+						description: secondDescription,
 						index: 1,
-						isViolation: true,
 						lineNumber: 2,
-					},
+					}),
 				],
 				violations: [
 					'public class MyClass {}',
 					'private void method() {}',
 				],
-			},
-			{
+			}),
+			createExampleData({
 				content: 'public class Test3 {}',
 				exampleIndex: 3,
-				validMarkers: [],
-				valids: [],
 				violationMarkers: [
-					{
-						description:
-							'This is the first test marker description',
-						index: 0,
-						isViolation: true,
-						lineNumber: 1,
-					},
+					createViolationMarker({ description: firstDescription }),
 				],
 				violations: ['public class MyClass {}'],
-			},
+			}),
 		];
 
 		const result = checkDuplicates(examples);
 
-		expect(result.passed).toBe(true);
-		expect(result.issues).toHaveLength(0);
-		expect(result.warnings).toHaveLength(2); // Two marker descriptions duplicated
+		expectPassedWithNoIssuesOnly(result);
+		expectWarningCount(result, 2);
 	});
 
 	it('should normalize whitespace when comparing marker descriptions', () => {
-		const examples: ExampleData[] = [
-			{
+		const examples = [
+			createExampleData({
 				content: 'public class Test1 {}',
 				exampleIndex: 1,
-				validMarkers: [],
-				valids: [],
 				violationMarkers: [
-					{
+					createViolationMarker({
 						description:
 							'This   is   a   test   marker   description',
-						index: 0,
-						isViolation: true,
-						lineNumber: 1,
-					},
+					}),
 				],
 				violations: ['public class MyClass {}'],
-			},
-			{
+			}),
+			createExampleData({
 				content: 'public class Test2 {}',
 				exampleIndex: 2,
-				validMarkers: [],
-				valids: [],
 				violationMarkers: [
-					{
+					createViolationMarker({
 						description: 'This is a test marker description',
-						index: 0,
-						isViolation: true,
-						lineNumber: 1,
-					},
+					}),
 				],
 				violations: ['public class MyClass {}'],
-			},
+			}),
 		];
 
 		const result = checkDuplicates(examples);
 
-		expect(result.passed).toBe(true);
-		expect(result.issues).toHaveLength(0);
-		expect(result.warnings).toHaveLength(1);
-		expect(result.warnings[0]).toContain('Duplicate marker description');
+		expectPassedWithNoIssuesOnly(result);
+		expectWarningCount(result, 1);
+		expectWarningContaining(result, 'Duplicate marker description');
 	});
 
 	it('should handle edge case where descriptionList get returns undefined', () => {
 		// This test covers the defensive check for undefined descriptionList
 		// In practice, get() after set() should never return undefined,
 		// but TypeScript requires the check
-		const examples: ExampleData[] = [
-			{
+		const duplicateDescription = 'This is a test marker description';
+		const examples = [
+			createExampleData({
 				content: 'public class Test1 {}',
 				exampleIndex: 1,
-				validMarkers: [],
-				valids: [],
 				violationMarkers: [
-					{
-						description: 'This is a test marker description',
-						index: 0,
-						isViolation: true,
-						lineNumber: 1,
-					},
+					createViolationMarker({
+						description: duplicateDescription,
+					}),
 				],
 				violations: ['public class MyClass {}'],
-			},
-			{
+			}),
+			createExampleData({
 				content: 'public class Test2 {}',
 				exampleIndex: 2,
-				validMarkers: [],
-				valids: [],
 				violationMarkers: [
-					{
-						description: 'This is a test marker description',
-						index: 0,
-						isViolation: true,
-						lineNumber: 1,
-					},
+					createViolationMarker({
+						description: duplicateDescription,
+					}),
 				],
 				violations: ['public class MyClass {}'],
-			},
+			}),
 		];
 
 		const result = checkDuplicates(examples);

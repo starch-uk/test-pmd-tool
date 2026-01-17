@@ -29,7 +29,7 @@ describe('findNodeTypeLineNumber edge cases', () => {
 	});
 
 	it('should handle newlineMatches null case when no newlines in XPath substring', () => {
-		// Test line 178: newlineMatches is null when match() returns null
+		// Test newlineMatches is null when match() returns null
 		// This happens when xpathBeforeNodeType has no newlines
 		// To trigger this, we need:
 		// 1. Node type not found in single line (forces fallback)
@@ -47,8 +47,8 @@ describe('findNodeTypeLineNumber edge cases', () => {
 		});
 
 		// XML where node type is NOT in a single line and NOT in XPath section
-		// This forces the fallback path (lines 161-184)
-		// XPath has no newlines before the node type, so newlineMatches will be null (line 178)
+		// This forces the fallback path
+		// XPath has no newlines before the node type, so newlineMatches will be null
 		const mockXmlContent = `<?xml version="1.0"?>
 <rule name="TestRule">
   <properties>
@@ -76,7 +76,7 @@ describe('findNodeTypeLineNumber edge cases', () => {
 		const xpath = '//SomeNodeType[@Attr="value"]';
 		const result = checkXPathCoverage(xpath, examples, '/path/to/rule.xml');
 
-		// Should complete without errors and trigger line 178 (newlineMatches null)
+		// Should complete without errors and handle newlineMatches null case
 		expect(result).toBeDefined();
 		expect(result.coverage).toBeDefined();
 		// Should have coverage result for node types

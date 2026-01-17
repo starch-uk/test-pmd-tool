@@ -73,8 +73,8 @@ describe('RuleTester duplicate marker handling', () => {
 		});
 	});
 
-	it('should skip duplicate violation markers (line 429 false branch)', async () => {
-		// Test line 429: if (!seenViolationMarkers.has(uniqueKey)) false branch
+	it('should skip duplicate violation markers', async () => {
+		// Test false branch when duplicate violation markers have the same uniqueKey
 		// This happens when the same marker appears multiple times with the same uniqueKey
 		const tester = new RuleTester('/path/to/rule.xml');
 		tester.extractExamples();
@@ -149,8 +149,8 @@ describe('RuleTester duplicate marker handling', () => {
 		expect(result.examplesTested).toBeGreaterThanOrEqual(0);
 	});
 
-	it('should skip duplicate valid markers (line 510 false branch)', async () => {
-		// Test line 510: if (!seenValidMarkers.has(uniqueKey)) false branch
+	it('should skip duplicate valid markers', async () => {
+		// Test false branch when duplicate valid markers have the same uniqueKey
 		// This happens when the same marker appears multiple times with the same uniqueKey
 		const tester = new RuleTester('/path/to/rule.xml');
 		tester.extractExamples();

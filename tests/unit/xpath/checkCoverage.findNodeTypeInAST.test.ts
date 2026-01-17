@@ -22,13 +22,13 @@ vi.mock('ts-summit-ast', async (importOriginal) => {
 			ast: {
 				kind: 'CompilationUnit',
 				children: [
-					// Array item with 'kind' property that is not a string (line 240: hasKindString false)
+					// Array item with 'kind' property that is not a string
 					{ kind: 123 }, // kind is number, not string
-					// Array item without 'kind' property (line 231: item check fails)
+					// Array item without 'kind' property
 					{ name: 'test' },
-					// Array item that is null (line 231: item !== null check)
+					// Array item that is null
 					null,
-					// Array item that is undefined (line 231: item !== undefined check)
+					// Array item that is undefined
 					undefined,
 					// Valid AST node
 					{
@@ -52,10 +52,10 @@ describe('findNodeTypeInAST edge cases', () => {
 		vi.clearAllMocks();
 	});
 
-	it('should handle array items without kind property or with non-string kind (lines 55, 63 false branches)', () => {
-		// Test lines 55, 63: array items that don't pass the checks
-		// Line 55 false: item is null, undefined, not object, or missing 'kind'
-		// Line 63 false: item has 'kind' but it's not a string
+	it('should handle array items without kind property or with non-string kind', () => {
+		// Test array items that don't pass the checks
+		// Item is null, undefined, not object, or missing 'kind'
+		// Item has 'kind' but it's not a string
 		mockedAnalyzeXPath.mockReturnValue({
 			attributes: [],
 			conditionals: [],

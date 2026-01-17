@@ -50,7 +50,7 @@ describe('extractMarkers with AST associations', () => {
 	});
 
 	it('should include AST information when comment has associated node with good and confident association', () => {
-		// Test lines 122-136: AST information extraction paths
+		// Test AST information extraction paths
 		const sourceRange = createMockSourceRange(3, 5, 3, 25);
 		const associatedNode = createMockASTNode('MethodDeclaration');
 		const comments = [
@@ -102,7 +102,7 @@ describe('extractMarkers with AST associations', () => {
 	});
 
 	it('should include rule mismatch warning when wouldTriggerRule returns false', () => {
-		// Test lines 145-151: XPath rule verification with mismatch
+		// Test XPath rule verification with mismatch
 		const associatedNode = createMockASTNode('MethodDeclaration');
 		const comments = [
 			createMockExtractedComment({
@@ -150,7 +150,7 @@ describe('extractMarkers with AST associations', () => {
 	});
 
 	it('should include AST information for annotated comments', () => {
-		// Test annotated node relationship (line 106)
+		// Test annotated node relationship
 		const associatedNode = createMockASTNode('FieldDeclaration');
 		const comments = [
 			createMockExtractedComment({
@@ -198,7 +198,7 @@ describe('extractMarkers with AST associations', () => {
 	});
 
 	it('should not include AST information when association is not good or confident', () => {
-		// Test lines 154-159: else branch when no good association
+		// Test else branch when no good association
 		const comments = [
 			createMockExtractedComment({
 				fullText: '// ❌ Violation',
@@ -233,7 +233,7 @@ describe('extractMarkers with AST associations', () => {
 	});
 
 	it('should use default association confidence when associationConfidence is undefined', () => {
-		// Test line 111: associationConfidence ?? DEFAULT_ASSOCIATION_CONFIDENCE
+		// Test default association confidence when undefined
 		const comments = [
 			createMockExtractedComment({
 				fullText: '// ❌ Violation',
@@ -269,7 +269,7 @@ describe('extractMarkers with AST associations', () => {
 	});
 
 	it('should handle section markers with empty description match', () => {
-		// Test lines 176-181: section marker description extraction when matchGroup is undefined or empty
+		// Test section marker description extraction when matchGroup is undefined or empty
 		const comments = [
 			createMockExtractedComment({
 				fullText: '// Violation:',
@@ -300,7 +300,7 @@ public class Test {
 	});
 
 	it('should handle violation markers with XPath when rule matches', () => {
-		// Test lines 140-148: XPath provided but rule matches
+		// Test XPath provided but rule matches
 		const associatedNode = createMockASTNode('MethodDeclaration');
 		const comments = [
 			createMockExtractedComment({

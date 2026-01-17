@@ -99,7 +99,7 @@ describe('checkXPathCoverage', () => {
 	});
 
 	it('should handle AST parsing failure in checkNodeTypeCoverage', () => {
-		// Test lines 285-288: when AST parsing fails, all node types should be marked as missing
+		// Test when AST parsing fails, all node types should be marked as missing
 		// Note: ts-summit-ast may handle invalid code gracefully, so this path might be hard to test
 		// If the path is unreachable in practice, it should be removed
 		mockedAnalyzeXPath.mockReturnValue({
@@ -2638,7 +2638,7 @@ return //MethodCallExpression[
 	});
 
 	it('should handle findNodeTypeLineNumber when node type not in single line and no newlines before node type', () => {
-		// Test line 178: newlineMatches null case when xpathBeforeNodeType has no newlines
+		// Test newlineMatches null case when xpathBeforeNodeType has no newlines
 		const examples = [
 			{
 				content: 'public class TestClass {}',
@@ -3247,7 +3247,7 @@ public class OuterClass {
 	});
 
 	it('should handle conditional when xpathSectionStart is NOT_FOUND_INDEX', () => {
-		// Tests line 410: when xpathSectionStart === NOT_FOUND_INDEX (property not found)
+		// Test when xpathSectionStart === NOT_FOUND_INDEX (property not found)
 		mockedAnalyzeXPath.mockReturnValue({
 			attributes: [],
 			conditionals: [
@@ -3296,7 +3296,7 @@ public class OuterClass {
 	});
 
 	it('should handle conditional when hasNextLine is false', () => {
-		// Tests line 444: when hasNextLine is false (nextLineIndex >= lines.length)
+		// Test when hasNextLine is false (nextLineIndex >= lines.length)
 		mockedAnalyzeXPath.mockReturnValue({
 			attributes: [],
 			conditionals: [
