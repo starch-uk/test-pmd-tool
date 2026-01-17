@@ -195,10 +195,18 @@ export default [
 			...allRules,
 			// Explicitly disable no-magic-numbers for test files
 			'@typescript-eslint/no-magic-numbers': 'off',
+			// Disable sort-keys for test files (mock data may need to match external API formats)
+			'sort-keys/sort-keys-fix': 'off',
 			// Ensure this override takes precedence by setting it after allRules
 		},
 	},
 	{
-		ignores: ['dist/**', 'node_modules/**', 'coverage/**'],
+		ignores: [
+			'dist/**',
+			'node_modules/**',
+			'coverage/**',
+			'**/__mocks__/**',
+			'**/*.mock.ts',
+		],
 	},
 ];

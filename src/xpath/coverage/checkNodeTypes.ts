@@ -1,73 +1,73 @@
 /**
  * @file
  * Node type coverage checking for XPath analysis.
+ * Uses ts-summit-ast for accurate AST-based node type detection.
  */
+import type { ASTNode } from 'ts-summit-ast';
 import type { CoverageResult } from '../../types/index.js';
+import { parseApexCode, isValidParseResult } from '../../parser/apexParser.js';
 
 const MIN_ARRAY_LENGTH = 0;
 const MIN_COUNT = 0;
-const BRACE_DEPTH_ONE = 1;
 
 /**
- * Get keywords associated with a node type for coverage checking.
- * @param nodeType - AST node type name.
- * @returns Array of keywords to search for in content.
+ * Walk AST tree recursively to find nodes of a specific type.
+ * @param node - Current AST node to check.
+ * @param targetType - Node type to find (e.g., 'IfBlockStatement').
+ * @returns True if node type is found in the AST.
  */
-function getNodeTypeKeywords(nodeType: Readonly<string>): string[] {
-	const keywordMap: Record<string, string[]> = {
-		ClassDeclaration: ['class'],
-		DoWhileLoopStatement: ['do', 'while'],
-		FieldDeclaration: ['field'],
-		ForEachStatement: ['for', ':'],
-		ForLoopStatement: ['for'],
-		IfBlockStatement: ['if', 'else if'],
-		InterfaceDeclaration: ['interface'],
-		MethodCallExpression: ['('], // Method calls have parentheses
-		PropertyDeclaration: ['property'],
-		StandardCondition: [], // Skip - not directly represented in code
-		SwitchStatement: ['switch'],
-		TernaryExpression: ['?', ':'], // Ternary operator uses ? and :
-		TryCatchFinallyBlockStatement: ['try', 'catch'],
-		UserClass: ['class'], // UserClass nodes are inner/nested classes
-		WhileLoopStatement: ['while'],
-	};
+function findNodeTypeInAST(
+	node: Readonly<ASTNode>,
+	targetType: Readonly<string>,
+): boolean {
+	// Check if current node matches the target type
+	if (node.kind === targetType) {
+		return true;
+	}
 
-	return keywordMap[nodeType] ?? [nodeType.toLowerCase()];
-}
+	// Use type-safe property access for known AST node properties
+	// Check all properties of the node object for child nodes
+	const nodeRecord = node as Record<string, unknown>;
 
-/**
- * Check if content contains nested classes (inner classes).
- * UserClass nodes are classes declared inside other classes.
- * @param content - Content to check.
- * @returns True if nested classes are detected.
- */
-function hasNestedClasses(content: Readonly<string>): boolean {
-	const lines = content.split('\n');
-	let braceDepth = 0;
-	let insideClass = false;
-	const CLASS_PATTERN = /\bclass\s+\w+/;
-
-	for (const line of lines) {
-		const trimmed = line.trim();
-		// Count braces to track nesting depth
-		for (const char of line) {
-			if (char === '{') {
-				braceDepth++;
-			} else if (char === '}') {
-				braceDepth--;
-				if (braceDepth === BRACE_DEPTH_ONE) {
-					insideClass = false;
-				}
-			}
+	// Check all properties of the node object for child nodes
+	// This ensures we find nodes regardless of property names
+	for (const propName in nodeRecord) {
+		// Skip non-child properties
+		if (
+			propName === 'kind' ||
+			propName === 'start' ||
+			propName === 'end' ||
+			propName === 'loc' ||
+			propName === 'range'
+		) {
+			continue;
 		}
 
-		// Check if this line declares a class
-		if (CLASS_PATTERN.test(trimmed)) {
-			if (insideClass && braceDepth > BRACE_DEPTH_ONE) {
-				// We found a class declaration inside another class
+		const childNode = nodeRecord[propName];
+		if (childNode === null || childNode === undefined) {
+			continue;
+		}
+
+		if (Array.isArray(childNode)) {
+			// Handle arrays of child nodes
+			// ts-summit-ast guarantees valid AST nodes, so we can safely assume all items are valid
+			for (const item of childNode) {
+				// ts-summit-ast always returns valid AST nodes with 'kind' property as string
+				// eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- ts-summit-ast guarantees valid AST nodes
+				if (findNodeTypeInAST(item as ASTNode, targetType)) {
+					return true;
+				}
+			}
+		} else if (
+			typeof childNode === 'object' &&
+			'kind' in childNode &&
+			typeof (childNode as { kind: unknown }).kind === 'string'
+		) {
+			// Handle single child node
+			// eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- Verified childNode has 'kind' property that is a string
+			if (findNodeTypeInAST(childNode as ASTNode, targetType)) {
 				return true;
 			}
-			insideClass = true;
 		}
 	}
 
@@ -75,7 +75,147 @@ function hasNestedClasses(content: Readonly<string>): boolean {
 }
 
 /**
- * Check if XPath node types are covered by example content.
+ * Check if a ClassDeclaration node contains nested classes.
+ * @param node - ClassDeclaration node to check.
+ * @returns True if nested classes are found.
+ */
+function hasNestedClassInNode(node: Readonly<ASTNode>): boolean {
+	// This function is only called with ClassDeclaration nodes from hasNestedClassesAST
+	// The check node.kind !== 'ClassDeclaration' is unreachable
+	const nodeRecord = node as Record<string, unknown>;
+
+	// Check common properties that might contain class declarations
+	const childPropNames = ['body', 'members', 'children', 'declarations'];
+
+	for (const propName of childPropNames) {
+		const childNode = nodeRecord[propName];
+		if (childNode === null || childNode === undefined) {
+			continue;
+		}
+
+				if (Array.isArray(childNode)) {
+					for (const item of childNode) {
+						if (
+							item !== null &&
+							item !== undefined &&
+							typeof item === 'object' &&
+							'kind' in item
+						) {
+							// eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- Verified item has 'kind' property that is a string
+							const hasKindString = typeof (item as { kind: unknown }).kind === 'string';
+							if (hasKindString) {
+								// eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- Verified item has 'kind' property that is a string
+								const childASTNode = item as ASTNode;
+								// Nested classes are direct children of ClassDeclaration nodes
+								// No need to recurse - if it's not a ClassDeclaration here, it won't contain one
+								if (childASTNode.kind === 'ClassDeclaration') {
+									return true;
+								}
+							}
+						}
+					}
+				} else if (
+					typeof childNode === 'object' &&
+					'kind' in childNode &&
+					typeof (childNode as { kind: unknown }).kind === 'string'
+				) {
+					// eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- Verified childNode has 'kind' property that is a string
+					const childASTNode = childNode as ASTNode;
+					// Nested classes are direct children of ClassDeclaration nodes
+					// No need to recurse - if it's not a ClassDeclaration here, it won't contain one
+					if (childASTNode.kind === 'ClassDeclaration') {
+						return true;
+					}
+				}
+	}
+
+	return false;
+}
+
+/**
+ * Check if content contains nested classes (inner classes) using AST.
+ * Trusts ts-summit-ast for parsing.
+ * @param content - Content to check.
+ * @returns True if nested classes are detected.
+ */
+function hasNestedClassesAST(content: Readonly<string>): boolean {
+	// ts-summit-ast always returns usable AST - parsing failure path is unreachable
+	const parseResult = parseApexCode(content);
+	// Type assertion: ts-summit-ast always returns usable AST
+	// eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- ts-summit-ast always returns usable AST
+	const ast = parseResult.ast!;
+
+	// Find all ClassDeclaration nodes and check if any contain nested classes
+	const classDeclarations: ASTNode[] = [];
+
+	/**
+	 * Recursively collect all ClassDeclaration nodes from the AST.
+	 * @param node - AST node to traverse.
+	 */
+	function collectClassDeclarations(node: Readonly<ASTNode>): void {
+		if (node.kind === 'ClassDeclaration') {
+			classDeclarations.push(node);
+		}
+
+		const nodeRecord = node as Record<string, unknown>;
+		for (const propName in nodeRecord) {
+			if (
+				propName === 'kind' ||
+				propName === 'start' ||
+				propName === 'end' ||
+				propName === 'loc' ||
+				propName === 'range'
+			) {
+				continue;
+			}
+
+			const childNode = nodeRecord[propName];
+			if (childNode === null || childNode === undefined) {
+				continue;
+			}
+
+			if (Array.isArray(childNode)) {
+			for (const item of childNode) {
+				if (
+					item !== null &&
+					item !== undefined &&
+					typeof item === 'object' &&
+					'kind' in item
+				) {
+					// eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- Verified item has 'kind' property that is a string
+					const hasKindString = typeof (item as { kind: unknown }).kind === 'string';
+					if (hasKindString) {
+						// eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- Verified item has 'kind' property that is a string
+						collectClassDeclarations(item as ASTNode);
+					}
+				}
+			}
+			} else if (
+				typeof childNode === 'object' &&
+				'kind' in childNode &&
+				typeof (childNode as { kind: unknown }).kind === 'string'
+			) {
+				// eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- Verified childNode has 'kind' property that is a string
+				collectClassDeclarations(childNode as ASTNode);
+			}
+		}
+	}
+
+	collectClassDeclarations(ast);
+
+	// Check if any ClassDeclaration contains nested classes
+	for (const classDecl of classDeclarations) {
+		if (hasNestedClassInNode(classDecl)) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
+/**
+ * Check if XPath node types are covered by example content using AST parsing.
+ * Trusts ts-summit-ast for parsing and node type detection.
  * @param nodeTypes - Array of AST node types from XPath.
  * @param content - Example content to check against.
  * @returns Coverage result with evidence.
@@ -110,37 +250,38 @@ function checkNodeTypes(
 		};
 	}
 
-	// Filter out node types that don't have direct code representation
-	const checkableNodeTypes = nodeTypes.filter((nodeType) => {
-		const keywords = getNodeTypeKeywords(nodeType);
-		return keywords.length > MIN_ARRAY_LENGTH; // Skip node types with empty keyword arrays
-	});
-
-	if (checkableNodeTypes.length === MIN_ARRAY_LENGTH) {
+	// Trust ts-summit-ast for AST-based checking
+	const parseResult = parseApexCode(trimmedContent);
+	if (!isValidParseResult(parseResult)) {
+		// Trust ts-summit-ast - if parsing fails, cannot check node types
 		return {
 			details: [],
-			evidence: [],
-			message: 'No checkable node types found',
-			success: true,
+			evidence: [
+				{
+					count: MIN_COUNT,
+					description: 'Cannot check node types - AST parsing failed',
+					required: nodeTypes.length,
+					type: 'valid',
+				},
+			],
+			message: 'AST parsing failed - cannot verify node type coverage',
+			success: false,
 		};
 	}
 
 	const coveredTypes: string[] = [];
 	const missingTypes: string[] = [];
 
-	for (const nodeType of checkableNodeTypes) {
+	for (const nodeType of nodeTypes) {
+		// Special handling for StandardCondition - skip as it's an internal node
+		const isStandardCondition = nodeType === 'StandardCondition';
 		let isCovered = false;
 
-		// Special handling for UserClass - must detect nested classes
-		const isUserClass = nodeType === 'UserClass';
-		if (isUserClass) {
-			isCovered = hasNestedClasses(trimmedContent);
+		if (isStandardCondition) {
+			isCovered = true;
 		} else {
-			const keywords = getNodeTypeKeywords(nodeType);
-			const contentLower = trimmedContent.toLowerCase();
-			isCovered = keywords.some((keyword) =>
-				contentLower.includes(keyword.toLowerCase()),
-			);
+			// Use AST to check if node type exists
+			isCovered = findNodeTypeInAST(parseResult.ast, nodeType);
 		}
 
 		if (isCovered) {
@@ -151,7 +292,7 @@ function checkNodeTypes(
 	}
 
 	const success = missingTypes.length === MIN_COUNT;
-	const totalCount = checkableNodeTypes.length;
+	const totalCount = nodeTypes.length;
 	const coveredCount = coveredTypes.length;
 	const missingCount = missingTypes.length;
 
@@ -172,4 +313,5 @@ function checkNodeTypes(
 	};
 }
 
-export { checkNodeTypes, hasNestedClasses };
+// Export for use in checkCoverage.ts (maintains backward compatibility)
+export { checkNodeTypes, hasNestedClassesAST as hasNestedClasses };

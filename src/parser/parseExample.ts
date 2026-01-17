@@ -10,17 +10,22 @@ const EMPTY_STRING_INDEX = 0;
 /**
  * Parse example content and extract violations, valids, and markers.
  * @param exampleContent - Raw example content with code and markers.
+ * @param xpathExpression - Optional XPath expression for rule triggering verification.
  * @returns Parsed example data (without exampleIndex, which is added by the caller).
  */
 export function parseExample(
 	exampleContent: string,
+	xpathExpression?: string,
 ): Omit<ExampleData, 'exampleIndex'> {
 	const lines = exampleContent.split('\n');
 	const violations: string[] = [];
 	const valids: string[] = [];
 	let currentMode: 'valid' | 'violation' | null = null;
 
-	const { validMarkers, violationMarkers } = extractMarkers(exampleContent);
+	const { validMarkers, violationMarkers } = extractMarkers(
+		exampleContent,
+		xpathExpression,
+	);
 
 	const hasInlineMarkersInExample =
 		exampleContent.includes('// ❌') || exampleContent.includes('// ✅');

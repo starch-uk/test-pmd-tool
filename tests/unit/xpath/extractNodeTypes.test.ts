@@ -162,4 +162,155 @@ return $methods//IfBlockStatement`;
 		expect(result).toContain('Method');
 		expect(Array.isArray(result)).toBe(true);
 	});
+
+	it('should filter out PMD attribute names like ReferenceType', () => {
+		const xpath =
+			'//MethodCallExpression[@FullMethodName = "split" and ./*[1][self::ReferenceExpression[@ReferenceType = "METHOD"]]]';
+		const result = extractNodeTypes(xpath);
+
+		expect(result).not.toContain('ReferenceType');
+		expect(result).toContain('ReferenceExpression');
+		expect(result).toContain('MethodCallExpression');
+	});
+
+	it('should filter out all PMD attribute names', () => {
+		const xpath =
+			'//Method[@Name="test" and @Static=true() and @Final=false() and @BeginLine=10 and @Image="test"]';
+		const result = extractNodeTypes(xpath);
+
+		// Should not contain attribute names
+		expect(result).not.toContain('Name');
+		expect(result).not.toContain('Static');
+		expect(result).not.toContain('Final');
+		expect(result).not.toContain('BeginLine');
+		expect(result).not.toContain('Image');
+		// Should contain node types
+		expect(result).toContain('Method');
+	});
+
+	it('should extract root node types (Pattern 4)', () => {
+		const xpath = '//ApexFile | /CompilationUnit';
+		const result = extractNodeTypes(xpath);
+
+		expect(result).toContain('ApexFile');
+		expect(result).toContain('CompilationUnit');
+	});
+
+	it('should extract User* node types (Pattern 5)', () => {
+		const xpath = '//UserClass | //UserInterface | //UserEnum';
+		const result = extractNodeTypes(xpath);
+
+		expect(result).toContain('UserClass');
+		expect(result).toContain('UserInterface');
+		expect(result).toContain('UserEnum');
+	});
+
+	it('should extract DML statement node types (Pattern 6)', () => {
+		const xpath =
+			'//DmlInsertStatement | //DmlUpdateStatement | //DmlDeleteStatement | //DmlUndeleteStatement | //DmlUpsertStatement | //DmlMergeStatement';
+		const result = extractNodeTypes(xpath);
+
+		expect(result).toContain('DmlInsertStatement');
+		expect(result).toContain('DmlUpdateStatement');
+		expect(result).toContain('DmlDeleteStatement');
+		expect(result).toContain('DmlUndeleteStatement');
+		expect(result).toContain('DmlUpsertStatement');
+		expect(result).toContain('DmlMergeStatement');
+	});
+
+	it('should extract initializer node types (Pattern 7)', () => {
+		const xpath =
+			'//ConstructorInitializer | //ValuesInitializer | //MapInitializer | //SizedArrayInitializer';
+		const result = extractNodeTypes(xpath);
+
+		expect(result).toContain('ConstructorInitializer');
+		expect(result).toContain('ValuesInitializer');
+		expect(result).toContain('MapInitializer');
+		expect(result).toContain('SizedArrayInitializer');
+	});
+
+	it('should extract KeywordModifier node type (Pattern 8)', () => {
+		const xpath = '//KeywordModifier';
+		const result = extractNodeTypes(xpath);
+
+		expect(result).toContain('KeywordModifier');
+	});
+
+	it('should extract other important node types (Pattern 9)', () => {
+		const xpath =
+			'//TypeRef | //Identifier | //StandardCondition | //WhenValue | //WhenType | //WhenElse | //EnumValue | //SoqlOrSoslBinding | //FormalComment | //MapEntryNode | //SuperExpression | //ThisVariableExpression | //CompoundStatement | //BreakStatement | //ContinueStatement | //EmptyStatement | //TriggerDeclaration';
+		const result = extractNodeTypes(xpath);
+
+		expect(result).toContain('TypeRef');
+		expect(result).toContain('Identifier');
+		expect(result).toContain('StandardCondition');
+		expect(result).toContain('WhenValue');
+		expect(result).toContain('WhenType');
+		expect(result).toContain('WhenElse');
+		expect(result).toContain('EnumValue');
+		expect(result).toContain('SoqlOrSoslBinding');
+		expect(result).toContain('FormalComment');
+		expect(result).toContain('MapEntryNode');
+		expect(result).toContain('SuperExpression');
+		expect(result).toContain('ThisVariableExpression');
+		expect(result).toContain('CompoundStatement');
+		expect(result).toContain('BreakStatement');
+		expect(result).toContain('ContinueStatement');
+		expect(result).toContain('EmptyStatement');
+		expect(result).toContain('TriggerDeclaration');
+	});
+
+	it('should extract SOQL/SOSL expression node types (Pattern 10)', () => {
+		const xpath = '//SoqlExpression | //SoslExpression';
+		const result = extractNodeTypes(xpath);
+
+		expect(result).toContain('SoqlExpression');
+		expect(result).toContain('SoslExpression');
+	});
+
+	it('should handle XPath axes with node types', () => {
+		const xpath =
+			'self::Method | ancestor::Class | parent::Field | child::MethodDeclaration | descendant::IfBlockStatement | following::WhileLoopStatement | preceding::ForLoopStatement | following-sibling::BreakStatement | preceding-sibling::ContinueStatement';
+		const result = extractNodeTypes(xpath);
+
+		expect(result).toContain('Method');
+		expect(result).toContain('Class');
+		expect(result).toContain('Field');
+		expect(result).toContain('MethodDeclaration');
+		expect(result).toContain('IfBlockStatement');
+		expect(result).toContain('WhileLoopStatement');
+		expect(result).toContain('ForLoopStatement');
+		expect(result).toContain('BreakStatement');
+		expect(result).toContain('ContinueStatement');
+	});
+
+	it('should filter out PMD attribute names when they would match pattern keywords', () => {
+		// Test case where attribute names like "Type", "Name" could potentially match patterns
+		// but should be filtered out
+		const xpath =
+			'//TypeRef[@Type="String"] | //Method[@Name="test"] | //FieldDeclaration[@ReturnType="Integer"]';
+		const result = extractNodeTypes(xpath);
+
+		expect(result).toContain('TypeRef');
+		expect(result).toContain('Method');
+		expect(result).toContain('FieldDeclaration');
+		expect(result).not.toContain('Type');
+		expect(result).not.toContain('Name');
+		expect(result).not.toContain('ReturnType');
+	});
+
+	it('should filter out node types that match patterns but are in PMD_ATTRIBUTE_NAMES', () => {
+		// Test case where "Type" matches Pattern 2 (Method|Field|Class|Type|...)
+		// but should be filtered out because "Type" is in PMD_ATTRIBUTE_NAMES
+		// This tests the false branch of if (!PMD_ATTRIBUTE_NAMES.has(nodeType))
+		const xpath = '//Type | //Parameter | //Property | //Annotation';
+		const result = extractNodeTypes(xpath);
+
+		// "Type" matches pattern 2 but should be filtered out (branch coverage)
+		expect(result).not.toContain('Type');
+		// These should still be included (they're in pattern 2 but not in PMD_ATTRIBUTE_NAMES)
+		expect(result).toContain('Parameter');
+		expect(result).toContain('Property');
+		expect(result).toContain('Annotation');
+	});
 });

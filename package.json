@@ -5,12 +5,13 @@
 	"dependencies": {
 		"@xmldom/xmldom": "^0.8.11",
 		"stringify-tree": "^1.1.1",
-		"tmp": "^0.2.5"
+		"tmp": "^0.2.5",
+		"ts-summit-ast": "^0.5.0"
 	},
 	"devDependencies": {
 		"@eslint/js": "^9.39.2",
 		"@prettier/plugin-xml": "^3.4.2",
-		"@types/node": "^25.0.8",
+		"@types/node": "^25.0.9",
 		"@types/tmp": "^0.2.6",
 		"@typescript-eslint/eslint-plugin": "^8.53.0",
 		"@typescript-eslint/parser": "^8.53.0",
@@ -24,7 +25,7 @@
 		"eslint-plugin-sort-keys": "^2.3.5",
 		"husky": "^9.1.7",
 		"lint-staged": "^16.2.7",
-		"prettier": "^3.7.4",
+		"prettier": "^3.8.0",
 		"tsx": "^4.21.0",
 		"typescript": "^5.9.3",
 		"typescript-eslint": "^8.53.0",

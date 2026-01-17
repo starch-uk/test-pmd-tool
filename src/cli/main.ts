@@ -1916,10 +1916,13 @@ async function testRuleFile(
 
 		// Display detailed test results
 		const MIN_DETAILED_RESULTS_COUNT = 0;
-		if (
-			result.detailedTestResults &&
-			result.detailedTestResults.length > MIN_DETAILED_RESULTS_COUNT
-		) {
+		const MIN_EXAMPLES_COUNT = 0;
+		const hasDetailedResults =
+			result.detailedTestResults !== undefined &&
+			result.detailedTestResults.length > MIN_DETAILED_RESULTS_COUNT;
+		// Type assertion: hasDetailedResults ensures result.detailedTestResults is non-null
+		const hasExamples = result.examplesTested > MIN_EXAMPLES_COUNT;
+		if (hasDetailedResults || hasExamples) {
 			console.log('📋 Test Details:');
 
 			const forbiddenExampleIndices = new Set<number>();
@@ -1955,27 +1958,36 @@ async function testRuleFile(
 				}
 			}
 
-			for (const testResult of result.detailedTestResults) {
-				// Skip further checks for examples that violated the testMethod rule
-				if (forbiddenExampleIndices.has(testResult.exampleIndex)) {
-					continue;
-				}
+			if (
+				hasDetailedResults &&
+				result.detailedTestResults !== undefined
+			) {
+				for (const testResult of result.detailedTestResults) {
+					// Skip further checks for examples that violated the testMethod rule
+					if (forbiddenExampleIndices.has(testResult.exampleIndex)) {
+						continue;
+					}
 
-				const status = testResult.passed ? '✅' : '❌';
-				const lineNumber =
-					testResult.lineNumber !== undefined
-						? String(testResult.lineNumber)
-						: '?';
-				const message =
-					testResult.testType === 'violation'
-						? testResult.passed
-							? 'Violation triggered'
-							: 'Violation not triggered'
-						: testResult.passed
-							? 'Valid not triggered'
-							: 'Valid triggered';
+					const status = testResult.passed ? '✅' : '❌';
+					const lineNumber =
+						testResult.lineNumber !== undefined
+							? String(testResult.lineNumber)
+							: '?';
+					const message =
+						testResult.testType === 'violation'
+							? testResult.passed
+								? 'Violation triggered'
+								: 'Violation not triggered'
+							: testResult.passed
+								? 'Valid not triggered'
+								: 'Valid triggered';
+					console.log(
+						`   - Line: ${lineNumber}, Example ${String(testResult.exampleIndex)}: ${message} ${status}`,
+					);
+				}
+			} else if (hasExamples) {
 				console.log(
-					`   - Line: ${lineNumber}, Example ${String(testResult.exampleIndex)}: ${message} ${status}`,
+					`   No detailed test results available (${String(result.examplesTested)} example(s) were tested)`,
 				);
 			}
 		}
@@ -1985,17 +1997,13 @@ async function testRuleFile(
 		const INDEX_OFFSET = 1;
 
 		// Show overall success
-		if (result.success) {
-			console.log('\n📊 Test Summary:');
-			console.log(`  Examples tested: ${String(result.examplesTested)}`);
-			console.log(`  Examples passed: ${String(result.examplesPassed)}`);
-			console.log(
-				`  Total violations: ${String(result.totalViolations)}`,
-			);
-			console.log(
-				`  Rule triggers violations: ${result.ruleTriggersViolations ? '✅ Yes' : '❌ No'}`,
-			);
-		}
+		console.log('\n📊 Test Summary:');
+		console.log(`  Examples tested: ${String(result.examplesTested)}`);
+		console.log(`  Examples passed: ${String(result.examplesPassed)}`);
+		console.log(`  Total violations: ${String(result.totalViolations)}`);
+		console.log(
+			`  Rule triggers violations: ${result.ruleTriggersViolations ? '✅ Yes' : '❌ No'}`,
+		);
 
 		// Quality Checks
 		if (result.qualityChecks) {

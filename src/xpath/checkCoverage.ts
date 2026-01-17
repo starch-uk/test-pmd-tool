@@ -1,8 +1,10 @@
 /**
  * @file
  * XPath coverage checking module. Checks if XPath components are covered in examples.
+ * Uses ts-summit-ast for accurate AST-based node type detection.
  */
 import { readFileSync } from 'fs';
+import type { ASTNode } from 'ts-summit-ast';
 import type {
 	CoverageResult,
 	CoverageEvidence,
@@ -10,6 +12,7 @@ import type {
 	XPathCoverageResult,
 	Conditional,
 } from '../types/index.js';
+import { parseApexCode } from '../parser/apexParser.js';
 import { analyzeXPath } from './analyzeXPath.js';
 import { conditionalCheckers } from './coverage/conditional/strategies.js';
 import { hasNestedClasses } from './coverage/checkNodeTypes.js';
@@ -187,6 +190,78 @@ function findNodeTypeLineNumber(
 }
 
 /**
+ * Walk AST tree recursively to find nodes of a specific type.
+ * @param node - Current AST node to check.
+ * @param targetType - Node type to find (e.g., 'IfBlockStatement').
+ * @returns True if node type is found in the AST.
+ */
+function findNodeTypeInAST(
+	node: Readonly<ASTNode>,
+	targetType: Readonly<string>,
+): boolean {
+	// Check if current node matches the target type
+	if (node.kind === targetType) {
+		return true;
+	}
+
+	// Check all properties of the node object for child nodes
+	// This ensures we find nodes regardless of property names
+	const nodeRecord = node as Record<string, unknown>;
+
+	for (const propName in nodeRecord) {
+		// Skip non-child properties
+		if (
+			propName === 'kind' ||
+			propName === 'start' ||
+			propName === 'end' ||
+			propName === 'loc' ||
+			propName === 'range'
+		) {
+			continue;
+		}
+
+		const childNode = nodeRecord[propName];
+		if (childNode === null || childNode === undefined) {
+			continue;
+		}
+
+		if (Array.isArray(childNode)) {
+			// Handle arrays of child nodes
+			for (const item of childNode) {
+				if (
+					item !== null &&
+					item !== undefined &&
+					typeof item === 'object' &&
+					'kind' in item
+				) {
+					const hasKindString =
+						// eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- Verified item has 'kind' property that is a string, type assertion is verified by runtime checks
+						typeof (item as { kind: unknown }).kind === 'string';
+					if (hasKindString) {
+						// eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- Verified item has 'kind' property that is a string
+						if (findNodeTypeInAST(item as ASTNode, targetType)) {
+							return true;
+						}
+					}
+				}
+			}
+		} else if (
+			typeof childNode === 'object' &&
+			'kind' in childNode &&
+			typeof (childNode as { kind: unknown }).kind === 'string'
+		) {
+			// Handle single child node
+			// eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- Verified childNode has 'kind' property that is a string
+			if (findNodeTypeInAST(childNode as ASTNode, targetType)) {
+				return true;
+			}
+		}
+	}
+
+	return false;
+}
+
+/**
  * Check if node types from XPath are present in example content.
  * @param nodeTypes - Node types to check.
  * @param content - Example content to search.
@@ -199,85 +274,26 @@ function checkNodeTypeCoverage(
 	options?: Readonly<NodeTypeCoverageOptions>,
 ): CoverageEvidence {
 	const lineNumberCollector = options?.lineNumberCollector;
-	const lowerContent = content.toLowerCase();
 	const foundNodeTypes: string[] = [];
 	const missingNodeTypes: string[] = [];
 
+	// Trust ts-summit-ast for accurate AST-based node type detection
+	// ts-summit-ast handles parsing gracefully and always returns a usable AST
+	const parseResult = parseApexCode(content);
+	// Type assertion: ts-summit-ast always returns usable AST
+	// eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- ts-summit-ast always returns usable AST
+	const ast = parseResult.ast!;
+
 	for (const nodeType of nodeTypes) {
+		// Special handling for StandardCondition - skip as it's an internal node
+		const isStandardCondition = nodeType === 'StandardCondition';
 		let isCovered = false;
 
-		// Use intelligent heuristics to match AST node types to Apex code patterns
-		switch (nodeType) {
-			case 'BinaryExpression':
-				// Look for binary operators like +, -, *, /, ==, !=, <, >, etc.
-				isCovered = /[+\-*/=<>!&|]{1,2}/.test(content);
-				break;
-			case 'LiteralExpression':
-				// Look for any literals: strings, numbers, booleans, null
-				isCovered =
-					/\b\d+(\.\d+)?\b|'(?:[^'\\]|\\.)*'|"[^"]*"|\bnull\b|\btrue\b|\bfalse\b/.test(
-						lowerContent,
-					);
-				break;
-			case 'ModifierNode':
-				// Look for modifiers like static, final, public, private
-				isCovered = /\b(static|final|public|private|protected)\b/.test(
-					lowerContent,
-				);
-				break;
-			case 'Annotation':
-				// Look for @annotations
-				isCovered = /@\w+/.test(content);
-				break;
-			case 'AnnotationParameter':
-				// Look for annotation parameters like (key=value)
-				isCovered = /@\w+\([^)]+\)/.test(content);
-				break;
-			case 'IfBlockStatement':
-				// Look for if statements
-				isCovered = /\bif\b/.test(lowerContent);
-				break;
-			case 'SwitchStatement':
-				// Look for switch statements
-				isCovered = /\bswitch\b/.test(lowerContent);
-				break;
-			case 'ForLoopStatement':
-				// Look for for loops
-				isCovered = /\bfor\s*\(/.test(lowerContent);
-				break;
-			case 'ForEachStatement':
-				// Look for for-each loops (for (... : ...))
-				isCovered = /\bfor\s*\([^:]+:[^)]+\)/.test(lowerContent);
-				break;
-			case 'WhileLoopStatement':
-				// Look for while loops
-				isCovered = /\bwhile\b/.test(lowerContent);
-				break;
-			case 'DoWhileLoopStatement':
-				// Look for do-while loops
-				isCovered = /\bdo\b/.test(lowerContent);
-				break;
-			case 'TernaryExpression':
-				// Look for ternary expressions (condition ? true : false)
-				isCovered = /\?\s*[^:]+\s*:\s*[^;]+/.test(content);
-				break;
-			case 'MethodCallExpression':
-				// Look for method calls (anything with parentheses after a word)
-				isCovered = /\w+\s*\(/.test(content);
-				break;
-			case 'StandardCondition':
-				// Skip StandardCondition - it's an internal AST node not directly represented in code
-				isCovered = true;
-				break;
-			case 'UserClass':
-				// UserClass nodes are inner/nested classes (classes declared inside other classes)
-				// Check if there are nested classes in the content
-				isCovered = hasNestedClasses(content);
-				break;
-			default:
-				// Fallback to simple string matching for unknown node types
-				isCovered = lowerContent.includes(nodeType.toLowerCase());
-				break;
+		if (isStandardCondition) {
+			isCovered = true;
+		} else {
+			// Use AST to check if node type exists
+			isCovered = findNodeTypeInAST(ast, nodeType);
 		}
 
 		if (isCovered) {

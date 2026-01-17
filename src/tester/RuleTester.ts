@@ -191,7 +191,11 @@ export class RuleTester {
 			const exampleContent = textContent.trim();
 			if (exampleContent.length > MIN_CONTENT_LENGTH) {
 				// Parse the example content using our parser module
-				const parsedExample = parseExample(exampleContent);
+				// Pass XPath for AST-based rule verification
+				const parsedExample = parseExample(
+					exampleContent,
+					this.ruleMetadata.xpath ?? undefined,
+				);
 
 				extractedExamples.push({
 					content: exampleContent,
@@ -408,12 +412,28 @@ export class RuleTester {
 
 				// Create one test case result per violation marker
 				// Match each marker to violations by line number
+				// Use a Set to track unique (exampleIndex, lineNumber) combinations to avoid duplicates
+				const seenViolationMarkers = new Set<string>();
 				for (const marker of example.violationMarkers) {
 					const xmlLineNumber = this.findMarkerLineNumber(
 						example,
 						exampleIndex,
 						marker.lineNumber,
 					);
+					// Use a unique key based on example index and line number to prevent duplicates
+					const xmlLineNumberStr =
+						xmlLineNumber !== undefined
+							? String(xmlLineNumber)
+							: 'undefined';
+					const uniqueKey = `${String(exampleIndex)}-${xmlLineNumberStr}-violation`;
+					// Check if this uniqueKey has already been seen (duplicate detected)
+					const isDuplicate = seenViolationMarkers.has(uniqueKey);
+					if (isDuplicate) {
+						// False branch: duplicate marker detected, skip it
+						continue;
+					}
+					// True branch: new unique marker, add it
+					seenViolationMarkers.add(uniqueKey);
 					const testFileLineNumber = this.findMarkerLineInTestFile(
 						example,
 						marker.lineNumber,
@@ -477,12 +497,28 @@ export class RuleTester {
 				}
 
 				// Create one test case result per valid marker
+				// Use a Set to track unique (exampleIndex, lineNumber) combinations to avoid duplicates
+				const seenValidMarkers = new Set<string>();
 				for (const marker of example.validMarkers) {
 					const xmlLineNumber = this.findMarkerLineNumber(
 						example,
 						exampleIndex,
 						marker.lineNumber,
 					);
+					// Use a unique key based on example index and line number to prevent duplicates
+					const xmlLineNumberStr =
+						xmlLineNumber !== undefined
+							? String(xmlLineNumber)
+							: 'undefined';
+					const uniqueKey = `${String(exampleIndex)}-${xmlLineNumberStr}-valid`;
+					// Check if this uniqueKey has already been seen (duplicate detected)
+					const isDuplicate = seenValidMarkers.has(uniqueKey);
+					if (isDuplicate) {
+						// False branch: duplicate marker detected, skip it
+						continue;
+					}
+					// True branch: new unique marker, add it
+					seenValidMarkers.add(uniqueKey);
 					testCaseResults.push({
 						description: `Valid test for example ${String(exampleIndex)}`,
 						exampleIndex,

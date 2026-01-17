@@ -17,16 +17,19 @@ importers:
       tmp:
         specifier: ^0.2.5
         version: 0.2.5
+      ts-summit-ast:
+        specifier: ^0.5.0
+        version: 0.5.0
     devDependencies:
       '@eslint/js':
         specifier: ^9.39.2
         version: 9.39.2
       '@prettier/plugin-xml':
         specifier: ^3.4.2
-        version: 3.4.2(prettier@3.7.4)
+        version: 3.4.2(prettier@3.8.0)
       '@types/node':
-        specifier: ^25.0.8
-        version: 25.0.8
+        specifier: ^25.0.9
+        version: 25.0.9
       '@types/tmp':
         specifier: ^0.2.6
         version: 0.2.6
@@ -38,7 +41,7 @@ importers:
         version: 8.53.0(eslint@9.39.2)(typescript@5.9.3)
       '@vitest/coverage-v8':
         specifier: ^4.0.17
-        version: 4.0.17(vitest@4.0.17(@types/node@25.0.8)(tsx@4.21.0)(yaml@2.8.2))
+        version: 4.0.17(vitest@4.0.17(@types/node@25.0.9)(tsx@4.21.0)(yaml@2.8.2))
       agent-docs:
         specifier: ^1.4.0
         version: 1.4.0
@@ -67,8 +70,8 @@ importers:
         specifier: ^16.2.7
         version: 16.2.7
       prettier:
-        specifier: ^3.7.4
-        version: 3.7.4
+        specifier: ^3.8.0
+        version: 3.8.0
       tsx:
         specifier: ^4.21.0
         version: 4.21.0
@@ -80,7 +83,7 @@ importers:
         version: 8.53.0(eslint@9.39.2)(typescript@5.9.3)
       vitest:
         specifier: ^4.0.17
-        version: 4.0.17(@types/node@25.0.8)(tsx@4.21.0)(yaml@2.8.2)
+        version: 4.0.17(@types/node@25.0.9)(tsx@4.21.0)(yaml@2.8.2)
 
 packages:
 
@@ -494,8 +497,8 @@ packages:
   '@types/lodash@4.17.23':
     resolution: {integrity: sha512-RDvF6wTulMPjrNdCoYRC8gNR880JNGT8uB+REUpC2Ns4pRqQJhGz90wh7rgdXDPpCczF3VGktDuFGVnz8zP7HA==}
 
-  '@types/node@25.0.8':
-    resolution: {integrity: sha512-powIePYMmC3ibL0UJ2i2s0WIbq6cg6UyVFQxSCpaPxxzAaziRfimGivjdF943sSGV6RADVbk0Nvlm5P/FB44Zg==}
+  '@types/node@25.0.9':
+    resolution: {integrity: sha512-/rpCXHlCWeqClNBwUhDcusJxXYDjZTyE8v5oTO7WbL8eij2nKhUeU89/6xgjU7N4/Vh3He0BtyhJdQbDyhiXAw==}
 
   '@types/tmp@0.2.6':
     resolution: {integrity: sha512-chhaNf2oKHlRkDGt+tiKE2Z5aJ6qalm7Z9rlLdBwmOiAAf09YQvvoLXjWK4HWPF1xU/fqvMgfNfpVoBscA/tKA==}
@@ -1438,8 +1441,8 @@ packages:
     resolution: {integrity: sha512-vkcDPrRZo1QZLbn5RLGPpg/WmIQ65qoWWhcGKf/b5eplkkarX0m9z8ppCat4mlOqUsWpyNuYgO3VRyrYHSzX5g==}
     engines: {node: '>= 0.8.0'}
 
-  prettier@3.7.4:
-    resolution: {integrity: sha512-v6UNi1+3hSlVvv8fSaoUbggEM5VErKmmpGA7Pl3HF8V6uKY7rvClBOJlH6yNwQtfTueNkGVpOv/mtWL9L4bgRA==}
+  prettier@3.8.0:
+    resolution: {integrity: sha512-yEPsovQfpxYfgWNhCfECjG5AQaO+K3dp6XERmOepyPDVqcJm+bjyCVO3pmU+nAPe0N5dDvekfGezt/EIiRe1TA==}
     engines: {node: '>=14'}
     hasBin: true
 
@@ -1657,6 +1660,11 @@ packages:
     peerDependencies:
       typescript: '>=4.8.4'
 
+  ts-summit-ast@0.5.0:
+    resolution: {integrity: sha512-yM9fXphHt8OvvMV6moTomv9FGuE21BBYveAcLSRMODdqr49bAZStBVti71sBcMNEAUOuiM6D9sKLtkx/nK/O3g==}
+    engines: {node: '>=18.0.0'}
+    hasBin: true
+
   tsconfig-paths@3.15.0:
     resolution: {integrity: sha512-2Ac2RgzDe/cn48GvOe3M+o82pEFewD3UPbyoUHHdKasHwJKjds4fLXWf/Ux5kATBKN20oaFGu+jbElp1pos0mg==}
 
@@ -1793,8 +1801,8 @@ packages:
     resolution: {integrity: sha512-K4jVyjnBdgvc86Y6BkaLZEN933SwYOuBFkdmBu9ZfkcAbdVbpITnDmjvZ/aQjRXQrv5EPkTnD1s39GiiqbngCw==}
     engines: {node: '>= 0.4'}
 
-  which-typed-array@1.1.19:
-    resolution: {integrity: sha512-rEvr90Bck4WZt9HHFC4DJMsjvu7x+r6bImz0/BrbWb7A2djJ8hnZMrWnHo9F8ssv0OMErasDhftrfROTyqSDrw==}
+  which-typed-array@1.1.20:
+    resolution: {integrity: sha512-LYfpUkmqwl0h9A2HL09Mms427Q1RZWuOHsukfVcKRq9q95iQxdw0ix1JQrqbcDR9PH1QDwf5Qo8OZb5lksZ8Xg==}
     engines: {node: '>= 0.4'}
 
   which@2.0.2:
@@ -1995,10 +2003,10 @@ snapshots:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.5.5
 
-  '@prettier/plugin-xml@3.4.2(prettier@3.7.4)':
+  '@prettier/plugin-xml@3.4.2(prettier@3.8.0)':
     dependencies:
       '@xml-tools/parser': 1.0.11
-      prettier: 3.7.4
+      prettier: 3.8.0
 
   '@rollup/rollup-android-arm-eabi@4.55.1':
     optional: true
@@ -2100,7 +2108,7 @@ snapshots:
 
   '@types/lodash@4.17.23': {}
 
-  '@types/node@25.0.8':
+  '@types/node@25.0.9':
     dependencies:
       undici-types: 7.16.0
 
@@ -2197,7 +2205,7 @@ snapshots:
       '@typescript-eslint/types': 8.53.0
       eslint-visitor-keys: 4.2.1
 
-  '@vitest/coverage-v8@4.0.17(vitest@4.0.17(@types/node@25.0.8)(tsx@4.21.0)(yaml@2.8.2))':
+  '@vitest/coverage-v8@4.0.17(vitest@4.0.17(@types/node@25.0.9)(tsx@4.21.0)(yaml@2.8.2))':
     dependencies:
       '@bcoe/v8-coverage': 1.0.2
       '@vitest/utils': 4.0.17
@@ -2209,7 +2217,7 @@ snapshots:
       obug: 2.1.1
       std-env: 3.10.0
       tinyrainbow: 3.0.3
-      vitest: 4.0.17(@types/node@25.0.8)(tsx@4.21.0)(yaml@2.8.2)
+      vitest: 4.0.17(@types/node@25.0.9)(tsx@4.21.0)(yaml@2.8.2)
 
   '@vitest/expect@4.0.17':
     dependencies:
@@ -2220,13 +2228,13 @@ snapshots:
       chai: 6.2.2
       tinyrainbow: 3.0.3
 
-  '@vitest/mocker@4.0.17(vite@7.3.1(@types/node@25.0.8)(tsx@4.21.0)(yaml@2.8.2))':
+  '@vitest/mocker@4.0.17(vite@7.3.1(@types/node@25.0.9)(tsx@4.21.0)(yaml@2.8.2))':
     dependencies:
       '@vitest/spy': 4.0.17
       estree-walker: 3.0.3
       magic-string: 0.30.21
     optionalDependencies:
-      vite: 7.3.1(@types/node@25.0.8)(tsx@4.21.0)(yaml@2.8.2)
+      vite: 7.3.1(@types/node@25.0.9)(tsx@4.21.0)(yaml@2.8.2)
 
   '@vitest/pretty-format@4.0.17':
     dependencies:
@@ -2534,7 +2542,7 @@ snapshots:
       typed-array-byte-offset: 1.0.4
       typed-array-length: 1.0.7
       unbox-primitive: 1.1.0
-      which-typed-array: 1.1.19
+      which-typed-array: 1.1.20
 
   es-define-property@1.0.1: {}
 
@@ -2990,7 +2998,7 @@ snapshots:
 
   is-typed-array@1.1.15:
     dependencies:
-      which-typed-array: 1.1.19
+      which-typed-array: 1.1.20
 
   is-weakmap@2.0.2: {}
 
@@ -3223,7 +3231,7 @@ snapshots:
 
   prelude-ls@1.2.1: {}
 
-  prettier@3.7.4: {}
+  prettier@3.8.0: {}
 
   punycode@2.3.1: {}
 
@@ -3488,6 +3496,8 @@ snapshots:
     dependencies:
       typescript: 5.9.3
 
+  ts-summit-ast@0.5.0: {}
+
   tsconfig-paths@3.15.0:
     dependencies:
       '@types/json5': 0.0.29
@@ -3565,7 +3575,7 @@ snapshots:
     dependencies:
       punycode: 2.3.1
 
-  vite@7.3.1(@types/node@25.0.8)(tsx@4.21.0)(yaml@2.8.2):
+  vite@7.3.1(@types/node@25.0.9)(tsx@4.21.0)(yaml@2.8.2):
     dependencies:
       esbuild: 0.27.2
       fdir: 6.5.0(picomatch@4.0.3)
@@ -3574,15 +3584,15 @@ snapshots:
       rollup: 4.55.1
       tinyglobby: 0.2.15
     optionalDependencies:
-      '@types/node': 25.0.8
+      '@types/node': 25.0.9
       fsevents: 2.3.3
       tsx: 4.21.0
       yaml: 2.8.2
 
-  vitest@4.0.17(@types/node@25.0.8)(tsx@4.21.0)(yaml@2.8.2):
+  vitest@4.0.17(@types/node@25.0.9)(tsx@4.21.0)(yaml@2.8.2):
     dependencies:
       '@vitest/expect': 4.0.17
-      '@vitest/mocker': 4.0.17(vite@7.3.1(@types/node@25.0.8)(tsx@4.21.0)(yaml@2.8.2))
+      '@vitest/mocker': 4.0.17(vite@7.3.1(@types/node@25.0.9)(tsx@4.21.0)(yaml@2.8.2))
       '@vitest/pretty-format': 4.0.17
       '@vitest/runner': 4.0.17
       '@vitest/snapshot': 4.0.17
@@ -3599,10 +3609,10 @@ snapshots:
       tinyexec: 1.0.2
       tinyglobby: 0.2.15
       tinyrainbow: 3.0.3
-      vite: 7.3.1(@types/node@25.0.8)(tsx@4.21.0)(yaml@2.8.2)
+      vite: 7.3.1(@types/node@25.0.9)(tsx@4.21.0)(yaml@2.8.2)
       why-is-node-running: 2.3.0
     optionalDependencies:
-      '@types/node': 25.0.8
+      '@types/node': 25.0.9
     transitivePeerDependencies:
       - jiti
       - less
@@ -3638,7 +3648,7 @@ snapshots:
       isarray: 2.0.5
       which-boxed-primitive: 1.1.1
       which-collection: 1.0.2
-      which-typed-array: 1.1.19
+      which-typed-array: 1.1.20
 
   which-collection@1.0.2:
     dependencies:
@@ -3647,7 +3657,7 @@ snapshots:
       is-weakmap: 2.0.2
       is-weakset: 2.0.4
 
-  which-typed-array@1.1.19:
+  which-typed-array@1.1.20:
     dependencies:
       available-typed-arrays: 1.0.7
       call-bind: 1.0.8

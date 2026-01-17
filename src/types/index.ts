@@ -55,6 +55,29 @@ export interface ViolationMarker {
 	isViolation: boolean;
 	index: number;
 	sectionIndex?: number;
+
+	/**
+	 * AST-based code span information (start/end line and column).
+	 * Provides precise location for color coding and visualization.
+	 */
+	codeSpan?: {
+		startLine: number;
+		startColumn: number;
+		endLine: number;
+		endColumn: number;
+	};
+
+	/**
+	 * AST node type that this marker applies to (e.g., 'MethodDeclaration', 'VariableDeclaration').
+	 * Helps identify which code element is marked.
+	 */
+	astNodeType?: string;
+
+	/**
+	 * The actual code text that this marker applies to.
+	 * Extracted from the source using AST location information.
+	 */
+	codeText?: string;
 }
 
 export interface ExampleData {

@@ -11,6 +11,10 @@ export default defineConfig({
 		coverage: {
 			provider: 'v8',
 			reporter: ['text', 'html', 'json'],
+			exclude: [
+				'**/__mocks__/**',
+				'**/*.mock.ts',
+			],
 			thresholds: {
 				lines: 100,
 				functions: 100,
