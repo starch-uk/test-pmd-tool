@@ -8,6 +8,9 @@ export default defineConfig({
 		sequence: {
 			concurrent: true,
 		},
+		// Ensure mocks are always fresh for every test
+		// clearMocks: vi.clearAllMocks() before each test (clears call history, keeps implementations)
+		clearMocks: true,
 		coverage: {
 			provider: 'v8',
 			reporter: ['text', 'html', 'json'],

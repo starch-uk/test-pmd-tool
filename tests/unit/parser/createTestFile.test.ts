@@ -41,7 +41,6 @@ let capturedContent = '';
 
 describe('createTestFile', () => {
 	beforeEach(() => {
-		vi.clearAllMocks();
 		mockedWriteFileSync.mockClear();
 		mockedWriteFileSync.mock.calls.length = 0;
 		capturedContent = '';

@@ -142,7 +142,7 @@ vi.mock('ts-summit-ast', async (importOriginal) => {
 
 describe('hasNestedClasses edge cases', () => {
 	beforeEach(() => {
-		vi.clearAllMocks();
+		// Mocks are cleared automatically by clearMocks: true in vitest.config.ts
 	});
 
 	it('should return false when root node is not ClassDeclaration', () => {

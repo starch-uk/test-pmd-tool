@@ -3,7 +3,7 @@
  * Message validation tests for checkQualityChecks.
  */
 import { readFileSync } from 'fs';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { checkQualityChecks } from '../../../../src/tester/quality/checkQualityChecks.js';
 import type { RuleMetadata, ExampleData } from '../../../../src/types/index.js';
 
@@ -12,9 +12,7 @@ vi.mock('fs', () => ({
 }));
 
 describe('checkQualityChecks', () => {
-	beforeEach(() => {
-		vi.clearAllMocks();
-	});
+	// Mocks are cleared automatically by clearMocks: true in vitest.config.ts
 
 	it('should fail when message attribute is missing', () => {
 		const xmlContent = `<?xml version="1.0" encoding="UTF-8"?>

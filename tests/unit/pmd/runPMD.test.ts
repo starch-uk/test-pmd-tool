@@ -29,7 +29,7 @@ interface ExecFileSyncTestError extends Error {
 
 describe('runPMD', () => {
 	beforeEach(() => {
-		vi.clearAllMocks();
+		// Mocks are cleared automatically by clearMocks: true in vitest.config.ts
 	});
 
 	afterEach(() => {
@@ -400,7 +400,7 @@ describe('runPMD', () => {
 
 describe('runPmdAstDump', () => {
 	beforeEach(() => {
-		vi.clearAllMocks();
+		// Mocks are cleared automatically by clearMocks: true in vitest.config.ts
 	});
 
 	afterEach(() => {

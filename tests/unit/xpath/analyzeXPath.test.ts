@@ -34,7 +34,7 @@ const mockedExtractConditionals = vi.mocked(extractConditionals);
 
 describe('analyzeXPath', () => {
 	beforeEach(() => {
-		vi.clearAllMocks();
+		// Mocks are cleared automatically by clearMocks: true in vitest.config.ts
 	});
 
 	afterEach(() => {

@@ -46,7 +46,6 @@ import * as tsSummitAST from 'ts-summit-ast';
 describe('extractMarkers with AST associations', () => {
 	beforeEach(() => {
 		mock.reset();
-		vi.clearAllMocks();
 	});
 
 	it('should include AST information when comment has associated node with good and confident association', () => {

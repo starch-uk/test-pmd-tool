@@ -49,7 +49,7 @@ const mockedAnalyzeXPath = vi.mocked(analyzeXPath);
 
 describe('findNodeTypeInAST edge cases', () => {
 	beforeEach(() => {
-		vi.clearAllMocks();
+		// Mocks are cleared automatically by clearMocks: true in vitest.config.ts
 	});
 
 	it('should handle array items without kind property or with non-string kind', () => {

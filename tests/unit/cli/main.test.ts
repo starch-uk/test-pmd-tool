@@ -11,7 +11,6 @@ describe('parseCliArgs', () => {
 	let exitSpy: ReturnType<typeof vi.spyOn<typeof process, 'exit'>> | null =
 		null;
 	beforeEach(() => {
-		vi.clearAllMocks();
 		const exitImpl = (code?: number): never => {
 			throw new Error(`process.exit(${String(code)})`);
 		};
@@ -160,7 +159,6 @@ describe('printUsage', () => {
 	let exitSpy: ReturnType<typeof vi.spyOn<typeof process, 'exit'>> | null =
 		null;
 	beforeEach(() => {
-		vi.clearAllMocks();
 		const exitImpl = (code?: number): never => {
 			throw new Error(`process.exit(${String(code)})`);
 		};

@@ -24,7 +24,6 @@ const mockedAnalyzeXPath = vi.mocked(analyzeXPath);
 
 describe('findNodeTypeLineNumber edge cases', () => {
 	beforeEach(() => {
-		vi.clearAllMocks();
 		mockedReadFileSync.mockReset();
 	});
 

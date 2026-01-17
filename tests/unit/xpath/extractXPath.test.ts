@@ -73,7 +73,6 @@ const mockedResolve = vi.mocked(resolve);
 
 describe('extractXPath', () => {
 	beforeEach(() => {
-		vi.clearAllMocks();
 		// Default mock behavior: resolve and realpathSync return the input path
 		mockedResolve.mockImplementation((path: Readonly<string>) => path);
 		mockedRealpathSync.mockImplementation((path: Readonly<string>) => path);

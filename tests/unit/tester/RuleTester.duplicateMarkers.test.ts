@@ -51,7 +51,6 @@ const mockedExtractXPath = vi.mocked(extractXPath);
 
 describe('RuleTester duplicate marker handling', () => {
 	beforeEach(() => {
-		vi.clearAllMocks();
 		mockedExtractXPath.mockResolvedValue({
 			data: '//Method',
 			success: true,
