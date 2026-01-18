@@ -1003,5 +1003,44 @@ singleChild`;
 			// Should return false (no nested ClassDeclaration found)
 			expect(result).toBe(false);
 		});
+
+		it('should handle node without kind property in findNodeTypeInAST', () => {
+			// Test guard clause at line 24 when node doesn't have kind property
+			// This tests the branch where typeof node !== 'object' || !('kind' in node)
+			// Put node without kind in an array so it bypasses the check at lines 67-69
+			// and reaches the guard clause at line 24
+			vi.mocked(tsSummitAST.parseApexCode).mockReturnValueOnce({
+				ast: {
+					kind: 'CompilationUnit',
+					children: [
+						{
+							kind: 'ClassDeclaration',
+							name: 'TestClass',
+							// Add array with item that doesn't have 'kind'
+							// This will be passed to findNodeTypeInAST at line 62 without kind check
+							members: [
+								// eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- Test requires node without kind property
+								{
+									name: 'member', // No 'kind' property - will hit guard clause
+								} as unknown as typeof tsSummitAST.ASTNode,
+							],
+						},
+					],
+				},
+				isUsable: true,
+				errors: [],
+			});
+
+			// Search for a node type that doesn't exist so it traverses the entire tree
+			// This ensures we hit the node without kind property
+			const result = checkNodeTypes(
+				['NonExistentNodeType'],
+				'public class TestClass {}',
+			);
+
+			// Should not find NonExistentNodeType, but should handle node without kind gracefully
+			expect(result.success).toBe(false);
+			expect(result.message).toContain('not covered');
+		});
 	});
 });

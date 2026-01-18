@@ -29,6 +29,11 @@ function findNodeTypeInAST(
 	node: Readonly<ASTNode>,
 	targetType: Readonly<string>,
 ): boolean {
+	// Guard against nodes without kind property
+	if (typeof node !== 'object' || !('kind' in node)) {
+		return false;
+	}
+
 	// Check if current node matches the target type
 	if (node.kind === targetType) {
 		return true;
@@ -110,9 +115,17 @@ function checkNodeTypeCoverage(
 	// Trust ts-summit-ast for accurate AST-based node type detection
 	// ts-summit-ast handles parsing gracefully and always returns a usable AST
 	const parseResult = parseApexCode(content);
-	// Type assertion: ts-summit-ast always returns usable AST
-	// eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- ts-summit-ast always returns usable AST
-	const ast = parseResult.ast!;
+	// Guard against undefined AST
+	const { ast } = parseResult;
+	if (!ast) {
+		// Return empty evidence if AST is not available
+		return {
+			count: MIN_COUNT,
+			description: 'Cannot check node types - AST parsing failed',
+			required: nodeTypes.length,
+			type: 'violation',
+		};
+	}
 
 	for (const nodeType of nodeTypes) {
 		// Special handling for StandardCondition - skip as it's an internal node

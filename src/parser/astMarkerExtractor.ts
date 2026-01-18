@@ -113,13 +113,14 @@ export function extractMarkersWithAST(
 				const hasConfidentAssociation =
 					associationConfidence >= MIN_CONFIDENCE_THRESHOLD;
 
+				const { associatedNode } = comment;
 				if (
-					comment.associatedNode &&
+					associatedNode &&
 					hasGoodAssociation &&
 					hasConfidentAssociation
 				) {
 					// ts-summit-ast always provides source range for associated nodes
-					const sourceRange = getSourceRange(comment.associatedNode);
+					const sourceRange = getSourceRange(associatedNode);
 					// Type assertion: ts-summit-ast guarantees source range for associated nodes
 					// eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- ts-summit-ast guarantees source range for associated nodes
 					const range = sourceRange!;
@@ -130,12 +131,17 @@ export function extractMarkersWithAST(
 						startLine: range.start.line,
 					};
 					marker.codeText = getSourceText(
-						comment.associatedNode,
+						associatedNode,
 						exampleContent,
 					);
 
 					// Get node type from AST
-					marker.astNodeType = comment.associatedNode.kind;
+					// Ensure associatedNode has kind property before accessing
+					if ('kind' in associatedNode) {
+						marker.astNodeType = (
+							associatedNode as { kind: string }
+						).kind;
+					}
 
 					// Verify rule triggering if XPath is provided
 					// Only check for violation markers to avoid unnecessary warnings on valid markers
@@ -145,7 +151,7 @@ export function extractMarkersWithAST(
 						isViolationMarker
 					) {
 						const ruleMatch = wouldTriggerRule(
-							comment.associatedNode,
+							associatedNode,
 							xpathExpression,
 						);
 						// Add warning only if rule doesn't match (unreachable in practice)

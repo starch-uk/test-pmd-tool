@@ -20,6 +20,11 @@ function findNodeTypeInAST(
 	node: Readonly<ASTNode>,
 	targetType: Readonly<string>,
 ): boolean {
+	// Guard against nodes without kind property
+	if (typeof node !== 'object' || !('kind' in node)) {
+		return false;
+	}
+
 	// Check if current node matches the target type
 	if (node.kind === targetType) {
 		return true;
