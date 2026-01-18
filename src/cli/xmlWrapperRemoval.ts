@@ -17,7 +17,8 @@ const DOT_SEPARATOR_LENGTH = 1;
  * @param wrapperInfo - Tracking information about what was added by createTestFile.
  */
 export function removeWrappersFromXmlDom(
-	doc: Readonly<Document>, // eslint-disable-line @typescript-eslint/prefer-readonly-parameter-types -- Document is DOM type, Readonly wrapper is appropriate
+	// eslint-disable-next-line @typescript-eslint/prefer-readonly-parameter-types -- DOM Document type cannot be made readonly
+	doc: Readonly<Document>,
 	exampleIndex: number,
 	wrapperInfo:
 		| Readonly<{
@@ -39,10 +40,6 @@ export function removeWrappersFromXmlDom(
 		const helperMethods: Element[] = [];
 
 		for (const method of Array.from(allMethods)) {
-			// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- Array.from can return null/undefined elements
-			if (method === null || method === undefined) {
-				continue;
-			}
 			const image = method.getAttribute('Image');
 			const canonicalName = method.getAttribute('CanonicalName');
 
@@ -54,8 +51,8 @@ export function removeWrappersFromXmlDom(
 			}
 
 			const blockStatements = Array.from(method.childNodes).filter(
-				// eslint-disable-next-line @typescript-eslint/prefer-readonly-parameter-types -- Type predicate requires mutable parameter
-				(child): child is Element =>
+				// eslint-disable-next-line @typescript-eslint/prefer-readonly-parameter-types -- DOM Node type cannot be made readonly
+				(child: Readonly<Node>): child is Element =>
 					child.nodeType === NODE_TYPE_ELEMENT &&
 					child.nodeName === 'BlockStatement',
 			);
@@ -64,8 +61,8 @@ export function removeWrappersFromXmlDom(
 				const returnStatements = Array.from(
 					blockStatement.childNodes,
 				).filter(
-					// eslint-disable-next-line @typescript-eslint/prefer-readonly-parameter-types -- Type predicate requires mutable parameter
-					(child): child is Element =>
+					// eslint-disable-next-line @typescript-eslint/prefer-readonly-parameter-types -- DOM Node type cannot be made readonly
+					(child: Readonly<Node>): child is Element =>
 						child.nodeType === NODE_TYPE_ELEMENT &&
 						child.nodeName === 'ReturnStatement',
 				);
@@ -74,8 +71,8 @@ export function removeWrappersFromXmlDom(
 					const literalExpressions = Array.from(
 						returnStatement.childNodes,
 					).filter(
-						// eslint-disable-next-line @typescript-eslint/prefer-readonly-parameter-types -- Type predicate requires mutable parameter
-						(child): child is Element =>
+						// eslint-disable-next-line @typescript-eslint/prefer-readonly-parameter-types -- DOM Node type cannot be made readonly
+						(child: Readonly<Node>): child is Element =>
 							child.nodeType === NODE_TYPE_ELEMENT &&
 							child.nodeName === 'LiteralExpression',
 					);
@@ -83,8 +80,8 @@ export function removeWrappersFromXmlDom(
 					const otherStatements = Array.from(
 						blockStatement.childNodes,
 					).filter(
-						// eslint-disable-next-line @typescript-eslint/prefer-readonly-parameter-types -- Type predicate requires mutable parameter
-						(child): child is Element =>
+						// eslint-disable-next-line @typescript-eslint/prefer-readonly-parameter-types -- DOM Node type cannot be made readonly
+						(child: Readonly<Node>): child is Element =>
 							child.nodeType === NODE_TYPE_ELEMENT &&
 							child.nodeName !== 'ReturnStatement' &&
 							child.nodeName !== 'ModifierNode',
@@ -110,17 +107,15 @@ export function removeWrappersFromXmlDom(
 
 		const wrapperMethods = Array.from(
 			doc.getElementsByTagName('Method'),
-		).filter(
-			// eslint-disable-next-line @typescript-eslint/prefer-readonly-parameter-types -- Callback parameter for filter
-			(method) => {
-				const image = method.getAttribute('Image');
-				const canonicalName = method.getAttribute('CanonicalName');
-				return (
-					image === wrapperMethodName ||
-					canonicalName === wrapperMethodName
-				);
-			},
-		);
+			// eslint-disable-next-line @typescript-eslint/prefer-readonly-parameter-types -- DOM Element type cannot be made readonly
+		).filter((method: Readonly<Element>) => {
+			const image = method.getAttribute('Image');
+			const canonicalName = method.getAttribute('CanonicalName');
+			return (
+				image === wrapperMethodName ||
+				canonicalName === wrapperMethodName
+			);
+		});
 
 		for (const wrapperMethod of wrapperMethods) {
 			const parent = wrapperMethod.parentNode;
@@ -153,23 +148,19 @@ export function removeWrappersFromXmlDom(
 
 		const wrapperClasses = Array.from(
 			doc.getElementsByTagName('UserClass'),
-		).filter(
-			// eslint-disable-next-line @typescript-eslint/prefer-readonly-parameter-types -- Callback parameter for filter
-			(userClass) => {
-				const simpleName = userClass.getAttribute('SimpleName');
-				return simpleName === wrapperClassName;
-			},
-		);
+			// eslint-disable-next-line @typescript-eslint/prefer-readonly-parameter-types -- DOM Element type cannot be made readonly
+		).filter((userClass: Readonly<Element>) => {
+			const simpleName = userClass.getAttribute('SimpleName');
+			return simpleName === wrapperClassName;
+		});
 
 		const classDeclarations = Array.from(
 			doc.getElementsByTagName('ClassDeclaration'),
-		).filter(
-			// eslint-disable-next-line @typescript-eslint/prefer-readonly-parameter-types -- Callback parameter for filter
-			(classDecl) => {
-				const simpleName = classDecl.getAttribute('SimpleName');
-				return simpleName === wrapperClassName;
-			},
-		);
+			// eslint-disable-next-line @typescript-eslint/prefer-readonly-parameter-types -- DOM Element type cannot be made readonly
+		).filter((classDecl: Readonly<Element>) => {
+			const simpleName = classDecl.getAttribute('SimpleName');
+			return simpleName === wrapperClassName;
+		});
 
 		const allWrapperClasses = [...wrapperClasses, ...classDeclarations];
 
@@ -180,8 +171,8 @@ export function removeWrappersFromXmlDom(
 			}
 
 			const classChildren = Array.from(wrapperClass.childNodes).filter(
-				// eslint-disable-next-line @typescript-eslint/prefer-readonly-parameter-types -- Type predicate requires mutable parameter
-				(child): child is Element =>
+				// eslint-disable-next-line @typescript-eslint/prefer-readonly-parameter-types -- DOM Node type cannot be made readonly
+				(child: Readonly<Node>): child is Element =>
 					child.nodeType === NODE_TYPE_ELEMENT,
 			);
 
@@ -231,8 +222,7 @@ export function removeWrappersFromXmlDom(
 			i--
 		) {
 			const method = methodsArray[i];
-			// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- Array access can return undefined
-			if (method === null || method === undefined) {
+			if (method === undefined) {
 				continue;
 			}
 			// TypeScript doesn't narrow after continue, so use a local variable
@@ -256,17 +246,15 @@ export function removeWrappersFromXmlDom(
 	if (addedWrapperMethod) {
 		const wrapperMethods = Array.from(
 			doc.getElementsByTagName('Method'),
-		).filter(
-			// eslint-disable-next-line @typescript-eslint/prefer-readonly-parameter-types -- Callback parameter for filter
-			(method) => {
-				const image = method.getAttribute('Image');
-				const canonicalName = method.getAttribute('CanonicalName');
-				return (
-					image === wrapperMethodName ||
-					canonicalName === wrapperMethodName
-				);
-			},
-		);
+			// eslint-disable-next-line @typescript-eslint/prefer-readonly-parameter-types -- DOM Element type cannot be made readonly
+		).filter((method: Readonly<Element>) => {
+			const image = method.getAttribute('Image');
+			const canonicalName = method.getAttribute('CanonicalName');
+			return (
+				image === wrapperMethodName ||
+				canonicalName === wrapperMethodName
+			);
+		});
 
 		for (const wrapperMethod of wrapperMethods) {
 			const parent = wrapperMethod.parentNode;
@@ -316,23 +304,19 @@ export function removeWrappersFromXmlDom(
 	if (addedWrapperClass) {
 		const wrapperClasses = Array.from(
 			doc.getElementsByTagName('UserClass'),
-		).filter(
-			// eslint-disable-next-line @typescript-eslint/prefer-readonly-parameter-types -- Callback parameter for filter
-			(userClass) => {
-				const simpleName = userClass.getAttribute('SimpleName');
-				return simpleName === wrapperClassName;
-			},
-		);
+			// eslint-disable-next-line @typescript-eslint/prefer-readonly-parameter-types -- DOM Element type cannot be made readonly
+		).filter((userClass: Readonly<Element>) => {
+			const simpleName = userClass.getAttribute('SimpleName');
+			return simpleName === wrapperClassName;
+		});
 
 		const classDeclarations = Array.from(
 			doc.getElementsByTagName('ClassDeclaration'),
-		).filter(
-			// eslint-disable-next-line @typescript-eslint/prefer-readonly-parameter-types -- Callback parameter for filter
-			(classDecl) => {
-				const simpleName = classDecl.getAttribute('SimpleName');
-				return simpleName === wrapperClassName;
-			},
-		);
+			// eslint-disable-next-line @typescript-eslint/prefer-readonly-parameter-types -- DOM Element type cannot be made readonly
+		).filter((classDecl: Readonly<Element>) => {
+			const simpleName = classDecl.getAttribute('SimpleName');
+			return simpleName === wrapperClassName;
+		});
 
 		const allWrapperClasses = [...wrapperClasses, ...classDeclarations];
 
@@ -343,8 +327,8 @@ export function removeWrappersFromXmlDom(
 			}
 
 			const classChildren = Array.from(wrapperClass.childNodes).filter(
-				// eslint-disable-next-line @typescript-eslint/prefer-readonly-parameter-types -- Type predicate requires mutable parameter
-				(child): child is Element =>
+				// eslint-disable-next-line @typescript-eslint/prefer-readonly-parameter-types -- DOM Node type cannot be made readonly
+				(child: Readonly<Node>): child is Element =>
 					child.nodeType === NODE_TYPE_ELEMENT,
 			);
 
@@ -367,23 +351,19 @@ export function removeWrappersFromXmlDom(
 		// Also remove the ModifierNode that belongs to the wrapper class
 		const wrapperClasses = Array.from(
 			doc.getElementsByTagName('UserClass'),
-		).filter(
-			// eslint-disable-next-line @typescript-eslint/prefer-readonly-parameter-types -- Callback parameter for filter
-			(userClass) => {
-				const simpleName = userClass.getAttribute('SimpleName');
-				return simpleName === wrapperClassName;
-			},
-		);
+			// eslint-disable-next-line @typescript-eslint/prefer-readonly-parameter-types -- DOM Element type cannot be made readonly
+		).filter((userClass: Readonly<Element>) => {
+			const simpleName = userClass.getAttribute('SimpleName');
+			return simpleName === wrapperClassName;
+		});
 
 		const classDeclarations = Array.from(
 			doc.getElementsByTagName('ClassDeclaration'),
-		).filter(
-			// eslint-disable-next-line @typescript-eslint/prefer-readonly-parameter-types -- Callback parameter for filter
-			(classDecl) => {
-				const simpleName = classDecl.getAttribute('SimpleName');
-				return simpleName === wrapperClassName;
-			},
-		);
+			// eslint-disable-next-line @typescript-eslint/prefer-readonly-parameter-types -- DOM Element type cannot be made readonly
+		).filter((classDecl: Readonly<Element>) => {
+			const simpleName = classDecl.getAttribute('SimpleName');
+			return simpleName === wrapperClassName;
+		});
 
 		const allWrapperClasses = [...wrapperClasses, ...classDeclarations];
 

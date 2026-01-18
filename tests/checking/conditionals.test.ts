@@ -3,8 +3,11 @@
  * Unit tests for conditional coverage strategies.
  */
 
-import { describe, it, expect } from 'vitest';
-import { conditionalCheckers } from '../../src/xpath/checkConditionalStrategies.js';
+import { describe, it, expect, vi } from 'vitest';
+import {
+	checkConditionPart,
+	conditionalCheckers,
+} from '../../src/xpath/checkConditionalStrategies.js';
 import type { Conditional } from '../../src/types/index.js';
 
 describe('conditionalCheckers', () => {
@@ -129,6 +132,159 @@ public class Test {}`;
 
 			expect(result.success).toBe(true);
 			expect(result.message).toContain('all');
+		});
+
+		it('should handle attribute pattern where regex exec returns null', () => {
+			// Test to cover line 230: when attrMatch is null
+			const part = '@Test = $var';
+			const content = 'some content';
+
+			// Mock RegExp.prototype.exec to return null for the attribute regex
+			// eslint-disable-next-line @typescript-eslint/unbound-method -- Testing with bound method mock
+			const originalExec = RegExp.prototype.exec;
+			let callCount = 0;
+			RegExp.prototype.exec = vi.fn(function (
+				// eslint-disable-next-line @typescript-eslint/prefer-readonly-parameter-types -- this parameter cannot be made readonly
+				this: RegExp,
+				str: Readonly<string>,
+			) {
+				callCount++;
+				// Return null for the attrRegex call (second exec call)
+				if (callCount === 2 && this.source === '@(\\w+)') {
+					return null;
+				}
+				return originalExec.call(this, str);
+			});
+
+			try {
+				const result = checkConditionPart(part, content);
+				// Should handle gracefully when attrMatch is null
+				expect(result).toBe(false);
+			} finally {
+				RegExp.prototype.exec = originalExec;
+			}
+		});
+
+		it('should handle attribute pattern where capture group is undefined', () => {
+			// Test to cover line 234: when attrName is undefined
+			const part = '@Test = $var';
+			const content = 'some content';
+
+			// Mock RegExp.prototype.exec to return array without capture group (index 1)
+			// eslint-disable-next-line @typescript-eslint/unbound-method -- Testing with bound method mock
+			const originalExec = RegExp.prototype.exec;
+			let callCount = 0;
+			RegExp.prototype.exec = vi.fn(function (
+				// eslint-disable-next-line @typescript-eslint/prefer-readonly-parameter-types -- this parameter cannot be made readonly
+				this: RegExp,
+				str: Readonly<string>,
+			) {
+				callCount++;
+				// Return array without index 1 for attrRegex (second exec call)
+				if (callCount === 2 && this.source === '@(\\w+)') {
+					// Create array that matches but doesn't have index 1
+					// eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- Test mock requires type assertion
+					const mockArray: RegExpExecArray = [
+						'@Test',
+					] as RegExpExecArray;
+					// Remove index 1 to make it undefined
+					delete (mockArray as Record<number, string>)[1];
+					return mockArray;
+				}
+				return originalExec.call(this, str);
+			});
+
+			try {
+				const result = checkConditionPart(part, content);
+				// Should handle gracefully when attrName is undefined
+				expect(result).toBe(false);
+			} finally {
+				RegExp.prototype.exec = originalExec;
+			}
+		});
+
+		it('should handle node type pattern where regex exec returns null', () => {
+			// Test to cover line 267: when nodeTypeMatch is null
+			const conditional = {
+				expression: './/TestNode and @Name = $var',
+				position: 0,
+				type: 'and',
+			} as const satisfies Readonly<Conditional>;
+			const content = 'some content';
+			const checker = conditionalCheckers.and_operator;
+
+			// Mock RegExp.prototype.exec to return null for node type regex
+			// eslint-disable-next-line @typescript-eslint/unbound-method -- Testing with bound method mock
+			const originalExec = RegExp.prototype.exec;
+			RegExp.prototype.exec = vi.fn(function (
+				// eslint-disable-next-line @typescript-eslint/prefer-readonly-parameter-types -- this parameter cannot be made readonly
+				this: RegExp,
+				str: Readonly<string>,
+			) {
+				// Return null for nodeTypeRegex
+				if (this.source === '\\.?\\/\\/([A-Z][a-zA-Z]*)') {
+					return null;
+				}
+				return originalExec.call(this, str);
+			});
+
+			try {
+				const result = checker(conditional, content);
+				// Should handle gracefully when nodeTypeMatch is null
+				expect(result.success).toBe(false);
+			} finally {
+				RegExp.prototype.exec = originalExec;
+			}
+		});
+
+		it('should handle node type pattern where capture group is undefined', () => {
+			// Test to cover line 267: when nodeType is undefined
+			const conditional = {
+				expression: './/TestNode and @Name = $var',
+				position: 0,
+				type: 'and',
+			} as const satisfies Readonly<Conditional>;
+			const content = 'some content';
+			const checker = conditionalCheckers.and_operator;
+
+			// Mock RegExp.prototype.exec to return array without capture group (index 1)
+			// eslint-disable-next-line @typescript-eslint/unbound-method -- Testing with bound method mock
+			const originalExec = RegExp.prototype.exec;
+			RegExp.prototype.exec = vi.fn(function (
+				// eslint-disable-next-line @typescript-eslint/prefer-readonly-parameter-types -- this parameter cannot be made readonly
+				this: RegExp,
+				str: Readonly<string>,
+			) {
+				// Return array without index 1 for nodeTypeRegex
+				if (this.source === '\\.?\\/\\/([A-Z][a-zA-Z]*)') {
+					// Create array-like object that matches but doesn't have index 1
+					const mockArray: RegExpExecArray = Object.assign(
+						['.//TestNode'],
+						{
+							index: 0,
+							input: str,
+							groups: undefined,
+						},
+					);
+					// Ensure index 1 is explicitly undefined (not just missing)
+					Object.defineProperty(mockArray, '1', {
+						value: undefined,
+						configurable: true,
+						enumerable: true,
+						writable: true,
+					});
+					return mockArray;
+				}
+				return originalExec.call(this, str);
+			});
+
+			try {
+				const result = checker(conditional, content);
+				// Should handle gracefully when nodeType is undefined
+				expect(result.success).toBe(false);
+			} finally {
+				RegExp.prototype.exec = originalExec;
+			}
 		});
 
 		it('should handle MethodName attribute in checkConditionPart', () => {

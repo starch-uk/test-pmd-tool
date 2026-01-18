@@ -112,11 +112,9 @@ export class RuleTester {
 			// NodeList[0] when length > 0 is always defined
 			const descElement = descriptionElements[MIN_EXAMPLES_COUNT]!;
 			const { textContent } = descElement;
-			if (
-				// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- textContent can be null at runtime
-				textContent !== null &&
-				textContent.trim() !== EMPTY_STRING
-			) {
+			// @xmldom/xmldom always returns textContent as string (never null), but DOM types allow null
+			// Check for both null and empty string to satisfy type safety
+			if (textContent && textContent.trim() !== EMPTY_STRING) {
 				description = textContent.trim();
 			}
 		}

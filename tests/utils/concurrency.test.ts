@@ -2,19 +2,15 @@
  * @file
  * Unit tests for limitConcurrency function.
  */
-/* eslint-disable @typescript-eslint/strict-void-return */
-/* eslint-disable @typescript-eslint/explicit-function-return-type */
-/* eslint-disable @typescript-eslint/require-await */
-/* eslint-disable jsdoc/require-returns */
 import { describe, it, expect } from 'vitest';
 import { limitConcurrency } from '../../src/utils/concurrency.js';
 
 describe('limitConcurrency', () => {
 	it('should execute all tasks and return results in order', async () => {
 		const tasks = [
-			async () => Promise.resolve(1),
-			async () => Promise.resolve(2),
-			async () => Promise.resolve(3),
+			async (): Promise<number> => Promise.resolve(1),
+			async (): Promise<number> => Promise.resolve(2),
+			async (): Promise<number> => Promise.resolve(3),
 		];
 
 		const results = await limitConcurrency(tasks, 2);
@@ -25,18 +21,21 @@ describe('limitConcurrency', () => {
 	it('should limit concurrent execution to maxConcurrency', async () => {
 		const executionOrder: number[] = [];
 		const tasks = [
-			async () => {
+			async (): Promise<number> => {
 				executionOrder.push(1);
+				// eslint-disable-next-line @typescript-eslint/strict-void-return -- setTimeout callback requires void return
 				await new Promise((resolve) => setTimeout(resolve, 10));
 				return 1;
 			},
-			async () => {
+			async (): Promise<number> => {
 				executionOrder.push(2);
+				// eslint-disable-next-line @typescript-eslint/strict-void-return -- setTimeout callback requires void return
 				await new Promise((resolve) => setTimeout(resolve, 10));
 				return 2;
 			},
-			async () => {
+			async (): Promise<number> => {
 				executionOrder.push(3);
+				// eslint-disable-next-line @typescript-eslint/strict-void-return -- setTimeout callback requires void return
 				await new Promise((resolve) => setTimeout(resolve, 10));
 				return 3;
 			},
@@ -56,7 +55,7 @@ describe('limitConcurrency', () => {
 	});
 
 	it('should handle single task', async () => {
-		const tasks = [async () => Promise.resolve(42)];
+		const tasks = [async (): Promise<number> => Promise.resolve(42)];
 
 		const results = await limitConcurrency(tasks, 1);
 
@@ -65,8 +64,8 @@ describe('limitConcurrency', () => {
 
 	it('should handle maxConcurrency greater than task count', async () => {
 		const tasks = [
-			async () => Promise.resolve(1),
-			async () => Promise.resolve(2),
+			async (): Promise<number> => Promise.resolve(1),
+			async (): Promise<number> => Promise.resolve(2),
 		];
 
 		const results = await limitConcurrency(tasks, 10);
@@ -76,11 +75,12 @@ describe('limitConcurrency', () => {
 
 	it('should propagate errors from tasks', async () => {
 		const tasks = [
-			async () => Promise.resolve(1),
+			async (): Promise<number> => Promise.resolve(1),
+			// eslint-disable-next-line @typescript-eslint/explicit-function-return-type,@typescript-eslint/require-await -- Error-throwing function has implicit return type and doesn't need await
 			async () => {
 				throw new Error('Task failed');
 			},
-			async () => Promise.resolve(3),
+			async (): Promise<number> => Promise.resolve(3),
 		];
 
 		await expect(limitConcurrency(tasks, 2)).rejects.toThrow('Task failed');
@@ -88,9 +88,10 @@ describe('limitConcurrency', () => {
 
 	it('should handle tasks that return different types', async () => {
 		const tasks = [
-			async () => Promise.resolve('string'),
-			async () => Promise.resolve(42),
-			async () => Promise.resolve({ key: 'value' }),
+			async (): Promise<string> => Promise.resolve('string'),
+			async (): Promise<number> => Promise.resolve(42),
+			async (): Promise<{ key: string }> =>
+				Promise.resolve({ key: 'value' }),
 		];
 
 		const results = await limitConcurrency(tasks, 2);
@@ -100,15 +101,18 @@ describe('limitConcurrency', () => {
 
 	it('should maintain order even with different execution times', async () => {
 		const tasks = [
-			async () => {
+			async (): Promise<number> => {
+				// eslint-disable-next-line @typescript-eslint/strict-void-return -- setTimeout callback requires void return
 				await new Promise((resolve) => setTimeout(resolve, 30));
 				return 1;
 			},
-			async () => {
+			async (): Promise<number> => {
+				// eslint-disable-next-line @typescript-eslint/strict-void-return -- setTimeout callback requires void return
 				await new Promise((resolve) => setTimeout(resolve, 10));
 				return 2;
 			},
-			async () => {
+			async (): Promise<number> => {
+				// eslint-disable-next-line @typescript-eslint/strict-void-return -- setTimeout callback requires void return
 				await new Promise((resolve) => setTimeout(resolve, 20));
 				return 3;
 			},
@@ -123,18 +127,21 @@ describe('limitConcurrency', () => {
 	it('should handle maxConcurrency of 1 (sequential execution)', async () => {
 		const executionOrder: number[] = [];
 		const tasks = [
-			async () => {
+			async (): Promise<number> => {
 				executionOrder.push(1);
+				// eslint-disable-next-line @typescript-eslint/strict-void-return -- setTimeout callback requires void return
 				await new Promise((resolve) => setTimeout(resolve, 10));
 				return 1;
 			},
-			async () => {
+			async (): Promise<number> => {
 				executionOrder.push(2);
+				// eslint-disable-next-line @typescript-eslint/strict-void-return -- setTimeout callback requires void return
 				await new Promise((resolve) => setTimeout(resolve, 10));
 				return 2;
 			},
-			async () => {
+			async (): Promise<number> => {
 				executionOrder.push(3);
+				// eslint-disable-next-line @typescript-eslint/strict-void-return -- setTimeout callback requires void return
 				await new Promise((resolve) => setTimeout(resolve, 10));
 				return 3;
 			},
@@ -150,8 +157,8 @@ describe('limitConcurrency', () => {
 	it('should handle task array with undefined entries gracefully', async () => {
 		// Create a sparse array to test the null check
 		const tasks: (() => Promise<number>)[] = [];
-		tasks[0] = async () => Promise.resolve(1);
-		tasks[2] = async () => Promise.resolve(3);
+		tasks[0] = async (): Promise<number> => Promise.resolve(1);
+		tasks[2] = async (): Promise<number> => Promise.resolve(3);
 		// Index 1 is undefined
 
 		const results = await limitConcurrency(tasks, 2);
@@ -162,22 +169,24 @@ describe('limitConcurrency', () => {
 	});
 
 	it('should handle early return when index exceeds task length', async () => {
+		// eslint-disable jsdoc/convert-to-jsdoc-comments -- Regular comments are appropriate for test explanations
 		// This test ensures the early return path in executeNext is covered (line 24)
-		// by having more tasks than maxConcurrency, so executeNext is called multiple times
-
-		/**
-		 * And eventually index >= tasks.length.
-		 */
+		// by having more tasks than maxConcurrency, so executeNext is called multiple times.
+		// Eventually index >= tasks.length.
+		// eslint-enable jsdoc/convert-to-jsdoc-comments
 		const tasks = [
-			async () => {
+			async (): Promise<number> => {
+				// eslint-disable-next-line @typescript-eslint/strict-void-return -- setTimeout callback requires void return
 				await new Promise((resolve) => setTimeout(resolve, 10));
 				return 1;
 			},
-			async () => {
+			async (): Promise<number> => {
+				// eslint-disable-next-line @typescript-eslint/strict-void-return -- setTimeout callback requires void return
 				await new Promise((resolve) => setTimeout(resolve, 10));
 				return 2;
 			},
-			async () => {
+			async (): Promise<number> => {
+				// eslint-disable-next-line @typescript-eslint/strict-void-return -- setTimeout callback requires void return
 				await new Promise((resolve) => setTimeout(resolve, 10));
 				return 3;
 			},

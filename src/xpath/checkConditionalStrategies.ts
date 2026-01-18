@@ -73,32 +73,43 @@ function isAndKeywordAtTopLevel(
 }
 
 /**
+ * Options for processing an expression character.
+ */
+interface ProcessExpressionCharOptions {
+	readonly char: string;
+	readonly currentIndex: number;
+	readonly expression: string;
+	readonly depth: number;
+	readonly inQuotes: boolean;
+	readonly currentPart: string;
+	parts: string[];
+}
+
+/**
  * Process character in expression parsing, updating state.
- * @param char - Current character being processed.
- * @param i - Current index position in expression.
- * @param expression - Full expression string being parsed.
- * @param depth - Current parentheses nesting depth.
- * @param inQuotes - Current quote state flag.
- * @param currentPart - Current part string being built.
- * @param parts - Array of completed condition parts.
+ * @param options - Processing options including character, index, expression, and state.
  * @returns Updated parsing state with new depth, quote state, and parts.
  */
-// eslint-disable-next-line @typescript-eslint/max-params -- Function processes expression character with necessary context: char, index, expression, depth, quote state, current part, and parts array
 function processExpressionChar(
-	char: Readonly<string>,
-	i: Readonly<number>,
-	expression: Readonly<string>,
-	depth: Readonly<number>,
-	inQuotes: Readonly<boolean>,
-	currentPart: string,
-	// eslint-disable-next-line @typescript-eslint/prefer-readonly-parameter-types -- Array is mutated via push()
-	parts: string[],
+	// eslint-disable-next-line @typescript-eslint/prefer-readonly-parameter-types -- parts array is intentionally mutated
+	options: Readonly<Omit<ProcessExpressionCharOptions, 'parts'>> & {
+		parts: string[];
+	},
 ): {
 	currentPart: string;
 	depth: number;
 	inQuotes: boolean;
 	skipChars: number;
 } {
+	const {
+		char,
+		currentIndex: i,
+		expression,
+		depth,
+		inQuotes,
+		currentPart,
+		parts,
+	} = options;
 	const AND_SKIP_OFFSET = 2;
 	const MIN_EXPRESSION_LENGTH = 0;
 
@@ -159,8 +170,8 @@ function splitCombinedAndConditions(expression: Readonly<string>): string[] {
 	let quoteChar = '';
 
 	for (let i = START_INDEX; i < expression.length; i++) {
-		// split() and array access within bounds check ensure char is always defined
-		// eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Loop condition ensures i < length
+		// Loop condition ensures i < length, so expression[i] is always defined
+		// eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- loop condition ensures index is valid
 		const char = expression[i]!;
 		const quoteState = updateQuoteState(char, inQuotes, quoteChar);
 		const { inQuotes: newInQuotes, quoteChar: newQuoteChar } = quoteState;
@@ -172,15 +183,15 @@ function splitCombinedAndConditions(expression: Readonly<string>): string[] {
 			continue;
 		}
 
-		const state = processExpressionChar(
+		const state = processExpressionChar({
 			char,
-			i,
-			expression,
-			depth,
-			inQuotes,
+			currentIndex: i,
 			currentPart,
+			depth,
+			expression,
+			inQuotes,
 			parts,
-		);
+		});
 		({ currentPart, depth, inQuotes } = state);
 		i += state.skipChars;
 	}
@@ -195,6 +206,7 @@ function splitCombinedAndConditions(expression: Readonly<string>): string[] {
 
 /**
  * Check if a single condition part is covered in content.
+ * @internal
  * @param part - Single condition part (e.g., "@FullMethodName = $var" or ".//NodeType").
  * @param content - Example content to validate against.
  * @returns True if the part is covered.
@@ -216,10 +228,15 @@ function checkConditionPart(
 		// Extract the attribute name (e.g., "FullMethodName" from "@FullMethodName = $var")
 		const attrRegex = /@(\w+)/;
 		const attrMatch = attrRegex.exec(part);
-		// Regex capture group (\w+) requires at least one word character, so match[1] is always defined when regex matches
-		// Since we're inside if (attrPattern.test(part)), attrMatch cannot be null
-		// eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Regex capture group ensures match[1] is defined, test() ensures match is not null
-		const attrName = attrMatch![ATTR_MATCH_INDEX]!;
+		// If attrPattern.test(part) is true, attrRegex.exec(part) will always match and have capture group
+		// This check is defensive but should never be true in practice
+		if (attrMatch === null) {
+			return false;
+		}
+		const attrName = attrMatch[ATTR_MATCH_INDEX];
+		if (attrName === undefined) {
+			return false;
+		}
 		// For FullMethodName, check for method calls
 		if (attrName.toLowerCase() === 'fullmethodname') {
 			return /\w+\.\w+\s*\(/.test(content);
@@ -245,10 +262,15 @@ function checkConditionPart(
 		// Extract node type name
 		const nodeTypeRegex = /\.?\/\/([A-Z][a-zA-Z]*)/;
 		const nodeTypeMatch = nodeTypeRegex.exec(part);
-		// Regex capture group ([A-Z][a-zA-Z]*) requires at least one character, so match[1] is always defined when regex matches
-		// Since we're inside if (nodeTypePattern.test(part)), nodeTypeMatch cannot be null
-		// eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Regex capture group ensures match[1] is defined, test() ensures match is not null
-		const nodeType = nodeTypeMatch![NODE_TYPE_MATCH_INDEX]!;
+		// If nodeTypePattern.test(part) is true, nodeTypeRegex.exec(part) will always match and have capture group
+		// This check is defensive but should never be true in practice
+		if (nodeTypeMatch === null) {
+			return false;
+		}
+		const nodeType = nodeTypeMatch[NODE_TYPE_MATCH_INDEX];
+		if (nodeType === undefined) {
+			return false;
+		}
 		// Use similar heuristics as checkNodeTypeCoverage
 		if (nodeType === 'NewListLiteralExpression') {
 			// Look for list literals: new List<...>() or new List()
@@ -595,7 +617,7 @@ function checkBooleanFunctionCoverage(
 /**
  * Strategy map for conditional coverage checkers.
  */
-export const conditionalCheckers: Record<
+const conditionalCheckers: Record<
 	string,
 	(
 		conditional: Readonly<Conditional>,
@@ -610,3 +632,5 @@ export const conditionalCheckers: Record<
 	or_branch: checkOrBranchCoverage,
 	quantified: checkQuantifiedCoverage,
 };
+
+export { checkConditionPart, conditionalCheckers };

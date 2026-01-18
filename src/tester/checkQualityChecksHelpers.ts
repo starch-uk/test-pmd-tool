@@ -3,8 +3,6 @@
  * Helper functions for quality checks.
  * Extracts and validates rule metadata, XPath values, and marker descriptions.
  */
-// eslint-disable-next-line @typescript-eslint/no-unused-vars -- readFileSync may be used in future implementations
-import { readFileSync } from 'fs';
 import type { ExampleData } from '../types/index.js';
 
 const MIN_STRING_LENGTH = 0;
@@ -51,9 +49,9 @@ function findMessageLineNumber(
 	const lines = xmlContent.split('\n');
 	for (let i = 0; i < lines.length; i++) {
 		// split('\n') always returns a dense array, so lines[i] is always defined
-		// eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Loop condition ensures i < length, split() returns dense array
-		const line = lines[i]!;
-		if (line.includes('message=')) {
+		const line = lines[i];
+		// eslint-disable-next-line @typescript-eslint/prefer-optional-chain -- explicit undefined check needed for strict-boolean-expressions
+		if (line !== undefined && line.includes('message=')) {
 			return i + LINE_NUMBER_OFFSET;
 		}
 	}
@@ -71,9 +69,9 @@ function findDescriptionLineNumber(
 	const lines = xmlContent.split('\n');
 	for (let i = 0; i < lines.length; i++) {
 		// split('\n') always returns a dense array, so lines[i] is always defined
-		// eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Loop condition ensures i < length, split() returns dense array
-		const line = lines[i]!;
-		if (line.includes('<description>')) {
+		const line = lines[i];
+		// eslint-disable-next-line @typescript-eslint/prefer-optional-chain -- explicit undefined check needed for strict-boolean-expressions
+		if (line !== undefined && line.includes('<description>')) {
 			return i + LINE_NUMBER_OFFSET;
 		}
 	}
@@ -97,7 +95,7 @@ function findXPathValueLocation(
 
 	for (let i = 0; i < lines.length; i++) {
 		// split('\n') always returns a dense array, so lines[i] is always defined
-		// eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Loop condition ensures i < length, split() returns dense array
+		// eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- split('\n') always returns dense array
 		const line = lines[i]!;
 
 		if (line.includes('<properties>')) {
@@ -218,7 +216,7 @@ function findMarkerLineNumber(
 
 	for (let i = 0; i < lines.length; i++) {
 		// split('\n') always returns a dense array, so lines[i] is always defined
-		// eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Loop condition ensures i < length, split() returns dense array
+		// eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- split('\n') always returns dense array
 		const line = lines[i]!;
 		if (line.includes('<example>')) {
 			currentExampleIndex++;

@@ -561,11 +561,18 @@ public class TestClass {
 	});
 
 	it('should handle AST parsing failure in hasNestedClasses', () => {
-		// Unparseable content - ts-summit-ast will fail to parse
-		const content = 'this is not valid apex code!!! {{{';
+		// Test to cover line 146: when isValidParseResult returns false
+		// Mock parseApexCode to return an invalid result (isUsable: false)
+		vi.mocked(tsSummitAST.parseApexCode).mockReturnValueOnce({
+			isUsable: false,
+			ast: undefined,
+			errors: [],
+		} as ReturnType<typeof tsSummitAST.parseApexCode>);
+
+		const content = 'test content';
 		const result = hasNestedClasses(content);
 
-		// When parsing fails, should return false (line 165)
+		// When parsing fails, should return false
 		expect(result).toBe(false);
 	});
 

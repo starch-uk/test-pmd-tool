@@ -140,11 +140,12 @@ function hasNestedClassInNode(node: Readonly<ASTNode>): boolean {
  * @returns True if nested classes are detected.
  */
 function hasNestedClassesAST(content: Readonly<string>): boolean {
-	// ts-summit-ast always returns usable AST - parsing failure path is unreachable
 	const parseResult = parseApexCode(content);
-	// Type assertion: ts-summit-ast always returns usable AST
-	// eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- ts-summit-ast always returns usable AST
-	const ast = parseResult.ast!;
+	// Check if parsing failed or AST is unusable
+	if (!isValidParseResult(parseResult)) {
+		return false;
+	}
+	const { ast } = parseResult;
 
 	// Find all ClassDeclaration nodes and check if any contain nested classes
 	const classDeclarations: ASTNode[] = [];
