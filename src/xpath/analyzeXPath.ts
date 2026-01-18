@@ -3,15 +3,15 @@
  * XPath analysis module. Analyzes XPath expressions and extracts components.
  */
 import type { XPathAnalysis } from '../types/index.js';
-import { extractNodeTypes } from './extractors/extractNodeTypes.js';
-import { extractOperators } from './extractors/extractOperators.js';
-import { extractAttributes } from './extractors/extractAttributes.js';
-import { extractConditionals } from './extractors/extractConditionals.js';
+import { extractNodeTypes } from './extractNodeTypes.js';
+import { extractOperators } from './extractOperators.js';
+import { extractAttributes } from './extractAttributes.js';
+import { extractConditionals } from './extractConditionals.js';
 
 /**
- * Analyze XPath expression and extract all components.
+ * Analyzes an XPath expression and extracts node types, operators, conditionals, attributes, hardcoded values, and let variables.
  * @param xpath - XPath expression to analyze.
- * @returns Complete XPath analysis result.
+ * @returns XPathAnalysis object containing extracted node types, operators, conditionals, attributes, hardcoded values, and let variables for coverage checking.
  */
 export function analyzeXPath(xpath: Readonly<string>): XPathAnalysis {
 	if (!xpath) {

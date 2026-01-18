@@ -3,8 +3,6 @@
  * Test data fixtures and builders for unit tests.
  * Reduces duplication and improves test maintainability.
  */
-/* eslint-disable import/group-exports -- Type definitions must be exported individually */
-/* eslint-disable @typescript-eslint/prefer-readonly-parameter-types -- Test helpers accept mutable test data */
 import type {
 	ExampleData,
 	RuleMetadata,
@@ -14,13 +12,13 @@ import type {
 /**
  * Options for creating ExampleData fixtures.
  */
-export interface ExampleDataOptions {
-	content?: string;
-	exampleIndex?: number;
-	validMarkers?: ViolationMarker[];
-	valids?: string[];
-	violationMarkers?: ViolationMarker[];
-	violations?: string[];
+interface ExampleDataOptions {
+	readonly content?: string;
+	readonly exampleIndex?: number;
+	readonly validMarkers?: readonly ViolationMarker[];
+	readonly valids?: readonly string[];
+	readonly violationMarkers?: readonly ViolationMarker[];
+	readonly violations?: readonly string[];
 }
 
 /**
@@ -28,8 +26,9 @@ export interface ExampleDataOptions {
  * @param options - Options to customize the example data.
  * @returns An ExampleData object with the specified options and defaults.
  */
-export function createExampleData(
-	options: ExampleDataOptions = {},
+function createExampleData(
+	// eslint-disable-next-line @typescript-eslint/prefer-readonly-parameter-types -- Parameter is already Readonly<ExampleDataOptions> with readonly properties
+	options: Readonly<ExampleDataOptions> = {},
 ): ExampleData {
 	return {
 		content: options.content ?? 'public class Test {}',
@@ -46,8 +45,9 @@ export function createExampleData(
  * @param options - Options to customize the violation marker.
  * @returns A ViolationMarker object with the specified options and defaults.
  */
-export function createViolationMarker(
-	options: Partial<ViolationMarker> = {},
+function createViolationMarker(
+	// eslint-disable-next-line @typescript-eslint/prefer-readonly-parameter-types -- Partial<T> utility type cannot be made readonly
+	options: Readonly<Partial<ViolationMarker>> = {},
 ): ViolationMarker {
 	return {
 		description: options.description ?? 'Test violation',
@@ -63,8 +63,9 @@ export function createViolationMarker(
  * @param options - Options to customize the valid marker.
  * @returns A ViolationMarker object (with isViolation: false) with the specified options and defaults.
  */
-export function createValidMarker(
-	options: Partial<ViolationMarker> = {},
+function createValidMarker(
+	// eslint-disable-next-line @typescript-eslint/prefer-readonly-parameter-types -- Partial<T> utility type cannot be made readonly
+	options: Readonly<Partial<ViolationMarker>> = {},
 ): ViolationMarker {
 	return {
 		description: options.description ?? 'Test valid',
@@ -78,11 +79,11 @@ export function createValidMarker(
 /**
  * Options for creating RuleMetadata fixtures.
  */
-export interface RuleMetadataOptions {
-	description?: string | null;
-	message?: string | null;
-	ruleName?: string | null;
-	xpath?: string | null;
+interface RuleMetadataOptions {
+	readonly description?: string | null;
+	readonly message?: string | null;
+	readonly ruleName?: string | null;
+	readonly xpath?: string | null;
 }
 
 /**
@@ -90,33 +91,58 @@ export interface RuleMetadataOptions {
  * @param options - Options to customize the rule metadata.
  * @returns A RuleMetadata object with the specified options and defaults.
  */
-export function createRuleMetadata(
-	options: RuleMetadataOptions = {},
-): RuleMetadata {
-	return {
-		description:
-			'description' in options
-				? options.description
-				: 'This is a detailed description of the rule that meets the minimum length requirement',
-		message:
-			'message' in options
-				? options.message
-				: 'This is a comprehensive test message',
-		ruleName: 'ruleName' in options ? options.ruleName : 'TestRule',
-		xpath: 'xpath' in options ? options.xpath : '//Method',
+function createRuleMetadata(
+	options: Readonly<RuleMetadataOptions> = {},
+): Readonly<RuleMetadata> {
+	const hasDescription = 'description' in options;
+	const hasMessage = 'message' in options;
+	const hasRuleName = 'ruleName' in options;
+	const hasXpath = 'xpath' in options;
+
+	const description: string | null | undefined = hasDescription
+		? (options.description ?? null)
+		: 'This is a detailed description of the rule that meets the minimum length requirement';
+	const message: string | null | undefined = hasMessage
+		? (options.message ?? null)
+		: 'This is a comprehensive test message';
+	const ruleName: string | null | undefined = hasRuleName
+		? (options.ruleName ?? null)
+		: 'TestRule';
+	const xpath: string | null | undefined = hasXpath
+		? (options.xpath ?? null)
+		: '//Method';
+
+	const result: RuleMetadata = {
+		description,
+		message,
+		ruleName,
+		xpath,
 	};
+	// Return as Readonly to match function parameter expectations
+	return result as Readonly<RuleMetadata>;
 }
 
 /**
  * Creates a minimal valid RuleMetadata for passing tests.
  * @returns A valid RuleMetadata object suitable for passing tests.
  */
-export function createValidRuleMetadata(): RuleMetadata {
-	return createRuleMetadata({
+function createValidRuleMetadata(): Readonly<RuleMetadata> {
+	const result = createRuleMetadata({
 		description:
 			'This is a detailed description of the rule that meets the minimum length requirement',
 		message: 'This is a comprehensive test message',
 		ruleName: 'TestRule',
 		xpath: '//Method',
 	});
+	return result;
 }
+
+export {
+	createExampleData,
+	createRuleMetadata,
+	createValidMarker,
+	createValidRuleMetadata,
+	createViolationMarker,
+};
+
+export type { ExampleDataOptions, RuleMetadataOptions };

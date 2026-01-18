@@ -6,26 +6,26 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { analyzeXPath } from '../../../src/xpath/analyzeXPath.js';
 
 // Mock the extractor functions
-vi.mock('../../../src/xpath/extractors/extractNodeTypes.js', () => ({
+vi.mock('../../../src/xpath/extractNodeTypes.js', () => ({
 	extractNodeTypes: vi.fn(),
 }));
 
-vi.mock('../../../src/xpath/extractors/extractOperators.js', () => ({
+vi.mock('../../../src/xpath/extractOperators.js', () => ({
 	extractOperators: vi.fn(),
 }));
 
-vi.mock('../../../src/xpath/extractors/extractAttributes.js', () => ({
+vi.mock('../../../src/xpath/extractAttributes.js', () => ({
 	extractAttributes: vi.fn(),
 }));
 
-vi.mock('../../../src/xpath/extractors/extractConditionals.js', () => ({
+vi.mock('../../../src/xpath/extractConditionals.js', () => ({
 	extractConditionals: vi.fn(),
 }));
 
-import { extractNodeTypes } from '../../../src/xpath/extractors/extractNodeTypes.js';
-import { extractOperators } from '../../../src/xpath/extractors/extractOperators.js';
-import { extractAttributes } from '../../../src/xpath/extractors/extractAttributes.js';
-import { extractConditionals } from '../../../src/xpath/extractors/extractConditionals.js';
+import { extractNodeTypes } from '../../../src/xpath/extractNodeTypes.js';
+import { extractOperators } from '../../../src/xpath/extractOperators.js';
+import { extractAttributes } from '../../../src/xpath/extractAttributes.js';
+import { extractConditionals } from '../../../src/xpath/extractConditionals.js';
 
 const mockedExtractNodeTypes = vi.mocked(extractNodeTypes);
 const mockedExtractOperators = vi.mocked(extractOperators);

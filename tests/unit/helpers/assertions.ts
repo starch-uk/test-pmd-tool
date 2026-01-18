@@ -3,8 +3,6 @@
  * Common assertion helpers for unit tests.
  * Reduces duplication and improves test readability.
  */
-/* eslint-disable import/group-exports -- Helper functions must be exported individually */
-/* eslint-disable @typescript-eslint/prefer-readonly-parameter-types -- Test helpers accept mutable test data */
 import { expect } from 'vitest';
 import type { ValidationResult } from '../../../src/types/index.js';
 
@@ -12,7 +10,8 @@ import type { ValidationResult } from '../../../src/types/index.js';
  * Asserts that a validation result passed with no issues or warnings.
  * @param result - The validation result to check.
  */
-export function expectPassedWithNoIssues(result: ValidationResult): void {
+// eslint-disable-next-line @typescript-eslint/prefer-readonly-parameter-types -- False positive, result is already Readonly<ValidationResult>
+function expectPassedWithNoIssues(result: Readonly<ValidationResult>): void {
 	expect(result.passed).toBe(true);
 	expect(result.issues).toHaveLength(0);
 	expect(result.warnings).toHaveLength(0);
@@ -22,7 +21,10 @@ export function expectPassedWithNoIssues(result: ValidationResult): void {
  * Asserts that a validation result passed with no issues (warnings may exist).
  * @param result - The validation result to check.
  */
-export function expectPassedWithNoIssuesOnly(result: ValidationResult): void {
+function expectPassedWithNoIssuesOnly(
+	// eslint-disable-next-line @typescript-eslint/prefer-readonly-parameter-types -- False positive, result is already Readonly<ValidationResult>
+	result: Readonly<ValidationResult>,
+): void {
 	expect(result.passed).toBe(true);
 	expect(result.issues).toHaveLength(0);
 }
@@ -31,7 +33,8 @@ export function expectPassedWithNoIssuesOnly(result: ValidationResult): void {
  * Asserts that a validation result passed (issues and warnings may exist).
  * @param result - The validation result to check.
  */
-export function expectPassed(result: ValidationResult): void {
+// eslint-disable-next-line @typescript-eslint/prefer-readonly-parameter-types -- False positive, result is already Readonly<ValidationResult>
+function expectPassed(result: Readonly<ValidationResult>): void {
 	expect(result.passed).toBe(true);
 }
 
@@ -39,7 +42,8 @@ export function expectPassed(result: ValidationResult): void {
  * Asserts that a validation result failed.
  * @param result - The validation result to check.
  */
-export function expectFailed(result: ValidationResult): void {
+// eslint-disable-next-line @typescript-eslint/prefer-readonly-parameter-types -- False positive, result is already Readonly<ValidationResult>
+function expectFailed(result: Readonly<ValidationResult>): void {
 	expect(result.passed).toBe(false);
 }
 
@@ -47,7 +51,8 @@ export function expectFailed(result: ValidationResult): void {
  * Asserts that a validation result has no issues.
  * @param result - The validation result to check.
  */
-export function expectNoIssues(result: ValidationResult): void {
+// eslint-disable-next-line @typescript-eslint/prefer-readonly-parameter-types -- False positive, result is already Readonly<ValidationResult>
+function expectNoIssues(result: Readonly<ValidationResult>): void {
 	expect(result.issues).toHaveLength(0);
 }
 
@@ -55,7 +60,8 @@ export function expectNoIssues(result: ValidationResult): void {
  * Asserts that a validation result has no warnings.
  * @param result - The validation result to check.
  */
-export function expectNoWarnings(result: ValidationResult): void {
+// eslint-disable-next-line @typescript-eslint/prefer-readonly-parameter-types -- False positive, result is already Readonly<ValidationResult>
+function expectNoWarnings(result: Readonly<ValidationResult>): void {
 	expect(result.warnings).toHaveLength(0);
 }
 
@@ -64,9 +70,10 @@ export function expectNoWarnings(result: ValidationResult): void {
  * @param result - The validation result to check.
  * @param count - The expected number of issues.
  */
-export function expectIssueCount(
-	result: ValidationResult,
-	count: number,
+function expectIssueCount(
+	// eslint-disable-next-line @typescript-eslint/prefer-readonly-parameter-types -- False positive, result is already Readonly<ValidationResult>
+	result: Readonly<ValidationResult>,
+	count: Readonly<number>,
 ): void {
 	expect(result.issues).toHaveLength(count);
 }
@@ -76,9 +83,10 @@ export function expectIssueCount(
  * @param result - The validation result to check.
  * @param count - The expected number of warnings.
  */
-export function expectWarningCount(
-	result: ValidationResult,
-	count: number,
+function expectWarningCount(
+	// eslint-disable-next-line @typescript-eslint/prefer-readonly-parameter-types -- False positive, result is already Readonly<ValidationResult>
+	result: Readonly<ValidationResult>,
+	count: Readonly<number>,
 ): void {
 	expect(result.warnings).toHaveLength(count);
 }
@@ -88,7 +96,11 @@ export function expectWarningCount(
  * @param result - The validation result to check.
  * @param issue - The issue message to look for.
  */
-export function expectIssue(result: ValidationResult, issue: string): void {
+function expectIssue(
+	// eslint-disable-next-line @typescript-eslint/prefer-readonly-parameter-types -- False positive, result is already Readonly<ValidationResult>
+	result: Readonly<ValidationResult>,
+	issue: Readonly<string>,
+): void {
 	expect(result.issues).toContain(issue);
 }
 
@@ -97,7 +109,11 @@ export function expectIssue(result: ValidationResult, issue: string): void {
  * @param result - The validation result to check.
  * @param warning - The warning message to look for.
  */
-export function expectWarning(result: ValidationResult, warning: string): void {
+function expectWarning(
+	// eslint-disable-next-line @typescript-eslint/prefer-readonly-parameter-types -- False positive, result is already Readonly<ValidationResult>
+	result: Readonly<ValidationResult>,
+	warning: Readonly<string>,
+): void {
 	expect(result.warnings).toContain(warning);
 }
 
@@ -106,9 +122,24 @@ export function expectWarning(result: ValidationResult, warning: string): void {
  * @param result - The validation result to check.
  * @param text - The text to search for in warnings.
  */
-export function expectWarningContaining(
-	result: ValidationResult,
-	text: string,
+function expectWarningContaining(
+	// eslint-disable-next-line @typescript-eslint/prefer-readonly-parameter-types -- False positive, result is already Readonly<ValidationResult>
+	result: Readonly<ValidationResult>,
+	text: Readonly<string>,
 ): void {
 	expect(result.warnings.some((w) => w.includes(text))).toBe(true);
 }
+
+export {
+	expectFailed,
+	expectIssue,
+	expectIssueCount,
+	expectNoIssues,
+	expectNoWarnings,
+	expectPassed,
+	expectPassedWithNoIssues,
+	expectPassedWithNoIssuesOnly,
+	expectWarning,
+	expectWarningContaining,
+	expectWarningCount,
+};

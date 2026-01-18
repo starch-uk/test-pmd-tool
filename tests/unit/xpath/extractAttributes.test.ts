@@ -3,7 +3,7 @@
  * Unit tests for extractAttributes function.
  */
 import { describe, it, expect } from 'vitest';
-import { extractAttributes } from '../../../src/xpath/extractors/extractAttributes.js';
+import { extractAttributes } from '../../../src/xpath/extractAttributes.js';
 
 describe('extractAttributes', () => {
 	it('should extract @AttributeName patterns', () => {

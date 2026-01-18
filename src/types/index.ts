@@ -2,8 +2,7 @@
  * @file
  * TypeScript type definitions for the PMD Rule Tester.
  */
-/* eslint-disable import/group-exports -- Type definitions must be exported individually */
-export interface XPathAnalysis {
+interface XPathAnalysis {
 	nodeTypes: string[];
 	operators: string[];
 	attributes: string[];
@@ -13,34 +12,34 @@ export interface XPathAnalysis {
 	patterns: string[];
 }
 
-export interface Conditional {
+interface Conditional {
 	type: string;
 	expression: string;
 	position: number;
 }
 
-export interface HardcodedValueIssue {
+interface HardcodedValueIssue {
 	type: 'array' | 'attribute' | 'number';
 	value: string;
 	recommendation: string;
 	severity: 'error' | 'warning';
 }
 
-export interface CoverageResult {
+interface CoverageResult {
 	success: boolean;
 	message: string;
 	evidence: CoverageEvidence[];
 	details: CoverageDetail[];
 }
 
-export interface CoverageEvidence {
+interface CoverageEvidence {
 	type: 'valid' | 'violation';
 	count: number;
 	required: number;
 	description: string;
 }
 
-export interface CoverageDetail {
+interface CoverageDetail {
 	exampleIndex: number;
 	lineNumber: number;
 	lineText: string;
@@ -49,7 +48,7 @@ export interface CoverageDetail {
 	markerType: 'combined' | 'inline' | 'section';
 }
 
-export interface ViolationMarker {
+interface ViolationMarker {
 	lineNumber: number;
 	description: string;
 	isViolation: boolean;
@@ -80,7 +79,7 @@ export interface ViolationMarker {
 	codeText?: string;
 }
 
-export interface ExampleData {
+interface ExampleData {
 	content: string;
 	exampleIndex: number;
 	violations: string[];
@@ -89,14 +88,14 @@ export interface ExampleData {
 	validMarkers: ViolationMarker[];
 }
 
-export interface RuleMetadata {
+interface RuleMetadata {
 	description: string | null | undefined;
 	message: string | null | undefined;
 	ruleName: string | null | undefined;
 	xpath: string | null | undefined;
 }
 
-export interface TestFileResult {
+interface TestFileResult {
 	filePath: string;
 	hasViolations: boolean;
 	hasValids: boolean;
@@ -111,11 +110,11 @@ export interface TestFileResult {
 	};
 }
 
-export interface PMDResult {
+interface PMDResult {
 	violations: Violation[];
 }
 
-export interface Violation {
+interface Violation {
 	line: number;
 	column: number;
 	message: string;
@@ -123,7 +122,7 @@ export interface Violation {
 	priority: number;
 }
 
-export interface TestResult {
+interface TestResult {
 	success: boolean;
 	violations: Violation[];
 	valids: Violation[];
@@ -131,7 +130,7 @@ export interface TestResult {
 	duration?: number;
 }
 
-export interface XPathCoverageResult {
+interface XPathCoverageResult {
 	coverage: CoverageResult[];
 	overallSuccess: boolean;
 	uncoveredBranches: string[];
@@ -142,7 +141,7 @@ export interface XPathCoverageResult {
 	coveredLineNumbers?: number[];
 }
 
-export interface TestCaseResult {
+interface TestCaseResult {
 	exampleIndex: number;
 	testType: 'valid' | 'violation';
 	passed: boolean;
@@ -150,7 +149,7 @@ export interface TestCaseResult {
 	description: string;
 }
 
-export interface OverallTestResults {
+interface OverallTestResults {
 	success: boolean;
 	testResults: TestResult[];
 	examplesTested: number;
@@ -163,25 +162,25 @@ export interface OverallTestResults {
 	qualityChecks?: ValidationResult;
 }
 
-export interface CLIArguments {
+interface CLIArguments {
 	ruleFile: string;
 	verbose?: boolean;
 	output?: string;
 }
 
-export interface FileOperationResult<T = void> {
+interface FileOperationResult<T = void> {
 	success: boolean;
 	data?: T;
 	error?: string;
 }
 
-export interface ValidationResult {
+interface ValidationResult {
 	passed: boolean;
 	issues: string[];
 	warnings: string[];
 }
 
-export interface BranchCombination {
+interface BranchCombination {
 	type: 'valid' | 'violation';
 	violationIndex?: number;
 	sectionIndex?: number;
@@ -189,8 +188,32 @@ export interface BranchCombination {
 	examples: number[];
 }
 
-export interface BranchTrackingResult {
+interface BranchTrackingResult {
 	combinations: BranchCombination[];
 	redundant: BranchCombination[];
 	coverage: number;
 }
+
+export type {
+	XPathAnalysis,
+	Conditional,
+	HardcodedValueIssue,
+	CoverageResult,
+	CoverageEvidence,
+	CoverageDetail,
+	ViolationMarker,
+	ExampleData,
+	RuleMetadata,
+	TestFileResult,
+	PMDResult,
+	Violation,
+	TestResult,
+	XPathCoverageResult,
+	TestCaseResult,
+	OverallTestResults,
+	CLIArguments,
+	FileOperationResult,
+	ValidationResult,
+	BranchCombination,
+	BranchTrackingResult,
+};

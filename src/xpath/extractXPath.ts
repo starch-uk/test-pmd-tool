@@ -27,6 +27,7 @@ function normalizePath(filePath: Readonly<string>): string {
 
 /**
  * Extract XPath expression from XML rule file.
+ * Parses the XML and extracts the XPath value from the properties section.
  * @param xmlFilePath - Path to the PMD rule XML file.
  * @returns XPath expression or null if not found.
  */

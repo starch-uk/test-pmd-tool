@@ -8,9 +8,9 @@ import type {
 	ExampleData,
 	ValidationResult,
 } from '../../types/index.js';
-import { extractLetVariables } from '../../xpath/extractors/extractLetVariables.js';
-import { extractHardcodedValues } from '../../xpath/extractors/extractHardcodedValues.js';
-import { checkDuplicates } from './checkDuplicates.js';
+import { extractLetVariables } from '../../xpath/extractLetVariables.js';
+import { extractHardcodedValues } from '../../xpath/extractHardcodedValues.js';
+import { checkDuplicates } from '../checkDuplicates.js';
 
 const MAX_MESSAGE_LENGTH = 80;
 const MIN_STRING_LENGTH = 0;
@@ -580,8 +580,11 @@ function checkMarkerDescriptions(
 						markerDescriptions.set(desc, []);
 					}
 					// get() after set() always returns the array, never undefined
-					// eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- get() after set() always returns the array
-					const locations = markerDescriptions.get(desc)!;
+					const locations = markerDescriptions.get(desc);
+					if (locations === undefined) {
+						// This should never happen since we just set it above
+						continue;
+					}
 					const lineNum = findMarkerLineNumber({
 						exampleIndex: example.exampleIndex,
 						lines,
@@ -640,8 +643,11 @@ function checkMarkerDescriptions(
 						markerDescriptions.set(desc, []);
 					}
 					// get() after set() always returns the array, never undefined
-					// eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- get() after set() always returns the array
-					const locations = markerDescriptions.get(desc)!;
+					const locations = markerDescriptions.get(desc);
+					if (locations === undefined) {
+						// This should never happen since we just set it above
+						continue;
+					}
 					const lineNum = findMarkerLineNumber({
 						exampleIndex: example.exampleIndex,
 						lines,

@@ -3,7 +3,7 @@
  * Unit tests for extractConditionals function.
  */
 import { describe, it, expect } from 'vitest';
-import { extractConditionals } from '../../../src/xpath/extractors/extractConditionals.js';
+import { extractConditionals } from '../../../src/xpath/extractConditionals.js';
 
 describe('extractConditionals', () => {
 	it('should extract not() conditions', () => {

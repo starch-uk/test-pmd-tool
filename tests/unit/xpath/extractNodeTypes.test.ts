@@ -3,7 +3,7 @@
  * Unit tests for extractNodeTypes function.
  */
 import { describe, it, expect } from 'vitest';
-import { extractNodeTypes } from '../../../src/xpath/extractors/extractNodeTypes.js';
+import { extractNodeTypes } from '../../../src/xpath/extractNodeTypes.js';
 
 describe('extractNodeTypes', () => {
 	it('should extract Statement node types', () => {

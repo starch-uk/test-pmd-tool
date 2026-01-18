@@ -3,7 +3,7 @@
  * Unit tests for extractOperators function.
  */
 import { describe, it, expect } from 'vitest';
-import { extractOperators } from '../../../src/xpath/extractors/extractOperators.js';
+import { extractOperators } from '../../../src/xpath/extractOperators.js';
 
 describe('extractOperators', () => {
 	it('should extract @Op attribute values', () => {

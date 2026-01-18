@@ -3,8 +3,6 @@
  * XPath coverage checking module. Checks if XPath components are covered in examples.
  * Uses ts-summit-ast for accurate AST-based node type detection.
  */
-import { readFileSync } from 'fs';
-import type { ASTNode } from 'ts-summit-ast';
 import type {
 	CoverageResult,
 	CoverageEvidence,
@@ -12,348 +10,28 @@ import type {
 	XPathCoverageResult,
 	Conditional,
 } from '../types/index.js';
-import { parseApexCode } from '../parser/apexParser.js';
 import { analyzeXPath } from './analyzeXPath.js';
-import { conditionalCheckers } from './coverage/conditional/strategies.js';
-import { hasNestedClasses } from './coverage/checkNodeTypes.js';
+import { conditionalCheckers } from './checkConditionalStrategies.js';
+import { hasNestedClasses } from './checkNodeTypes.js';
+import { checkNodeTypeCoverage } from './findNodeTypes.js';
+import type { NodeTypeCoverageOptions } from './findNodeTypes.js';
+import {
+	findAttributeLineNumber,
+	findConditionalLineNumber,
+	findOperatorLineNumber,
+} from './findLineNumbers.js';
 
 const MIN_COUNT = 0;
-const NOT_FOUND_INDEX = -1;
-const LINE_OFFSET = 1;
-
-/**
- * Options for node type coverage checking.
- */
-interface NodeTypeCoverageOptions {
-	ruleFilePath?: Readonly<string>;
-	xpath?: Readonly<string>;
-	lineNumberCollector?: (lineNumber: number) => void;
-}
-
-/**
- * Find line number for an attribute in the XPath within the XML file.
- * @param ruleFilePath - Path to the rule XML file.
- * @param xpath - XPath expression.
- * @param attribute - Attribute to find (e.g., "Image", "Nested").
- * @returns Line number where attribute appears, or null if not found.
- */
-function findAttributeLineNumber(
-	ruleFilePath: Readonly<string>,
-	xpath: Readonly<string>,
-	attribute: Readonly<string>,
-): number | null {
-	try {
-		const content = readFileSync(ruleFilePath, 'utf-8');
-		const lines = content.split('\n');
-
-		// Search for @AttributeName pattern in XPath section
-		const attributePattern = `@${attribute}`;
-
-		// Find the line containing the XPath value element
-		for (let i = 0; i < lines.length; i++) {
-			// split('\n') always returns a dense array, so lines[i] is always defined
-			// eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Loop condition ensures i < length, split() returns dense array
-			const line = lines[i]!;
-			// Check if this line contains the XPath and the attribute
-			const hasXPath = line.includes('xpath');
-			const hasValue = line.includes('value');
-			const hasAttribute = line.includes(attributePattern);
-			if (hasXPath && hasValue && hasAttribute) {
-				return i + LINE_OFFSET;
-			}
-		}
-
-		// If not found in a single line, search for the XPath section and then the attribute
-		let inXPathSection = false;
-		for (let i = 0; i < lines.length; i++) {
-			// split('\n') always returns a dense array, so lines[i] is always defined
-			// eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Loop condition ensures i < length, split() returns dense array
-			const line = lines[i]!;
-			if (line.includes('<property') && line.includes('name="xpath"')) {
-				inXPathSection = true;
-			}
-			if (inXPathSection && line.includes(attributePattern)) {
-				return i + LINE_OFFSET;
-			}
-			if (inXPathSection && line.includes('</property>')) {
-				inXPathSection = false;
-			}
-		}
-
-		// Fallback: find position in XPath string and estimate line
-		const xpathIndex = xpath.indexOf(attributePattern);
-		if (xpathIndex !== NOT_FOUND_INDEX) {
-			// Find the value element and count lines
-			for (let i = 0; i < lines.length; i++) {
-				// split('\n') always returns a dense array, so lines[i] is always defined
-				// eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Loop condition ensures i < length, split() returns dense array
-				const line = lines[i]!;
-				if (line.includes('<value>')) {
-					// Count newlines in XPath up to the attribute position
-					const xpathBeforeAttribute = xpath.substring(
-						MIN_COUNT,
-						xpathIndex,
-					);
-					const newlineMatches = xpathBeforeAttribute.match(/\n/g);
-					// match() returns null if no match, or array if match found
-					// Use 0 if no matches found (null case)
-					const newlineCount = newlineMatches
-						? newlineMatches.length
-						: MIN_COUNT;
-					return i + LINE_OFFSET + newlineCount;
-				}
-			}
-		}
-
-		return null;
-	} catch {
-		return null;
-	}
-}
-
-/**
- * Find line number for a node type in the XPath within the XML file.
- * @param ruleFilePath - Path to the rule XML file.
- * @param xpath - XPath expression.
- * @param nodeType - Node type to find.
- * @returns Line number where node type appears, or null if not found.
- */
-function findNodeTypeLineNumber(
-	ruleFilePath: Readonly<string>,
-	xpath: Readonly<string>,
-	nodeType: Readonly<string>,
-): number | null {
-	try {
-		const content = readFileSync(ruleFilePath, 'utf-8');
-		const lines = content.split('\n');
-
-		// Find the line containing the XPath value element
-		for (let i = 0; i < lines.length; i++) {
-			// split('\n') always returns a dense array, so lines[i] is always defined
-			// eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Loop condition ensures i < length, split() returns dense array
-			const line = lines[i]!;
-			// Check if this line contains the XPath and the node type
-			const hasXPath = line.includes('xpath');
-			const hasValue = line.includes('value');
-			const hasNodeType = line.includes(nodeType);
-			if (hasXPath && hasValue && hasNodeType) {
-				return i + LINE_OFFSET;
-			}
-		}
-
-		// If not found in a single line, search for the XPath section and then the node type
-		let inXPathSection = false;
-		for (let i = 0; i < lines.length; i++) {
-			// split('\n') always returns a dense array, so lines[i] is always defined
-			// eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Loop condition ensures i < length, split() returns dense array
-			const line = lines[i]!;
-			if (line.includes('<property') && line.includes('name="xpath"')) {
-				inXPathSection = true;
-			}
-			if (inXPathSection && line.includes(nodeType)) {
-				return i + LINE_OFFSET;
-			}
-			if (inXPathSection && line.includes('</property>')) {
-				inXPathSection = false;
-			}
-		}
-
-		// Fallback: find position in XPath string and estimate line
-		const xpathIndex = xpath.indexOf(nodeType);
-		if (xpathIndex !== NOT_FOUND_INDEX) {
-			// Find the value element and count lines
-			for (let i = 0; i < lines.length; i++) {
-				// split('\n') always returns a dense array, so lines[i] is always defined
-				// eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Loop condition ensures i < length, split() returns dense array
-				const line = lines[i]!;
-				if (line.includes('<value>')) {
-					// Count newlines in XPath up to the node type position
-					const xpathBeforeNodeType = xpath.substring(
-						MIN_COUNT,
-						xpathIndex,
-					);
-					const newlineMatches = xpathBeforeNodeType.match(/\n/g);
-					// match() returns null if no match, or array if match found
-					// Use 0 if no matches found (null case)
-					const newlineCount = newlineMatches
-						? newlineMatches.length
-						: MIN_COUNT;
-					return i + LINE_OFFSET + newlineCount;
-				}
-			}
-		}
-
-		return null;
-	} catch {
-		return null;
-	}
-}
-
-/**
- * Walk AST tree recursively to find nodes of a specific type.
- * @param node - Current AST node to check.
- * @param targetType - Node type to find (e.g., 'IfBlockStatement').
- * @returns True if node type is found in the AST.
- */
-function findNodeTypeInAST(
-	node: Readonly<ASTNode>,
-	targetType: Readonly<string>,
-): boolean {
-	// Check if current node matches the target type
-	if (node.kind === targetType) {
-		return true;
-	}
-
-	// Check all properties of the node object for child nodes
-	// This ensures we find nodes regardless of property names
-	const nodeRecord = node as Record<string, unknown>;
-
-	for (const propName in nodeRecord) {
-		// Skip non-child properties
-		if (
-			propName === 'kind' ||
-			propName === 'start' ||
-			propName === 'end' ||
-			propName === 'loc' ||
-			propName === 'range'
-		) {
-			continue;
-		}
-
-		const childNode = nodeRecord[propName];
-		if (childNode === null || childNode === undefined) {
-			continue;
-		}
-
-		if (Array.isArray(childNode)) {
-			// Handle arrays of child nodes
-			for (const item of childNode) {
-				if (
-					item !== null &&
-					item !== undefined &&
-					typeof item === 'object' &&
-					'kind' in item
-				) {
-					const hasKindString =
-						// eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- Verified item has 'kind' property that is a string, type assertion is verified by runtime checks
-						typeof (item as { kind: unknown }).kind === 'string';
-					if (hasKindString) {
-						// eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- Verified item has 'kind' property that is a string
-						if (findNodeTypeInAST(item as ASTNode, targetType)) {
-							return true;
-						}
-					}
-				}
-			}
-		} else if (
-			typeof childNode === 'object' &&
-			'kind' in childNode &&
-			typeof (childNode as { kind: unknown }).kind === 'string'
-		) {
-			// Handle single child node
-			// eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- Verified childNode has 'kind' property that is a string
-			if (findNodeTypeInAST(childNode as ASTNode, targetType)) {
-				return true;
-			}
-		}
-	}
-
-	return false;
-}
-
-/**
- * Check if node types from XPath are present in example content.
- * @param nodeTypes - Node types to check.
- * @param content - Example content to search.
- * @param options - Optional options for line number tracking.
- * @returns Coverage evidence.
- */
-function checkNodeTypeCoverage(
-	nodeTypes: readonly string[],
-	content: Readonly<string>,
-	options?: Readonly<NodeTypeCoverageOptions>,
-): CoverageEvidence {
-	const lineNumberCollector = options?.lineNumberCollector;
-	const foundNodeTypes: string[] = [];
-	const missingNodeTypes: string[] = [];
-
-	// Trust ts-summit-ast for accurate AST-based node type detection
-	// ts-summit-ast handles parsing gracefully and always returns a usable AST
-	const parseResult = parseApexCode(content);
-	// Type assertion: ts-summit-ast always returns usable AST
-	// eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- ts-summit-ast always returns usable AST
-	const ast = parseResult.ast!;
-
-	for (const nodeType of nodeTypes) {
-		// Special handling for StandardCondition - skip as it's an internal node
-		const isStandardCondition = nodeType === 'StandardCondition';
-		let isCovered = false;
-
-		if (isStandardCondition) {
-			isCovered = true;
-		} else {
-			// Use AST to check if node type exists
-			isCovered = findNodeTypeInAST(ast, nodeType);
-		}
-
-		if (isCovered) {
-			foundNodeTypes.push(nodeType);
-		} else {
-			missingNodeTypes.push(nodeType);
-		}
-	}
-
-	// For missing items, add line numbers if available
-	const missingList =
-		missingNodeTypes.length > MIN_COUNT
-			? missingNodeTypes
-					.map((item) => {
-						if (options !== undefined) {
-							// When options is provided from checkXPathCoverage, both ruleFilePath and xpath
-							// are always defined together (they're set together in checkXPathCoverage)
-							// nodeTypeOptions is only created when both hasRuleFilePath && hasXpathValue are true
-							const ruleFilePathValue = options.ruleFilePath;
-							const xpathValue = options.xpath;
-							// Both are guaranteed to be defined and non-empty when options is provided
-							// (nodeTypeOptions is only created when both hasRuleFilePath && hasXpathValue are true at line 417)
-							// The redundant check is removed to avoid unreachable branches
-							/* eslint-disable @typescript-eslint/no-non-null-assertion */
-							// Both are guaranteed when options is defined (see checkXPathCoverage line 417-419)
-							const lineNumber = findNodeTypeLineNumber(
-								ruleFilePathValue!,
-								xpathValue!,
-								item,
-							);
-							/* eslint-enable @typescript-eslint/no-non-null-assertion */
-							if (lineNumber !== null && lineNumberCollector) {
-								// Record this line as covered for LCOV reporting
-								lineNumberCollector(lineNumber);
-							}
-							return lineNumber !== null
-								? ` - Line ${String(lineNumber)}: ${item}`
-								: ` - ${item}`;
-						}
-						return ` - ${item}`;
-					})
-					.join('\n')
-			: '';
-
-	const missingText =
-		missingNodeTypes.length > MIN_COUNT ? `Missing:\n${missingList}` : '';
-
-	// Only include description if there are items to show
-	// For node types, only show Missing section (Found is empty when count is 0)
-	const description = missingText.length > MIN_COUNT ? missingText : '';
-
-	return {
-		count: foundNodeTypes.length,
-		description,
-		required: nodeTypes.length,
-		type: 'violation',
-	};
-}
 
 const MAX_EXPRESSION_LENGTH = 50;
+
+const NULL_LINE_NUMBER = null;
+
+const NULL_LINE_REFERENCE = null;
+
+const NULL_LINE_REF = null;
+
+const UNDEFINED_VALUE = undefined;
 
 /**
  * Truncate long expression for display and normalize whitespace.
@@ -371,216 +49,6 @@ function truncateExpression(
 		return normalized;
 	}
 	return `${normalized.substring(MIN_COUNT, maxLength)}...`;
-}
-
-/**
- * Find line number for a conditional expression in the XPath within the XML file.
- * @param ruleFilePath - Path to the rule XML file.
- * @param xpath - XPath expression (trimmed).
- * @param conditional - Conditional to find.
- * @returns Line number where conditional appears, or null if not found.
- */
-function findConditionalLineNumber(
-	ruleFilePath: Readonly<string>,
-	xpath: Readonly<string>,
-	conditional: Readonly<Conditional>,
-): number | null {
-	try {
-		const content = readFileSync(ruleFilePath, 'utf-8');
-		const lines = content.split('\n');
-
-		// Build search pattern from conditional expression
-		// Normalize whitespace for matching (replace multiple spaces with single space)
-		const exprPattern = conditional.expression.trim().replace(/\s+/g, ' ');
-		// For 'or' and 'and' conditionals, include the operator in the search to be more specific
-		// This helps distinguish nested conditionals (e.g., 'or' inside 'and')
-		// Build search pattern: operator + expression
-		const searchPattern =
-			conditional.type === 'or' || conditional.type === 'and'
-				? `${conditional.type} ${exprPattern}`
-				: exprPattern;
-		const normalizedSearchPattern = searchPattern.replace(/\s+/g, ' ');
-
-		// Find the XPath section first
-		let xpathSectionStart = NOT_FOUND_INDEX;
-		let inXPathSection = false;
-		let xpathContentStart = NOT_FOUND_INDEX;
-
-		for (let i = 0; i < lines.length; i++) {
-			// split('\n') always returns a dense array, so lines[i] is always defined
-			// eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Loop condition ensures i < length, split() returns dense array
-			const line = lines[i]!;
-			if (line.includes('<property') && line.includes('name="xpath"')) {
-				inXPathSection = true;
-				xpathSectionStart = i;
-			}
-			if (inXPathSection && line.includes('<value>')) {
-				xpathContentStart = i;
-			}
-			if (inXPathSection && line.includes('</property>')) {
-				inXPathSection = false;
-			}
-		}
-
-		// If we found the XPath section, search within it for the expression
-		if (xpathSectionStart !== NOT_FOUND_INDEX) {
-			// Search for the expression pattern in the XPath section
-			// Search from the end backwards to find the most specific match (for nested conditionals)
-			// This helps when 'or' is nested inside 'and' - we want to find the 'or' line, not the 'and' line
-			const LAST_INDEX_OFFSET = 1;
-			const lastLineIndex = lines.length - LAST_INDEX_OFFSET;
-			for (let i = lastLineIndex; i >= xpathSectionStart; i--) {
-				// split('\n') always returns a dense array, so lines[i] is always defined
-				// eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Loop condition ensures i < length, split() returns dense array
-				const line = lines[i]!;
-				// Normalize whitespace in the line for comparison (replace multiple spaces with single space)
-				const normalizedLine = line.replace(/\s+/g, ' ');
-				if (normalizedLine.includes(normalizedSearchPattern)) {
-					return i + LINE_OFFSET;
-				}
-			}
-		}
-
-		// Fallback: find position in trimmed XPath string and estimate line
-		// The xpath parameter is already trimmed, so position is relative to trimmed string
-		// For 'or' and 'and', position points to the operator, so we need to find that in the XML
-		const xpathIndex = conditional.position;
-		if (
-			xpathIndex !== NOT_FOUND_INDEX &&
-			xpathContentStart !== NOT_FOUND_INDEX
-		) {
-			// Find where the actual XPath content starts in the XML file
-			// This is after <value> and potentially after <![CDATA[
-			// eslint-disable-next-line @typescript-eslint/init-declarations -- Variable is assigned in all branches below
-			let actualContentStartLine;
-			// Check if CDATA is used
-			const NEXT_LINE_OFFSET = 1;
-			const nextLineIndex = xpathContentStart + NEXT_LINE_OFFSET;
-			const hasNextLine = nextLineIndex < lines.length;
-			const nextLine = hasNextLine ? lines[nextLineIndex] : undefined;
-			const hasCdataStart =
-				hasNextLine && nextLine?.includes('<![CDATA[') === true;
-			if (hasCdataStart) {
-				// CDATA starts on next line, actual content starts after that
-				const CDATA_CONTENT_OFFSET = 1;
-				actualContentStartLine = nextLineIndex + CDATA_CONTENT_OFFSET;
-			} else {
-				// Content might be on the same line as <value> or next line
-				// Check if <value> line contains the start of XPath content
-				const valueLine = lines[xpathContentStart];
-				const hasValueLine = valueLine !== undefined;
-				const valueLineEndsWithTag =
-					hasValueLine && valueLine.trim().endsWith('<value>');
-				if (hasValueLine && !valueLineEndsWithTag) {
-					// Content starts on same line as <value>
-					actualContentStartLine = xpathContentStart;
-				} else {
-					// Content starts on next line
-					actualContentStartLine =
-						xpathContentStart + NEXT_LINE_OFFSET;
-				}
-			}
-
-			// Count newlines in the trimmed XPath up to the conditional position
-			const xpathBeforeConditional = xpath.substring(
-				MIN_COUNT,
-				xpathIndex,
-			);
-			const newlineMatches = xpathBeforeConditional.match(/\n/g);
-			// match() returns null if no match, or array if match found
-			// Use 0 if no matches found (null case)
-			const newlineCount = newlineMatches?.length ?? MIN_COUNT;
-
-			// Calculate the line number
-			// actualContentStartLine is 0-indexed, so we add LINE_OFFSET to convert to 1-indexed
-			// Then add newlineCount to account for newlines in the XPath
-			return actualContentStartLine + LINE_OFFSET + newlineCount;
-		}
-
-		return null;
-	} catch {
-		return null;
-	}
-}
-
-/**
- * Find line number for an operator in the XPath within the XML file.
- * @param ruleFilePath - Path to the rule XML file.
- * @param xpath - XPath expression.
- * @param operator - Operator to find (e.g., "+", "=", "!=").
- * @returns Line number where operator appears, or null if not found.
- */
-function findOperatorLineNumber(
-	ruleFilePath: Readonly<string>,
-	xpath: Readonly<string>,
-	operator: Readonly<string>,
-): number | null {
-	try {
-		const content = readFileSync(ruleFilePath, 'utf-8');
-		const lines = content.split('\n');
-
-		// Escape special regex characters in operator
-		const escapedOperator = operator.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-		const operatorPattern = new RegExp(escapedOperator);
-
-		// Find the line containing the XPath value element
-		for (let i = 0; i < lines.length; i++) {
-			// split('\n') always returns a dense array, so lines[i] is always defined
-			// eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Loop condition ensures i < length, split() returns dense array
-			const line = lines[i]!;
-			// Check if this line contains the XPath and the operator
-			const hasXPath = line.includes('xpath');
-			const hasValue = line.includes('value');
-			const hasOperator = operatorPattern.test(line);
-			if (hasXPath && hasValue && hasOperator) {
-				return i + LINE_OFFSET;
-			}
-		}
-
-		// If not found in a single line, search for the XPath section and then the operator
-		let inXPathSection = false;
-		for (let i = 0; i < lines.length; i++) {
-			// split('\n') always returns a dense array, so lines[i] is always defined
-			// eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Loop condition ensures i < length, split() returns dense array
-			const line = lines[i]!;
-			if (line.includes('<property') && line.includes('name="xpath"')) {
-				inXPathSection = true;
-			}
-			if (inXPathSection && operatorPattern.test(line)) {
-				return i + LINE_OFFSET;
-			}
-			if (inXPathSection && line.includes('</property>')) {
-				inXPathSection = false;
-			}
-		}
-
-		// Fallback: find position in XPath string and estimate line
-		const xpathIndex = xpath.indexOf(operator);
-		if (xpathIndex !== NOT_FOUND_INDEX) {
-			// Find the value element and count lines
-			for (let i = 0; i < lines.length; i++) {
-				// split('\n') always returns a dense array, so lines[i] is always defined
-				// eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Loop condition ensures i < length, split() returns dense array
-				const line = lines[i]!;
-				if (line.includes('<value>')) {
-					// Count newlines in XPath up to the operator position
-					const xpathBeforeOperator = xpath.substring(
-						MIN_COUNT,
-						xpathIndex,
-					);
-					const newlineMatches = xpathBeforeOperator.match(/\n/g);
-					// match() returns null if no match, or array if match found
-					// Use 0 if no matches found (null case)
-					const newlineCount = newlineMatches?.length ?? MIN_COUNT;
-					return i + LINE_OFFSET + newlineCount;
-				}
-			}
-		}
-
-		return null;
-	} catch {
-		return null;
-	}
 }
 
 /**
@@ -662,19 +130,20 @@ function checkConditionalCoverage(
 			const ruleFilePath = options?.ruleFilePath;
 			const xpathValue = options?.xpath;
 			const hasOptions =
-				ruleFilePath !== undefined && xpathValue !== undefined;
+				ruleFilePath !== UNDEFINED_VALUE &&
+				xpathValue !== UNDEFINED_VALUE;
 			if (hasOptions) {
 				const lineNumber = findConditionalLineNumber(
 					ruleFilePath,
 					xpathValue,
 					conditional,
 				);
-				if (lineNumber !== null && lineNumberCollector) {
+				if (lineNumber !== NULL_LINE_NUMBER && lineNumberCollector) {
 					// Record this line as covered for LCOV reporting
 					lineNumberCollector(lineNumber);
 				}
 				missingConditionals.push(
-					lineNumber !== null
+					lineNumber !== NULL_LINE_REFERENCE
 						? ` - Line ${String(lineNumber)}: ${conditional.type}: ${displayExpr}`
 						: ` - ${conditional.type}: ${displayExpr}`,
 				);
@@ -688,11 +157,14 @@ function checkConditionalCoverage(
 
 	// For conditionals, we'll format them line by line in the CLI
 	// Store them as arrays for better formatting
+	const MIN_EVIDENCE_COUNT = 0;
 	const missingList =
-		missingConditionals.length > MIN_COUNT ? missingConditionals : [];
+		missingConditionals.length > MIN_EVIDENCE_COUNT
+			? missingConditionals
+			: [];
 
 	const missingText =
-		missingList.length > MIN_COUNT
+		missingList.length > MIN_EVIDENCE_COUNT
 			? `Missing:\n${missingList.join('\n')}`
 			: '';
 
@@ -826,11 +298,14 @@ function checkAttributeCoverage(
 								xpathValue,
 								item,
 							);
-							if (lineNumber !== null && lineNumberCollector) {
+							if (
+								lineNumber !== NULL_LINE_REF &&
+								lineNumberCollector
+							) {
 								// Record this line as covered for LCOV reporting
 								lineNumberCollector(lineNumber);
 							}
-							return lineNumber !== null
+							return lineNumber !== NULL_LINE_REF
 								? ` - Line ${String(lineNumber)}: ${item}`
 								: ` - ${item}`;
 						}
@@ -907,11 +382,14 @@ function checkOperatorCoverage(
 								xpathValue,
 								item,
 							);
-							if (lineNumber !== null && lineNumberCollector) {
+							if (
+								lineNumber !== NULL_LINE_REF &&
+								lineNumberCollector
+							) {
 								// Record this line as covered for LCOV reporting
 								lineNumberCollector(lineNumber);
 							}
-							return lineNumber !== null
+							return lineNumber !== NULL_LINE_REF
 								? ` - Line ${String(lineNumber)}: ${item}`
 								: ` - ${item}`;
 						}

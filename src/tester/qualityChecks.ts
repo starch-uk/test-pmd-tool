@@ -7,9 +7,9 @@ import type {
 	ExampleData,
 	ValidationResult,
 } from '../types/index.js';
-import { checkRuleMetadata } from './quality/checkRuleMetadata.js';
-import { checkExamples } from './quality/checkExamples.js';
-import { checkDuplicates } from './quality/checkDuplicates.js';
+import { checkRuleMetadata } from './checkRuleMetadata.js';
+import { checkExamples } from './checkExamples.js';
+import { checkDuplicates } from './checkDuplicates.js';
 
 const MIN_ISSUES_COUNT = 0;
 

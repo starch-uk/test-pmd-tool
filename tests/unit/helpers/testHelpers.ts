@@ -3,8 +3,6 @@
  * Test helpers for common test patterns and assertions.
  * Reduces duplication and improves test maintainability.
  */
-/* eslint-disable import/group-exports -- Helper functions must be exported individually */
-/* eslint-disable @typescript-eslint/prefer-readonly-parameter-types -- Test helpers accept mutable test data */
 import { expect } from 'vitest';
 import type {
 	Conditional,
@@ -16,24 +14,28 @@ import type {
 
 /**
  * Options for creating mock XPath analysis results.
+ * Allows customization of XPath analysis data for testing purposes.
  */
-export interface MockXPathAnalysisOptions {
-	attributes?: string[];
-	conditionals?: Conditional[];
-	hasLetExpressions?: boolean;
-	hasUnions?: boolean;
-	nodeTypes?: string[];
-	operators?: string[];
-	patterns?: string[];
+interface MockXPathAnalysisOptions {
+	readonly attributes?: readonly string[];
+	readonly conditionals?: readonly Conditional[];
+	readonly hasLetExpressions?: boolean;
+	readonly hasUnions?: boolean;
+	readonly nodeTypes?: readonly string[];
+	readonly operators?: readonly string[];
+	readonly patterns?: readonly string[];
 }
 
 /**
  * Creates a mock XPath analysis result with sensible defaults.
+ * Generates a complete XPathAnalysis object for testing coverage checks.
  * @param options - Options to customize the analysis result.
  * @returns A complete XPathAnalysis object with specified options and defaults.
+ * Exported for use in future tests.
  */
-export function createMockXPathAnalysis(
-	options: MockXPathAnalysisOptions = {},
+function createMockXPathAnalysis(
+	// eslint-disable-next-line @typescript-eslint/prefer-readonly-parameter-types -- False positive, options is already Readonly<>
+	options: Readonly<MockXPathAnalysisOptions> = {},
 ): XPathAnalysis {
 	return {
 		attributes: options.attributes ?? [],
@@ -48,21 +50,24 @@ export function createMockXPathAnalysis(
 
 /**
  * Options for creating XML rule file content.
+ * Customizes various aspects of the generated XML for testing purposes.
+ * Allows specification of rule name, XPath expression, and XML formatting options.
  */
-export interface MockXmlContentOptions {
-	ruleName?: string;
-	xpath?: string;
-	xpathOnSameLine?: boolean;
-	hasCdata?: boolean;
+interface MockXmlContentOptions {
+	readonly ruleName?: string;
+	readonly xpath?: string;
+	readonly xpathOnSameLine?: boolean;
+	readonly hasCdata?: boolean;
 }
 
 /**
  * Creates mock XML rule file content with sensible defaults.
+ * Generates valid PMD rule XML for testing purposes.
  * @param options - Options to customize the XML content.
  * @returns XML string with specified options.
  */
-export function createMockXmlContent(
-	options: MockXmlContentOptions = {},
+function createMockXmlContent(
+	options: Readonly<MockXmlContentOptions> = {},
 ): string {
 	const ruleName = options.ruleName ?? 'TestRule';
 	const xpath = options.xpath ?? '//Method';
@@ -106,22 +111,23 @@ ${xpath}
 /**
  * Options for creating example data for coverage tests.
  */
-export interface ExampleDataOptions {
-	content?: string;
-	exampleIndex?: number;
-	validMarkers?: never[];
-	valids?: never[];
-	violationMarkers?: never[];
-	violations?: never[];
+interface ExampleDataOptions {
+	readonly content?: string;
+	readonly exampleIndex?: number;
+	readonly validMarkers?: readonly never[];
+	readonly valids?: readonly never[];
+	readonly violationMarkers?: readonly never[];
+	readonly violations?: readonly never[];
 }
 
 /**
  * Creates example data for coverage tests with sensible defaults.
  * @param options - Options to customize the example data.
  * @returns ExampleData object with specified options and defaults.
+ * Exported for use in future tests.
  */
-export function createExampleDataForCoverage(
-	options: ExampleDataOptions = {},
+function createExampleDataForCoverage(
+	options: Readonly<ExampleDataOptions> = {},
 ): ExampleData {
 	return {
 		content: options.content ?? 'public class Test {}',
@@ -136,13 +142,13 @@ export function createExampleDataForCoverage(
 /**
  * Options for coverage result expectations.
  */
-export interface CoverageExpectations {
-	success?: boolean;
-	hasLineInfo?: boolean;
-	hasMissingItems?: boolean;
-	missingItems?: string[];
-	messageContains?: string[];
-	coverageCount?: number;
+interface CoverageExpectations {
+	readonly success?: boolean;
+	readonly hasLineInfo?: boolean;
+	readonly hasMissingItems?: boolean;
+	readonly missingItems?: readonly string[];
+	readonly messageContains?: readonly string[];
+	readonly coverageCount?: number;
 }
 
 /**
@@ -150,9 +156,10 @@ export interface CoverageExpectations {
  * @param result - The coverage result to check.
  * @param expectations - The expectations to verify.
  */
-export function expectCoverageResult(
-	result: CoverageResult,
-	expectations: CoverageExpectations,
+function expectCoverageResult(
+	// eslint-disable-next-line @typescript-eslint/prefer-readonly-parameter-types -- False positive, parameters are already Readonly<>
+	result: Readonly<CoverageResult>,
+	expectations: Readonly<CoverageExpectations>,
 ): void {
 	if (expectations.success !== undefined) {
 		expect(result.success).toBe(expectations.success);
@@ -163,6 +170,7 @@ export function expectCoverageResult(
 	}
 
 	if (expectations.hasLineInfo !== undefined) {
+		// eslint-disable-next-line @typescript-eslint/prefer-readonly-parameter-types -- Callback parameter
 		const hasLineInfoValue = result.evidence.some((evidence) =>
 			evidence.description.includes('Line'),
 		);
@@ -170,6 +178,7 @@ export function expectCoverageResult(
 	}
 
 	if (expectations.hasMissingItems !== undefined) {
+		// eslint-disable-next-line @typescript-eslint/prefer-readonly-parameter-types -- Callback parameter
 		const hasMissing = result.evidence.some((evidence) =>
 			evidence.description.includes('Missing:'),
 		);
@@ -178,6 +187,7 @@ export function expectCoverageResult(
 
 	if (expectations.missingItems !== undefined) {
 		const allDescriptions = result.evidence
+			// eslint-disable-next-line @typescript-eslint/prefer-readonly-parameter-types -- Callback parameter
 			.map((evidence) => evidence.description)
 			.join(' ');
 		for (const item of expectations.missingItems) {
@@ -195,11 +205,11 @@ export function expectCoverageResult(
 /**
  * Options for XPath coverage result expectations.
  */
-export interface XPathCoverageExpectations {
-	overallSuccess?: boolean;
-	coverageCount?: number;
-	uncoveredBranchesCount?: number;
-	hasLineInfo?: boolean;
+interface XPathCoverageExpectations {
+	readonly overallSuccess?: boolean;
+	readonly coverageCount?: number;
+	readonly uncoveredBranchesCount?: number;
+	readonly hasLineInfo?: boolean;
 }
 
 /**
@@ -210,10 +220,12 @@ export interface XPathCoverageExpectations {
  * @param expectations.coverageCount - Expected coverage count.
  * @param expectations.uncoveredBranchesCount - Expected uncovered branches count.
  * @param expectations.hasLineInfo - Whether line info should be present.
+ * Exported for use in future tests.
  */
-export function expectXPathCoverageResult(
-	result: XPathCoverageResult,
-	expectations: XPathCoverageExpectations,
+function expectXPathCoverageResult(
+	// eslint-disable-next-line @typescript-eslint/prefer-readonly-parameter-types -- False positive, parameters are already Readonly<>
+	result: Readonly<XPathCoverageResult>,
+	expectations: Readonly<XPathCoverageExpectations>,
 ): void {
 	if (expectations.overallSuccess !== undefined) {
 		expect(result.overallSuccess).toBe(expectations.overallSuccess);
@@ -230,7 +242,9 @@ export function expectXPathCoverageResult(
 	}
 
 	if (expectations.hasLineInfo !== undefined) {
+		// eslint-disable-next-line @typescript-eslint/prefer-readonly-parameter-types -- Callback parameter
 		const hasLineInfoValue = result.coverage.some((coverageResult) =>
+			// eslint-disable-next-line @typescript-eslint/prefer-readonly-parameter-types -- Callback parameter
 			coverageResult.evidence.some((evidence) =>
 				evidence.description.includes('Line'),
 			),
@@ -244,7 +258,7 @@ export function expectXPathCoverageResult(
  * @param description - The description string to check.
  * @returns True if the description contains line number information.
  */
-export function hasLineInfo(description: string): boolean {
+function hasLineInfo(description: Readonly<string>): boolean {
 	return description.includes('Line ');
 }
 
@@ -253,7 +267,7 @@ export function hasLineInfo(description: string): boolean {
  * @param description - The description string to check.
  * @returns True if the description contains missing items.
  */
-export function hasMissingItems(description: string): boolean {
+function hasMissingItems(description: Readonly<string>): boolean {
 	return description.includes('Missing:');
 }
 
@@ -262,7 +276,7 @@ export function hasMissingItems(description: string): boolean {
  * @param description - The description string to parse.
  * @returns Array of missing item identifiers.
  */
-export function extractMissingItems(description: string): string[] {
+function extractMissingItems(description: Readonly<string>): string[] {
 	if (!hasMissingItems(description)) {
 		return [];
 	}
@@ -281,3 +295,23 @@ export function extractMissingItems(description: string): string[] {
 		.map((item) => item.trim())
 		.filter((item) => item.length > 0);
 }
+
+export {
+	createExampleDataForCoverage,
+	createMockXmlContent,
+	createMockXPathAnalysis,
+	expectCoverageResult,
+	expectXPathCoverageResult,
+	extractMissingItems,
+	hasLineInfo,
+	hasMissingItems,
+};
+
+export type {
+	CoverageExpectations,
+	ExampleData,
+	ExampleDataOptions,
+	MockXmlContentOptions,
+	MockXPathAnalysisOptions,
+	XPathCoverageExpectations,
+};

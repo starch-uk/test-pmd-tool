@@ -3,13 +3,14 @@
  * Unit tests for extractMarkers function with AST associations.
  * Tests paths that require ts-summit-ast to return comments with associated nodes.
  */
+/* eslint-disable @typescript-eslint/no-unsafe-assignment -- Mock return values are intentionally any */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
 	TSSummitASTMock,
 	createMockASTNode,
 	createMockExtractedComment,
 	createMockSourceRange,
-} from './__mocks__/ts-summit-ast.mock.js';
+} from './ts-summit-ast.mock.js';
 
 // Mock ts-summit-ast at the top level using hoisted factory
 // Note: mock variable cannot be accessed in vi.mock due to hoisting
@@ -21,15 +22,10 @@ vi.mock('ts-summit-ast', async (importOriginal) => {
 	const mocks = mockInstance.getMocks();
 	return {
 		...actual,
-		// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- Mock return values are intentionally any
 		extractComments: mocks.extractComments,
-		// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- Mock return values are intentionally any
 		getSourceRange: mocks.getSourceRange,
-		// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- Mock return values are intentionally any
 		getSourceText: mocks.getSourceText,
-		// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- Mock return values are intentionally any
 		parseApexCode: mocks.parseApexCode,
-		// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- Mock return values are intentionally any
 		wouldTriggerRule: mocks.wouldTriggerRule,
 	};
 });

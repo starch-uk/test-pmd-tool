@@ -3,6 +3,7 @@
  * Unit tests for findNodeTypeInAST function edge cases.
  * Tests paths that require specific AST node structures.
  */
+/* eslint-disable @typescript-eslint/no-unsafe-return -- Test helpers require unsafe return */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { checkXPathCoverage } from '../../../src/xpath/checkCoverage.js';
 import type { ExampleData } from '../../../src/types/index.js';
@@ -40,7 +41,7 @@ vi.mock('ts-summit-ast', async (importOriginal) => {
 			isUsable: true,
 			errors: [],
 		})),
-	};
+	} as const satisfies Readonly<Conditional>;
 });
 
 import { analyzeXPath } from '../../../src/xpath/analyzeXPath.js';
