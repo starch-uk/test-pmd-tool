@@ -111,8 +111,10 @@ public class Example {
 
 		expect(results.detailedTestResults.length).toBeGreaterThan(0);
 		expect(
-			// eslint-disable-next-line @typescript-eslint/prefer-readonly-parameter-types -- Test callback parameter
-			results.detailedTestResults.some((r) => r.testType === 'violation'),
+			results.detailedTestResults.some(
+				// eslint-disable-next-line @typescript-eslint/prefer-readonly-parameter-types -- Test callback parameter
+				(r) => r.testType === 'violation',
+			),
 		).toBe(true);
 	});
 
