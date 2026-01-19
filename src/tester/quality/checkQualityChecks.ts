@@ -579,18 +579,16 @@ function checkMarkerDescriptions(
 					if (!markerDescriptions.has(desc)) {
 						markerDescriptions.set(desc, []);
 					}
-					// get() after set() always returns the array, never undefined
+					// get() after set() always returns the array
 					const locations = markerDescriptions.get(desc);
-					if (locations === undefined) {
-						// This should never happen since we just set it above
-						continue;
-					}
+					// eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Map get() after set() always returns the array
+					const ensuredLocations = locations!;
 					const lineNum = findMarkerLineNumber({
 						exampleIndex: example.exampleIndex,
 						lines,
 						markerLineInExample: marker.lineNumber,
 					});
-					locations.push({
+					ensuredLocations.push({
 						example: example.exampleIndex,
 						line: lineNum ?? ZERO_COUNT,
 					});
@@ -642,18 +640,16 @@ function checkMarkerDescriptions(
 					if (!markerDescriptions.has(desc)) {
 						markerDescriptions.set(desc, []);
 					}
-					// get() after set() always returns the array, never undefined
+					// get() after set() always returns the array
 					const locations = markerDescriptions.get(desc);
-					if (locations === undefined) {
-						// This should never happen since we just set it above
-						continue;
-					}
+					// eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Map get() after set() always returns the array
+					const ensuredLocations = locations!;
 					const lineNum = findMarkerLineNumber({
 						exampleIndex: example.exampleIndex,
 						lines,
 						markerLineInExample: marker.lineNumber,
 					});
-					locations.push({
+					ensuredLocations.push({
 						example: example.exampleIndex,
 						line: lineNum ?? ZERO_COUNT,
 					});

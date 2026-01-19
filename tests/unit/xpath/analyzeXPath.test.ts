@@ -3,57 +3,38 @@
  * Unit tests for analyzeXPath function.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { analyzeXPath } from '../../src/xpath/analyzeXPath.js';
+import { analyzeXPath } from '../../../src/xpath/analyzeXPath.js';
 
 // Mock the extractor functions
-vi.mock('../../src/xpath/extractors/extractNodeTypes.js', () => ({
+vi.mock('../../../src/xpath/extractors/extractNodeTypes.js', () => ({
 	extractNodeTypes: vi.fn(),
 }));
 
-vi.mock('../../src/xpath/extractors/extractOperators.js', () => ({
+vi.mock('../../../src/xpath/extractors/extractOperators.js', () => ({
 	extractOperators: vi.fn(),
 }));
 
-vi.mock('../../src/xpath/extractors/extractAttributes.js', () => ({
+vi.mock('../../../src/xpath/extractors/extractAttributes.js', () => ({
 	extractAttributes: vi.fn(),
 }));
 
-vi.mock('../../src/xpath/extractors/extractConditionals.js', () => ({
+vi.mock('../../../src/xpath/extractors/extractConditionals.js', () => ({
 	extractConditionals: vi.fn(),
 }));
 
-// Import mocked modules after all vi.mock() declarations
-// Per VITEST.md, vi.mock() is hoisted, so imports get the mocked version
-import * as extractNodeTypesModule from '../../src/xpath/extractors/extractNodeTypes.js';
-import * as extractOperatorsModule from '../../src/xpath/extractors/extractOperators.js';
-import * as extractAttributesModule from '../../src/xpath/extractors/extractAttributes.js';
-import * as extractConditionalsModule from '../../src/xpath/extractors/extractConditionals.js';
+import { extractNodeTypes } from '../../../src/xpath/extractors/extractNodeTypes.js';
+import { extractOperators } from '../../../src/xpath/extractors/extractOperators.js';
+import { extractAttributes } from '../../../src/xpath/extractors/extractAttributes.js';
+import { extractConditionals } from '../../../src/xpath/extractors/extractConditionals.js';
 
-// Use vi.spyOn per VITEST.md "Spy on Export" pattern to get typed mock access
-
-const mockedExtractNodeTypes = vi.spyOn(
-	extractNodeTypesModule,
-	'extractNodeTypes',
-);
-
-const mockedExtractOperators = vi.spyOn(
-	extractOperatorsModule,
-	'extractOperators',
-);
-
-const mockedExtractAttributes = vi.spyOn(
-	extractAttributesModule,
-	'extractAttributes',
-);
-
-const mockedExtractConditionals = vi.spyOn(
-	extractConditionalsModule,
-	'extractConditionals',
-);
+const mockedExtractNodeTypes = vi.mocked(extractNodeTypes);
+const mockedExtractOperators = vi.mocked(extractOperators);
+const mockedExtractAttributes = vi.mocked(extractAttributes);
+const mockedExtractConditionals = vi.mocked(extractConditionals);
 
 describe('analyzeXPath', () => {
 	beforeEach(() => {
-		// Mocks are cleared automatically by clearMocks: true in vitest.config.ts
+		vi.clearAllMocks();
 	});
 
 	afterEach(() => {

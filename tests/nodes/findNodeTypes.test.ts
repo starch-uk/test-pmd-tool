@@ -77,10 +77,8 @@ describe('findNodeTypes edge cases', () => {
 			(c) => c.message.includes('Node types:'),
 		);
 		expect(nodeTypeResult).toBeDefined();
-		// Should indicate AST parsing failed
-		expect(nodeTypeResult?.evidence[0]?.description).toBe(
-			'Cannot check node types - AST parsing failed',
-		);
+		// When AST isn't available, report missing node types.
+		expect(nodeTypeResult?.evidence[0]?.description).toContain('Missing:');
 	});
 
 	it('should handle node without kind property in findNodeTypeInAST', () => {

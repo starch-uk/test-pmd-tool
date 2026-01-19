@@ -13,7 +13,7 @@ import type {
 import { analyzeXPath } from './analyzeXPath.js';
 import { conditionalCheckers } from './checkConditionalStrategies.js';
 import { hasNestedClasses } from './checkNodeTypes.js';
-import { checkNodeTypeCoverage } from './findNodeTypes.js';
+import { checkNodeTypeCoverageAcrossExamples } from './findNodeTypes.js';
 import type { NodeTypeCoverageOptions } from './findNodeTypes.js';
 import {
 	findAttributeLineNumber,
@@ -442,11 +442,13 @@ export function checkXPathCoverage(
 	// already-covered node types and attributes).
 	let nodeTypeSuccess = false;
 	let attributeSuccess = false;
-	const allContent = examples
+	// Original content for AST parsing (case-sensitive)
+	const allContentOriginal = examples
 		// eslint-disable-next-line @typescript-eslint/prefer-readonly-parameter-types -- Callback parameter for map
 		.map((ex) => ex.content)
-		.join('\n')
-		.toLowerCase();
+		.join('\n');
+	// Lowercased content for string matching (conditionals, attributes, operators)
+	const allContent = allContentOriginal.toLowerCase();
 
 	const coverageResults: CoverageResult[] = [];
 	const uncoveredBranches: string[] = [];
@@ -471,9 +473,13 @@ export function checkXPathCoverage(
 						xpath: xpathValue,
 					}
 				: undefined;
-		const nodeTypeEvidence = checkNodeTypeCoverage(
+		const exampleContents = examples.map(
+			// eslint-disable-next-line @typescript-eslint/prefer-readonly-parameter-types -- Callback parameter for map
+			(ex) => ex.content,
+		);
+		const nodeTypeEvidence = checkNodeTypeCoverageAcrossExamples(
 			analysis.nodeTypes,
-			allContent,
+			exampleContents,
 			nodeTypeOptions,
 		);
 		nodeTypeSuccess = nodeTypeEvidence.count >= nodeTypeEvidence.required;

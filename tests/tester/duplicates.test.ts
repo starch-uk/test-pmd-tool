@@ -12,6 +12,7 @@ vi.mock('fs', () => ({
 	existsSync: vi.fn(() => true),
 	readFileSync: vi.fn(),
 	writeFileSync: vi.fn(),
+	appendFileSync: vi.fn(),
 }));
 
 vi.mock('tmp', () => ({

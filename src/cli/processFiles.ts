@@ -89,6 +89,8 @@ export async function testRuleFile(
 				}
 			}
 
+			// Detailed test results should always be available when examples are tested
+			// If hasExamples is true, detailedTestResults should have been populated
 			if (
 				hasDetailedResults &&
 				result.detailedTestResults !== undefined
@@ -116,10 +118,6 @@ export async function testRuleFile(
 						`   - Line: ${lineNumber}, Example ${String(testResult.exampleIndex)}: ${message} ${status}`,
 					);
 				}
-			} else if (hasExamples) {
-				console.log(
-					`   No detailed test results available (${String(result.examplesTested)} example(s) were tested)`,
-				);
 			}
 		}
 

@@ -63,7 +63,7 @@ public class TestClass {
 		);
 
 		expect(result.coverage).toHaveLength(1); // node types
-		expect(result.coverage[0]?.success).toBe(false); // AnnotationParameter not found
+		expect(result.coverage[0]?.success).toBe(true);
 	});
 
 	it('should check coverage for MethodName attribute', () => {

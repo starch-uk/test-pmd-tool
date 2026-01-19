@@ -293,18 +293,21 @@ async function main(): Promise<void> {
 	// Get CPU count for concurrency
 	const cpuCount = cpus().length;
 	const maxFileConcurrency = Math.min(xmlFiles.length, cpuCount);
+	const MAX_SINGLE_FILE_COUNT = 1;
 
 	/**
 	 * Use CPU count for example concurrency - PMD processes can handle parallel execution.
 	 */
 	const maxExampleConcurrency = cpuCount;
 
-	console.log(
-		`\n🚀 Processing ${String(xmlFiles.length)} rule file(s) with ${String(maxFileConcurrency)} parallel workers`,
-	);
-	console.log(
-		`   Each file will test examples with up to ${String(maxExampleConcurrency)} parallel workers\n`,
-	);
+	if (xmlFiles.length > MAX_SINGLE_FILE_COUNT) {
+		console.log(
+			`\n🚀 Processing ${String(xmlFiles.length)} rule file(s) with ${String(maxFileConcurrency)} parallel workers`,
+		);
+		console.log(
+			`   Each file will test examples with up to ${String(maxExampleConcurrency)} parallel workers\n`,
+		);
+	}
 
 	// Create coverage trackers if coverage is enabled
 	const coverageTrackers = parsedArgs.coverage
@@ -344,12 +347,14 @@ async function main(): Promise<void> {
 		(r: Readonly<TaskResult>) => !r.success,
 	).length;
 
-	console.log('\n' + '='.repeat(REPEAT_CHAR_COUNT));
-	console.log('🎯 OVERALL RESULTS');
-	console.log('='.repeat(REPEAT_CHAR_COUNT));
-	console.log(`Total files processed: ${String(xmlFiles.length)}`);
-	console.log(`Successful: ${String(successfulFiles)}`);
-	console.log(`Failed: ${String(failedFiles)}`);
+	if (xmlFiles.length > MAX_SINGLE_FILE_COUNT) {
+		console.log('\n' + '='.repeat(REPEAT_CHAR_COUNT));
+		console.log('🎯 OVERALL RESULTS');
+		console.log('='.repeat(REPEAT_CHAR_COUNT));
+		console.log(`Total files processed: ${String(xmlFiles.length)}`);
+		console.log(`Successful: ${String(successfulFiles)}`);
+		console.log(`Failed: ${String(failedFiles)}`);
+	}
 
 	if (failedFiles > MIN_FAILED_FILES_COUNT) {
 		console.log('\n❌ Failed files:');

@@ -208,8 +208,46 @@ export function extractMarkersWithAST(
 		}
 	}
 
-	// Trust ts-summit-ast to handle all marker extraction
-	// No fallback needed - if AST parsing fails, ts-summit-ast will handle it
+	// Fallback: If AST parsing failed, extract markers directly from content
+	if (!hasValidAST && hasInlineMarkersInExample) {
+		const contentLines = exampleContent.split('\n');
+		const LINE_NUMBER_OFFSET = 1;
+		for (let lineIndex = 0; lineIndex < contentLines.length; lineIndex++) {
+			const line = contentLines[lineIndex];
+			if (line === undefined || line.length === MIN_DESCRIPTION_LENGTH)
+				continue;
+
+			const isViolationMarker = line.includes('// ❌');
+			const isValidMarker = line.includes('// ✅');
+
+			if (isViolationMarker || isValidMarker) {
+				// Extract description from marker
+				const markerMatch = /\/\/\s*[❌✅]\s*(.+)$/.exec(line);
+				const rawDescription = markerMatch?.[FIRST_MATCH_GROUP_INDEX];
+				const descriptionText =
+					rawDescription !== undefined ? rawDescription.trim() : '';
+				const description =
+					descriptionText.length > MIN_DESCRIPTION_LENGTH
+						? `Inline ${isViolationMarker ? 'violation' : 'valid'} marker: ${descriptionText}`
+						: `Inline ${isViolationMarker ? 'violation' : 'valid'} marker // ${isViolationMarker ? '❌' : '✅'}`;
+
+				const marker: ViolationMarker = {
+					description,
+					index: isViolationMarker
+						? violationMarkers.length
+						: validMarkers.length,
+					isViolation: isViolationMarker,
+					lineNumber: lineIndex + LINE_NUMBER_OFFSET,
+				};
+
+				if (isViolationMarker) {
+					violationMarkers.push(marker);
+				} else {
+					validMarkers.push(marker);
+				}
+			}
+		}
+	}
 
 	return { validMarkers, violationMarkers };
 }

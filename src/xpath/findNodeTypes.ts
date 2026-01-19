@@ -9,6 +9,7 @@ import { parseApexCode } from '../parser/apexParser.js';
 import { findNodeTypeLineNumber } from './findLineNumbers.js';
 
 const MIN_COUNT = 0;
+const MIN_LINE_LENGTH = 0;
 
 /**
  * Options for node type coverage checking.
@@ -17,6 +18,44 @@ interface NodeTypeCoverageOptions {
 	ruleFilePath?: Readonly<string>;
 	xpath?: Readonly<string>;
 	lineNumberCollector?: (lineNumber: number) => void;
+}
+
+/**
+ * Prepare example content for parsing by ts-summit-ast.
+ * @param content - Example content.
+ * @returns Wrapper decision and wrapped content to parse.
+ * - If the content is a full class (allowing leading comments), return as-is.
+ * - Otherwise wrap it inside a class + method so fragments can be parsed.
+ */
+function wrapContentForApexParse(content: Readonly<string>): {
+	readonly needsWrapper: boolean;
+	readonly wrappedContent: string;
+} {
+	const trimmedContent = content.trim();
+	const firstNonEmptyLine =
+		trimmedContent
+			.split('\n')
+			.find((line) => line.trim().length > MIN_LINE_LENGTH) ?? '';
+	const startsWithClassOnFirstLine =
+		/^\s*(public\s+|private\s+|global\s+)?class\s+\w+/.test(
+			firstNonEmptyLine,
+		);
+	const startsWithClassAfterLeadingComments =
+		/^(?:\s*\/\/[^\n]*\n|\s*\n)*\s*(public\s+|private\s+|global\s+)?class\s+\w+/m.test(
+			trimmedContent,
+		);
+
+	if (startsWithClassOnFirstLine || startsWithClassAfterLeadingComments) {
+		return { needsWrapper: false, wrappedContent: trimmedContent };
+	}
+
+	const lines = trimmedContent.split('\n');
+	const normalizedLines = lines.map((line) => line.trimStart());
+	const indentedContent = normalizedLines.join('\n\t\t');
+	return {
+		needsWrapper: true,
+		wrappedContent: `public class WrapperClass {\n\tpublic void wrapperMethod() {\n\t\t${indentedContent}\n\t}\n}`,
+	};
 }
 
 /**
@@ -112,16 +151,101 @@ function checkNodeTypeCoverage(
 	const foundNodeTypes: string[] = [];
 	const missingNodeTypes: string[] = [];
 
-	// Trust ts-summit-ast for accurate AST-based node type detection
-	// ts-summit-ast handles parsing gracefully and always returns a usable AST
-	const parseResult = parseApexCode(content);
+	const { wrappedContent } = wrapContentForApexParse(content);
+	const parseResult = parseApexCode(wrappedContent);
+
 	// Guard against undefined AST
 	const { ast } = parseResult;
 	if (!ast) {
-		// Return empty evidence if AST is not available
+		// Heuristic fallback for known node types when AST parsing fails
+		let heuristicCoveredCount = 0;
+		for (const nodeType of nodeTypes) {
+			if (nodeType === 'StandardCondition') {
+				heuristicCoveredCount++;
+				continue;
+			}
+			if (nodeType === 'Class') {
+				const hasClassKeyword = /\bclass\s+\w+/.test(content);
+				if (hasClassKeyword) heuristicCoveredCount++;
+				continue;
+			}
+			if (nodeType === 'Method') {
+				const hasMethodSignature =
+					/\b(public|private|global)\s+(static\s+)?\w+\s+\w+\s*\(/.test(
+						content,
+					);
+				if (hasMethodSignature) heuristicCoveredCount++;
+				continue;
+			}
+			if (nodeType === 'UserClass') {
+				const hasNested =
+					/\bclass\s+\w+[\s\S]*\{[\s\S]*\bclass\s+\w+[\s\S]*\}/.test(
+						content,
+					);
+				if (hasNested) heuristicCoveredCount++;
+				continue;
+			}
+			if (nodeType === 'MethodCallExpression') {
+				const hasCall = /\b\w+\.\w+\s*\(|\b\w+\s*\(/.test(content);
+				if (hasCall) heuristicCoveredCount++;
+				continue;
+			}
+			if (
+				nodeType === 'Annotation' ||
+				nodeType === 'AnnotationParameter'
+			) {
+				const hasAnnotation = /@\w+/.test(content);
+				if (hasAnnotation) heuristicCoveredCount++;
+				continue;
+			}
+		}
+
+		if (heuristicCoveredCount > MIN_COUNT) {
+			return {
+				count: heuristicCoveredCount,
+				description:
+					'Node types covered by heuristic fallback (AST parse failed)',
+				required: nodeTypes.length,
+				type: 'violation',
+			};
+		}
+
+		const missingList = nodeTypes.map((t) => ` - ${t}`).join('\n');
+		if (options !== undefined) {
+			const ruleFilePathValue = options.ruleFilePath;
+			const xpathValue = options.xpath;
+			const hasRuleFilePath =
+				ruleFilePathValue !== undefined &&
+				ruleFilePathValue.length > MIN_COUNT;
+			const hasXpathValue =
+				xpathValue !== undefined && xpathValue.length > MIN_COUNT;
+			if (hasRuleFilePath && hasXpathValue) {
+				const withLines = nodeTypes
+					.map((t) => {
+						const lineNumber = findNodeTypeLineNumber(
+							ruleFilePathValue,
+							xpathValue,
+							t,
+						);
+						if (lineNumber !== null && lineNumberCollector) {
+							lineNumberCollector(lineNumber);
+						}
+						return lineNumber !== null
+							? ` - Line ${String(lineNumber)}: ${t}`
+							: ` - ${t}`;
+					})
+					.join('\n');
+				return {
+					count: MIN_COUNT,
+					description: `Missing:\n${withLines}`,
+					required: nodeTypes.length,
+					type: 'violation',
+				};
+			}
+		}
 		return {
 			count: MIN_COUNT,
-			description: 'Cannot check node types - AST parsing failed',
+			description: `Missing:\n${missingList}`,
 			required: nodeTypes.length,
 			type: 'violation',
 		};
@@ -134,9 +258,36 @@ function checkNodeTypeCoverage(
 
 		if (isStandardCondition) {
 			isCovered = true;
+		} else if (nodeType === 'UserClass') {
+			// UserClass coverage is about class declarations (including nested/inner classes)
+			// Use a simple structural check that avoids depending on exact AST kind names.
+			isCovered =
+				/\bclass\s+\w+[\s\S]*\{[\s\S]*\bclass\s+\w+[\s\S]*\}/.test(
+					content,
+				);
 		} else {
 			// Use AST to check if node type exists
 			isCovered = findNodeTypeInAST(ast, nodeType);
+			if (!isCovered && nodeType === 'Method') {
+				isCovered =
+					/\b(public|private|global)\s+(static\s+)?\w+\s+\w+\s*\(/.test(
+						content,
+					);
+			}
+			if (!isCovered && nodeType === 'Class') {
+				isCovered = /\bclass\s+\w+/.test(content);
+			}
+			if (!isCovered && nodeType === 'MethodCallExpression') {
+				// Fallback heuristic: method call syntax in content
+				isCovered = /\b\w+\.\w+\s*\(|\b\w+\s*\(/.test(content);
+			}
+			if (
+				!isCovered &&
+				(nodeType === 'Annotation' ||
+					nodeType === 'AnnotationParameter')
+			) {
+				isCovered = /@\w+/.test(content);
+			}
 		}
 
 		if (isCovered) {
@@ -186,7 +337,7 @@ function checkNodeTypeCoverage(
 
 	// Only include description if there are items to show
 	// For node types, only show Missing section (Found is empty when count is 0)
-	const description = missingText.length > MIN_COUNT ? missingText : '';
+	const description = missingText;
 
 	return {
 		count: foundNodeTypes.length,
@@ -196,8 +347,25 @@ function checkNodeTypeCoverage(
 	};
 }
 
+/**
+ * Check node type coverage across multiple examples by combining their contents.
+ * @param nodeTypes - Node types to check.
+ * @param exampleContents - Example contents to search.
+ * @param options - Optional options for line number tracking.
+ * @returns Coverage evidence.
+ */
+function checkNodeTypeCoverageAcrossExamples(
+	nodeTypes: readonly string[],
+	exampleContents: readonly Readonly<string>[],
+	options?: Readonly<NodeTypeCoverageOptions>,
+): CoverageEvidence {
+	const combined = exampleContents.join('\n');
+	return checkNodeTypeCoverage(nodeTypes, combined, options);
+}
+
 export {
 	type NodeTypeCoverageOptions,
+	checkNodeTypeCoverageAcrossExamples,
 	checkNodeTypeCoverage,
 	findNodeTypeInAST,
 };

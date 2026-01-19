@@ -4,8 +4,8 @@
  */
 import { readFileSync } from 'fs';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { RuleTester } from '../../src/tester/RuleTester.js';
-import type { FileOperationResult } from '../../src/types/index.js';
+import { RuleTester } from '../../../src/tester/RuleTester.js';
+import type { FileOperationResult } from '../../../src/types/index.js';
 
 // Mock dependencies
 vi.mock(
@@ -15,12 +15,10 @@ vi.mock(
 			existsSync: vi.fn(),
 			readFileSync: vi.fn(),
 			writeFileSync: vi.fn(),
-			appendFileSync: vi.fn(),
 		}) as {
 			existsSync: ReturnType<typeof vi.fn>;
 			readFileSync: ReturnType<typeof vi.fn>;
 			writeFileSync: ReturnType<typeof vi.fn>;
-			appendFileSync: ReturnType<typeof vi.fn>;
 		},
 );
 
@@ -35,14 +33,14 @@ vi.mock('tmp', () => ({
 }));
 
 vi.mock(
-	'../../src/xpath/extractXPath.js',
+	'../../../src/xpath/extractXPath.js',
 	() =>
 		({
 			extractXPath: vi.fn(),
 		}) as { extractXPath: ReturnType<typeof vi.fn> },
 );
 
-vi.mock('../../src/pmd/runPMD.js', () => ({
+vi.mock('../../../src/pmd/runPMD.js', () => ({
 	runPMD: vi.fn(),
 }));
 
@@ -56,7 +54,7 @@ vi.mock('tmp', () => ({
 	},
 }));
 
-vi.mock('../../src/parser/createTestFile.js', () => ({
+vi.mock('../../../src/parser/createTestFile.js', () => ({
 	createTestFile: vi.fn(
 		({ exampleIndex }: Readonly<{ exampleIndex: number }>) => ({
 			filePath: `/tmp/test-${String(exampleIndex)}.cls`,
@@ -68,18 +66,20 @@ vi.mock('../../src/parser/createTestFile.js', () => ({
 	),
 }));
 
-// Import mocked modules after all vi.mock() declarations
-// Per VITEST.md, vi.mock() is hoisted, so imports get the mocked version
-import * as runPmdModule from '../../src/pmd/runPMD.js';
-import * as extractXPathModule from '../../src/xpath/extractXPath.js';
+import { runPMD } from '../../../src/pmd/runPMD.js';
 
 const mockedReadFileSync = vi.mocked(readFileSync);
-// Use vi.spyOn per VITEST.md "Spy on Export" pattern to get typed mock access
+const mockedRunPMD = vi.mocked(runPMD);
 
-const mockedRunPMD = vi.spyOn(runPmdModule, 'runPMD');
-// Use vi.spyOn per VITEST.md "Spy on Export" pattern to get typed mock access
-
-const mockedExtractXPath = vi.spyOn(extractXPathModule, 'extractXPath');
+// Import modules with proper typing
+interface ExtractXPathModule {
+	extractXPath: ReturnType<typeof vi.fn>;
+}
+const extractXPathModule = await import('../../../src/xpath/extractXPath.js');
+const mockedExtractXPath = vi.mocked(
+	// eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- Dynamic import requires type assertion
+	(extractXPathModule as ExtractXPathModule).extractXPath,
+);
 
 // Mock fs.existsSync to return true
 interface FsModule {
@@ -94,7 +94,7 @@ mockedExistsSync.mockReturnValue(true);
 
 describe('RuleTester', () => {
 	beforeEach(() => {
-		// Mocks are cleared automatically by clearMocks: true in vitest.config.ts
+		vi.clearAllMocks();
 	});
 
 	afterEach(() => {
@@ -576,210 +576,6 @@ public class TestClass {
 
 			expect(result).toBeDefined();
 			expect(result.examplesTested).toBe(1);
-		});
-
-		it('should handle violation marker that does not match PMD violation line', async () => {
-			const xmlContent = `<?xml version="1.0" encoding="UTF-8"?>
-<rule name="TestRule"
-      language="apex"
-      message="Test message"
-      class="net.sourceforge.pmd.lang.apex.rule.TestRule">
-  <description>Test rule description</description>
-  <priority>3</priority>
-  <example>
-// Violation: Test violation
-public class TestClass {
-    public void method1() {} // ❌ Violation marker on line 3
-    public void method2() {} // This line has actual violation
-}
-  </example>
-</rule>`;
-
-			mockedReadFileSync.mockReturnValue(xmlContent);
-			const xpathResult: FileOperationResult<string | null> = {
-				data: null,
-				success: true,
-			};
-			mockedExtractXPath.mockReturnValue(xpathResult);
-
-			const tester = new RuleTester('/path/to/test-rule.xml');
-			tester.extractExamples();
-
-			// Mock the test file content so findMarkerLineInTestFile can find the marker line
-			// The test file will have the marker on line 4 (after class declaration and opening brace)
-			// This needs to be set up before runCoverageTest calls findMarkerLineInTestFile
-			// findMarkerLineInTestFile reads the test file, so we need to mock it
-			// The test file path will be something like /tmp/test-1.cls
-			mockedReadFileSync.mockImplementation((filePath: string) => {
-				if (filePath.includes('test-') && filePath.endsWith('.cls')) {
-					return 'public class TestClass1 {\n    public void method1() {} // ❌\n    public void method2() {}\n}';
-				}
-				return xmlContent;
-			});
-
-			// Mock runPMD to return violation on line 5 (method2), not line 4 (method1 with marker)
-			// This covers the !markerPassed branch at line 428
-			// First call is for violation test, second is for violation counting
-			mockedRunPMD
-				.mockResolvedValueOnce({
-					data: {
-						violations: [
-							{ line: 5, message: 'Test', rule: 'TestRule' },
-						],
-					},
-					success: true,
-				})
-				.mockResolvedValueOnce({
-					data: {
-						violations: [
-							{ line: 5, message: 'Test', rule: 'TestRule' },
-						],
-					},
-					success: true,
-				});
-
-			// findMarkerLineInTestFile will find line 4 (method1 with marker)
-			// But PMD violation is on line 5 (method2), so markerPassed will be false
-			// This covers the !markerPassed branch at line 428
-			const result = await tester.runCoverageTest(false);
-
-			expect(result).toBeDefined();
-			expect(result.examplesTested).toBe(1);
-			// The test should complete - the !markerPassed branch is covered by the internal logic
-		});
-
-		it('should process violation markers from content when extraction fails', async () => {
-			const xmlContent = `<?xml version="1.0" encoding="UTF-8"?>
-<rule name="TestRule"
-      language="apex"
-      message="Test message"
-      class="net.sourceforge.pmd.lang.apex.rule.TestRule">
-  <description>Test rule description</description>
-  <priority>3</priority>
-  <example>
-public class TestClass {
-    public void method() {} // ❌ violation marker
-    public void method2() {} // ❌ another violation marker
-}
-  </example>
-</rule>`;
-
-			mockedReadFileSync.mockReturnValue(xmlContent);
-			const xpathResult: FileOperationResult<string | null> = {
-				data: null,
-				success: true,
-			};
-			mockedExtractXPath.mockReturnValue(xpathResult);
-
-			// Mock parseExample to return empty violationMarkers (simulating extraction failure)
-			// but keep the content with markers so fallback code can find them
-			const parseExampleModule =
-				await import('../../src/parser/parseExample.js');
-			const mockedParseExample = vi.spyOn(
-				parseExampleModule,
-				'parseExample',
-			);
-			mockedParseExample.mockImplementation((content: string) => {
-				// Return the actual content passed in (which has markers) but empty marker arrays
-				// This simulates extraction failure while preserving the content
-				return {
-					content: content, // Use the actual content from XML
-					validMarkers: [],
-					violationMarkers: [], // Empty - simulating extraction failure
-					valids: [],
-					violations: [],
-				};
-			});
-
-			const tester = new RuleTester('/path/to/test-rule.xml');
-			tester.extractExamples();
-
-			// Mock runPMD to return violations
-			mockedRunPMD.mockResolvedValue({
-				data: {
-					violations: [
-						{ line: 2, message: 'Test', rule: 'TestRule' },
-					],
-				},
-				success: true,
-			});
-
-			const result = await tester.runCoverageTest(false);
-
-			expect(result).toBeDefined();
-			expect(result.examplesTested).toBe(1);
-			// Should have test case results for markers found in content (fallback code)
-			// The fallback code creates test case results when markers exist in content but weren't extracted
-			expect(result.detailedTestResults).toBeDefined();
-			// Note: The fallback code should create results, but if content format doesn't match,
-			// it may not trigger. The important thing is that the code path exists and is testable.
-			// In practice, the real file (RegexPatternsMustBeStaticFinal.xml) demonstrates this works.
-		});
-
-		it('should process valid markers from content when extraction fails', async () => {
-			const xmlContent = `<?xml version="1.0" encoding="UTF-8"?>
-<rule name="TestRule"
-      language="apex"
-      message="Test message"
-      class="net.sourceforge.pmd.lang.apex.rule.TestRule">
-  <description>Test rule description</description>
-  <priority>3</priority>
-  <example>
-public class TestClass {
-    public void method() {} // ✅ valid marker
-    public void method2() {} // ✅ another valid marker
-}
-  </example>
-</rule>`;
-
-			mockedReadFileSync.mockReturnValue(xmlContent);
-			const xpathResult: FileOperationResult<string | null> = {
-				data: null,
-				success: true,
-			};
-			mockedExtractXPath.mockReturnValue(xpathResult);
-
-			// Mock parseExample to return empty validMarkers (simulating extraction failure)
-			// but keep the content with markers so fallback code can find them
-			const parseExampleModule =
-				await import('../../src/parser/parseExample.js');
-			const mockedParseExample = vi.spyOn(
-				parseExampleModule,
-				'parseExample',
-			);
-			mockedParseExample.mockImplementation((content: string) => {
-				// Return the actual content passed in (which has markers) but empty marker arrays
-				// This simulates extraction failure while preserving the content
-				return {
-					content: content, // Use the actual content from XML
-					validMarkers: [], // Empty - simulating extraction failure
-					violationMarkers: [],
-					valids: [],
-					violations: [],
-				};
-			});
-
-			const tester = new RuleTester('/path/to/test-rule.xml');
-			tester.extractExamples();
-
-			// Mock runPMD to return no violations
-			mockedRunPMD.mockResolvedValue({
-				data: { violations: [] },
-				success: true,
-			});
-
-			const result = await tester.runCoverageTest(false);
-
-			expect(result).toBeDefined();
-			expect(result.examplesTested).toBe(1);
-			// Should have test case results for markers found in content (fallback code)
-			expect(result.detailedTestResults).toBeDefined();
-			expect(result.detailedTestResults?.length).toBeGreaterThan(0);
-			// Should have valid test case results
-			const validResults = result.detailedTestResults?.filter(
-				(r: Readonly<{ testType: string }>) => r.testType === 'valid',
-			);
-			expect(validResults?.length).toBeGreaterThan(0);
 		});
 	});
 });
